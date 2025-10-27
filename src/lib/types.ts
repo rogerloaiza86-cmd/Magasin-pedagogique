@@ -45,4 +45,11 @@ export type User = {
   username: string;
   password: string; // In a real app, this should be a hash
   profile: UserProfile;
+  classId?: number;
+}
+
+export type Class = {
+    id: number;
+    name: string;
+    teacherId?: string; // username of the teacher
 }

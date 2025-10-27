@@ -30,10 +30,11 @@ type SignUpFormData = {
   password: string;
   confirmPassword: string;
   profile: UserProfile;
+  classId: string;
 };
 
 export default function SignUpPage() {
-  const { dispatch } = useWms();
+  const { state, dispatch } = useWms();
   const router = useRouter();
   const { toast } = useToast();
   const {
@@ -47,20 +48,27 @@ export default function SignUpPage() {
       password: "",
       confirmPassword: "",
       profile: "élève",
+      classId: "",
     },
   });
 
   const password = watch("password");
+  const profile = watch("profile");
+  const classes = Array.from(state.classes.values());
 
   const onSubmit = (data: SignUpFormData) => {
     try {
-      dispatch({ 
-        type: 'REGISTER_USER', 
-        payload: { 
+      const payload: any = { 
             username: data.username, 
             password: data.password, 
             profile: data.profile 
-        } 
+      };
+      if (data.profile === 'élève') {
+        payload.classId = parseInt(data.classId, 10);
+      }
+      dispatch({ 
+        type: 'REGISTER_USER', 
+        payload
       });
       toast({
         title: "Compte créé",
@@ -165,6 +173,35 @@ export default function SignUpPage() {
                   </p>
                 )}
               </div>
+
+              {profile === 'élève' && (
+                <div>
+                    <Label htmlFor="classId">Classe</Label>
+                    <Controller
+                        name="classId"
+                        control={control}
+                        rules={{ required: "La classe est requise pour un élève" }}
+                        render={({ field }) => (
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <SelectTrigger id="classId">
+                                    <SelectValue placeholder="Sélectionner une classe..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {classes.map(c => (
+                                        <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                    />
+                    {errors.classId && (
+                        <p className="text-sm text-destructive mt-1">
+                            {errors.classId.message}
+                        </p>
+                    )}
+                </div>
+              )}
+
               <Button type="submit" className="w-full">
                 S'inscrire
               </Button>

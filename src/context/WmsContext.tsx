@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
-import type { Article, Tier, Document, Movement, User, UserProfile } from '@/lib/types';
+import type { Article, Tier, Document, Movement, User, UserProfile, Class } from '@/lib/types';
 import { initialArticles } from '@/lib/articles-data';
 
 interface WmsState {
@@ -10,9 +10,11 @@ interface WmsState {
   documents: Map<number, Document>;
   movements: Movement[];
   users: Map<string, User>;
+  classes: Map<number, Class>;
   tierIdCounter: number;
   docIdCounter: number;
   movementIdCounter: number;
+  classIdCounter: number;
   currentUser: User | null;
 }
 
@@ -29,6 +31,14 @@ const getInitialState = (): WmsState => {
 
   const initialUsers = new Map<string, User>();
   initialUsers.set('admin', { username: 'admin', password: 'admin', profile: 'Administrateur' });
+  initialUsers.set('prof', { username: 'prof', password: 'prof', profile: 'professeur' });
+
+
+  const initialClasses = new Map<number, Class>();
+  initialClasses.set(1, { id: 1, name: '2nde Logistique A' });
+  initialClasses.set(2, { id: 2, name: '2nde Logistique B' });
+  initialClasses.set(3, { id: 3, name: '1ere Logistique' });
+  initialClasses.set(4, { id: 4, name: 'Terminale Logistique' });
 
 
   return {
@@ -37,9 +47,11 @@ const getInitialState = (): WmsState => {
     documents: new Map(),
     movements: initialMovements,
     users: initialUsers,
+    classes: initialClasses,
     tierIdCounter: 1,
     docIdCounter: 1,
     movementIdCounter: initialMovements.length + 1,
+    classIdCounter: 5,
     currentUser: null,
   };
 };
@@ -51,7 +63,8 @@ type WmsAction =
   | { type: 'ADJUST_INVENTORY'; payload: { articleId: string; newStock: number; oldStock: number } }
   | { type: 'LOGIN'; payload: { username: string, password: string} }
   | { type: 'LOGOUT' }
-  | { type: 'REGISTER_USER', payload: { username: string, password: string, profile: UserProfile } }
+  | { type: 'REGISTER_USER', payload: Omit<User, 'password'> & { password?: string, classId?: number } }
+  | { type: 'ASSIGN_TEACHER_TO_CLASS', payload: { classId: number, teacherId: string } }
   | { type: 'SET_STATE'; payload: WmsState };
 
 
@@ -68,15 +81,39 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
     case 'LOGOUT':
       // Reset the entire state but keep users and articles
       const freshState = getInitialState();
-      return { ...freshState, currentUser: null, users: state.users, articles: state.articles, movements: state.movements };
+      return { ...freshState, currentUser: null, users: state.users, articles: state.articles, movements: state.movements, classes: state.classes };
     case 'REGISTER_USER': {
-        const { username, password, profile } = action.payload;
+        const { username, password, profile, classId } = action.payload;
         if (state.users.has(username)) {
             throw new Error("Cet identifiant existe déjà.");
         }
+        if (!password) {
+            throw new Error("Le mot de passe est requis.");
+        }
         const newUsers = new Map(state.users);
-        newUsers.set(username, { username, password, profile });
+        const newUser: User = { username, password, profile };
+        if (profile === 'élève' && classId) {
+            newUser.classId = classId;
+        }
+        newUsers.set(username, newUser);
         return { ...state, users: newUsers };
+    }
+    case 'ASSIGN_TEACHER_TO_CLASS': {
+        const { classId, teacherId } = action.payload;
+        const newClasses = new Map(state.classes);
+        const classToUpdate = newClasses.get(classId);
+        if (classToUpdate) {
+            // Remove teacher from old class if any
+            state.classes.forEach(c => {
+                if (c.teacherId === teacherId) {
+                    const oldClass = newClasses.get(c.id);
+                    if(oldClass) newClasses.set(c.id, {...oldClass, teacherId: undefined});
+                }
+            })
+            newClasses.set(classId, { ...classToUpdate, teacherId });
+            return { ...state, classes: newClasses };
+        }
+        return state;
     }
     case 'SET_STATE':
         return action.payload;
@@ -184,6 +221,7 @@ interface WmsContextType {
   getArticle: (id: string) => Article | undefined;
   getTier: (id: number) => Tier | undefined;
   getDocument: (id: number) => Document | undefined;
+  getClass: (id: number) => Class | undefined;
 }
 
 const WmsContext = createContext<WmsContextType | undefined>(undefined);
@@ -202,6 +240,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
         parsedState.tiers = new Map(parsedState.tiers.map((t: Tier) => [t.id, t]));
         parsedState.documents = new Map(parsedState.documents.map((d: Document) => [d.id, d]));
         parsedState.users = new Map(parsedState.users);
+        parsedState.classes = parsedState.classes ? new Map(parsedState.classes.map((c: Class) => [c.id, c])) : getInitialState().classes;
         
         // Prevent user from being logged in on refresh
         parsedState.currentUser = null;
@@ -224,6 +263,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
           tiers: Array.from(state.tiers.values()),
           documents: Array.from(state.documents.values()),
           users: Array.from(state.users.entries()),
+          classes: Array.from(state.classes.values()),
       };
       localStorage.setItem('wmsState', JSON.stringify(stateToSave));
     } catch (e) {
@@ -238,6 +278,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
     getArticle: (id: string) => state.articles.get(id),
     getTier: (id: number) => state.tiers.get(id),
     getDocument: (id: number) => state.documents.get(id),
+    getClass: (id: number) => state.classes.get(id),
   }), [state]);
 
   return <WmsContext.Provider value={contextValue}>{children}</WmsContext.Provider>;
