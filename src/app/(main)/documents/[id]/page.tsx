@@ -80,8 +80,8 @@ export default function DocumentViewPage() {
                             <p className="not-prose">
                                 <strong>Magasin Pédagogique</strong><br />
                                 Lycée Gaspard Monge<br />
-                                2 rue du Lieutenant-Colonel-de-Montbrison<br />
-                                77000, Savigny-le-Temple
+                                1 Pl. Monge<br />
+                                91600, Savigny-sur-Orge
                             </p>
                         </div>
                         <div className="text-right">
