@@ -67,13 +67,16 @@ export default function MainLayout({
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
-                  <Link href={item.href} legacyBehavior passHref>
+                  <Link href={item.href} passHref>
                     <SidebarMenuButton
+                      asChild
                       isActive={pathname.startsWith(item.href)}
                       tooltip={item.label}
                     >
-                      <item.icon />
-                      <span>{item.label}</span>
+                      <div>
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </div>
                     </SidebarMenuButton>
                   </Link>
                 </SidebarMenuItem>
@@ -88,7 +91,7 @@ export default function MainLayout({
                 <div className="flex-1 overflow-hidden">
                     <p className="text-sm font-semibold truncate">{state.currentUser}</p>
                 </div>
-                <Link href="/login" onClick={handleLogout} legacyBehavior>
+                <Link href="/login" onClick={handleLogout}>
                     <SidebarMenuButton tooltip="Se déconnecter" className="w-auto">
                         <LogOut />
                     </SidebarMenuButton>
