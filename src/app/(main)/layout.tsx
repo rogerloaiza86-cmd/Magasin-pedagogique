@@ -11,7 +11,7 @@ import {
   BrainCircuit,
   Boxes,
   LogOut,
-  Badge,
+  FileText,
 } from "lucide-react";
 
 import {
@@ -34,6 +34,7 @@ const navItems = [
   { href: "/flux-entrant", label: "Flux Entrant", icon: ArrowDownToLine, profiles: ["élève", "professeur", "Administrateur"] },
   { href: "/flux-sortant", label: "Flux Sortant", icon: ArrowUpFromLine, profiles: ["élève", "professeur", "Administrateur"] },
   { href: "/stock", label: "Gestion des Stocks", icon: Warehouse, profiles: ["élève", "professeur", "Administrateur"] },
+  { href: "/documents", label: "Documents", icon: FileText, profiles: ["élève", "professeur", "Administrateur"] },
   { href: "/ia-tools", label: "Outils d'IA", icon: BrainCircuit, profiles: ["professeur", "Administrateur"] },
 ];
 
