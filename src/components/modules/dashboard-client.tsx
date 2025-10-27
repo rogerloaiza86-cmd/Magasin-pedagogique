@@ -4,20 +4,29 @@ import { useWms } from "@/context/WmsContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Boxes, Users, FileText, Truck } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useEffect, useState } from "react";
 
 export function DashboardClient() {
   const { state } = useWms();
   const { articles, tiers, documents } = state;
   
-  const welcomeMessageShown = typeof window !== 'undefined' && sessionStorage.getItem('welcomeMessageShown');
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
-  if (typeof window !== 'undefined' && !welcomeMessageShown) {
-    sessionStorage.setItem('welcomeMessageShown', 'true');
+  let welcomeMessageShown = false;
+  if (isClient) {
+    welcomeMessageShown = sessionStorage.getItem('welcomeMessageShown') === 'true';
+    if (!welcomeMessageShown) {
+      sessionStorage.setItem('welcomeMessageShown', 'true');
+    }
   }
+
 
   return (
     <div className="space-y-6">
-      {!welcomeMessageShown && (
+      {isClient && !welcomeMessageShown && (
         <Alert className="bg-primary/10 border-primary/20">
           <Boxes className="h-4 w-4" />
           <AlertTitle className="font-bold text-primary">Bienvenue dans le Magasin Pédagogique !</AlertTitle>

@@ -23,6 +23,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,61 +85,66 @@ export function TiersClient() {
             <Button>Ajouter un Tiers</Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Ajouter un nouveau Tiers</DialogTitle>
-              <DialogDescription>
-                Remplissez les informations ci-dessous.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">
-                  Nom
-                </Label>
-                <Controller
-                  name="name"
-                  control={control}
-                  rules={{ required: "Le nom est requis" }}
-                  render={({ field }) => <Input id="name" {...field} className="col-span-3" />}
-                />
-                {errors.name && <p className="col-span-4 text-right text-xs text-destructive">{errors.name.message}</p>}
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="address" className="text-right">
-                  Adresse
-                </Label>
-                <Controller
-                  name="address"
-                  control={control}
-                  rules={{ required: "L'adresse est requise" }}
-                  render={({ field }) => <Input id="address" {...field} className="col-span-3" />}
-                />
-                 {errors.address && <p className="col-span-4 text-right text-xs text-destructive">{errors.address.message}</p>}
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="type" className="text-right">
-                  Type
-                </Label>
-                <Controller
-                  name="type"
-                  control={control}
-                  rules={{ required: "Le type est requis" }}
-                  render={({ field }) => (
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <SelectTrigger className="col-span-3">
-                        <SelectValue placeholder="Sélectionner un type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Client">Client</SelectItem>
-                        <SelectItem value="Fournisseur">Fournisseur</SelectItem>
-                        <SelectItem value="Transporteur">Transporteur</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.type && <p className="col-span-4 text-right text-xs text-destructive">{errors.type.message}</p>}
-              </div>
-              <Button type="submit">Enregistrer</Button>
+             <form onSubmit={handleSubmit(onSubmit)}>
+                <DialogHeader>
+                <DialogTitle>Ajouter un nouveau Tiers</DialogTitle>
+                <DialogDescription>
+                    Remplissez les informations ci-dessous.
+                </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="name" className="text-right">
+                    Nom
+                    </Label>
+                    <Controller
+                    name="name"
+                    control={control}
+                    rules={{ required: "Le nom est requis" }}
+                    render={({ field }) => <Input id="name" {...field} className="col-span-3" />}
+                    />
+                    {errors.name && <p className="col-span-4 text-right text-xs text-destructive">{errors.name.message}</p>}
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="address" className="text-right">
+                    Adresse
+                    </Label>
+                    <Controller
+                    name="address"
+                    control={control}
+                    rules={{ required: "L'adresse est requise" }}
+                    render={({ field }) => <Input id="address" {...field} className="col-span-3" />}
+                    />
+                    {errors.address && <p className="col-span-4 text-right text-xs text-destructive">{errors.address.message}</p>}
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="type" className="text-right">
+                    Type
+                    </Label>
+                    <Controller
+                    name="type"
+                    control={control}
+                    rules={{ required: "Le type est requis" }}
+                    render={({ field }) => (
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <SelectTrigger className="col-span-3">
+                            <SelectValue placeholder="Sélectionner un type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Client">Client</SelectItem>
+                            <SelectItem value="Fournisseur">Fournisseur</SelectItem>
+                            <SelectItem value="Transporteur">Transporteur</SelectItem>
+                        </SelectContent>
+                        </Select>
+                    )}
+                    />
+                    {errors.type && <p className="col-span-4 text-right text-xs text-destructive">{errors.type.message}</p>}
+                </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="ghost">Annuler</Button></DialogClose>
+                    <Button type="submit">Enregistrer</Button>
+                </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>

@@ -199,6 +199,7 @@ function ReceivePurchaseOrder() {
   const handleReceive = (docId: number) => {
     const doc = state.documents.get(docId);
     if (doc) {
+        // In a real scenario, we'd ask for quantities. Here we assume they match.
         dispatch({ type: 'UPDATE_DOCUMENT', payload: {...doc, status: 'Réceptionné'} });
         toast({
             title: "BC Réceptionné",
@@ -249,7 +250,7 @@ function ReceivePurchaseOrder() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Confirmer la réception ?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Cette action mettra à jour les niveaux de stock pour tous les articles de ce bon de commande. Cette action est irréversible.
+                            Cette action mettra à jour les niveaux de stock pour tous les articles de ce bon de commande. Pour ce scénario simplifié, nous supposons que les quantités reçues sont conformes. L'action est irréversible.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

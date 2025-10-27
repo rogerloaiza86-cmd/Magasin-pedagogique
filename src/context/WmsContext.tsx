@@ -54,7 +54,9 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
     case 'LOGIN':
       return { ...state, currentUser: action.payload };
     case 'LOGOUT':
-      return { ...state, currentUser: null };
+      // Reset the entire state but keep the user
+      const freshState = getInitialState();
+      return { ...freshState, currentUser: null };
     case 'SET_STATE':
         return action.payload;
     case 'ADD_TIER': {
@@ -82,7 +84,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         let newMovementIdCounter = state.movementIdCounter;
 
         // On Purchase Order reception
-        if (oldDoc.status !== 'Réceptionné' && docToUpdate.status === 'Réceptionné') {
+        if (oldDoc.type === 'Bon de Commande Fournisseur' && oldDoc.status !== 'Réceptionné' && docToUpdate.status === 'Réceptionné') {
             docToUpdate.lines.forEach(line => {
                 const article = newArticles.get(line.articleId);
                 if (article) {
@@ -102,7 +104,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         }
 
         // On Delivery Note shipment
-        if (oldDoc.status !== 'Expédié' && docToUpdate.status === 'Expédié') {
+        if (oldDoc.type === 'Bon de Livraison Client' && oldDoc.status !== 'Expédié' && docToUpdate.status === 'Expédié') {
             docToUpdate.lines.forEach(line => {
                 const article = newArticles.get(line.articleId);
                 if (article) {
@@ -170,35 +172,41 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
 
   // Load state from localStorage on startup
   useEffect(() => {
-    const savedState = localStorage.getItem('wmsState');
-    if (savedState) {
-        try {
-            const parsedState = JSON.parse(savedState);
-            // Re-hydrate Maps from arrays
-            parsedState.articles = new Map(parsedState.articles);
-            parsedState.tiers = new Map(parsedState.tiers.map((t: Tier) => [t.id, t]));
-            parsedState.documents = new Map(parsedState.documents.map((d: Document) => [d.id, d]));
-            
-            // Set currentUser to null on refresh
-            parsedState.currentUser = null;
+    try {
+      const savedState = localStorage.getItem('wmsState');
+      if (savedState) {
+        const parsedState = JSON.parse(savedState);
+        // Re-hydrate Maps from arrays
+        parsedState.articles = new Map(parsedState.articles);
+        // Ensure tiers are mapped correctly by ID
+        parsedState.tiers = new Map(parsedState.tiers.map((t: Tier) => [t.id, t]));
+        parsedState.documents = new Map(parsedState.documents.map((d: Document) => [d.id, d]));
+        
+        // Prevent user from being logged in on refresh
+        parsedState.currentUser = null;
 
-            dispatch({ type: 'SET_STATE', payload: parsedState });
-        } catch (e) {
-            console.error("Failed to parse saved state", e);
-        }
+        dispatch({ type: 'SET_STATE', payload: parsedState });
+      }
+    } catch (e) {
+      console.error("Could not load state from localStorage. Using initial state.", e);
+      dispatch({ type: 'SET_STATE', payload: getInitialState() });
     }
   }, []);
 
   // Save state to localStorage whenever it changes
   useEffect(() => {
-    const stateToSave = {
-        ...state,
-        // Convert Maps to arrays for JSON serialization
-        articles: Array.from(state.articles.entries()),
-        tiers: Array.from(state.tiers.values()),
-        documents: Array.from(state.documents.values()),
-    };
-    localStorage.setItem('wmsState', JSON.stringify(stateToSave));
+    try {
+      const stateToSave = {
+          ...state,
+          // Convert Maps to arrays for JSON serialization
+          articles: Array.from(state.articles.entries()),
+          tiers: Array.from(state.tiers.values()),
+          documents: Array.from(state.documents.values()),
+      };
+      localStorage.setItem('wmsState', JSON.stringify(stateToSave));
+    } catch (e) {
+      console.error("Could not save state to localStorage.", e);
+    }
   }, [state]);
 
 

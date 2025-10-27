@@ -64,7 +64,7 @@ Optimized Route: {
       "Designation": "{{Designation}}",
       "Emplacement": "{{Emplacement}}",
       "Quantite": {{Quantite}}
-    }}{{#unless @last}},{{/unless}}
+    }{{#unless @last}},{{/unless}}
     {{/each}}
   ]
 }
