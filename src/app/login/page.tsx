@@ -2,6 +2,7 @@
 
 import { useWms } from "@/context/WmsContext";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useForm, Controller } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,30 +15,39 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Boxes } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 type LoginFormData = {
-  firstName: string;
-  lastName: string;
+  username: string;
+  password: string;
 };
 
 export default function LoginPage() {
   const { dispatch } = useWms();
   const router = useRouter();
+  const { toast } = useToast();
   const {
     control,
     handleSubmit,
     formState: { errors },
   } = useForm<LoginFormData>({
     defaultValues: {
-      firstName: "",
-      lastName: "",
+      username: "",
+      password: "",
     },
   });
 
   const onSubmit = (data: LoginFormData) => {
-    const fullName = `${data.firstName} ${data.lastName}`;
-    dispatch({ type: "LOGIN", payload: fullName });
-    router.push("/dashboard");
+    try {
+      dispatch({ type: "LOGIN", payload: data });
+      router.push("/dashboard");
+    } catch (error: any) {
+        toast({
+            variant: "destructive",
+            title: "Erreur de connexion",
+            description: error.message,
+        })
+    }
   };
 
   return (
@@ -54,36 +64,36 @@ export default function LoginPage() {
           <CardHeader>
             <CardTitle>Connexion</CardTitle>
             <CardDescription>
-              Veuillez entrer votre nom et prénom pour continuer.
+              Entrez votre identifiant et mot de passe pour continuer.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
-                <Label htmlFor="firstName">Prénom</Label>
+                <Label htmlFor="username">Identifiant</Label>
                 <Controller
-                  name="firstName"
+                  name="username"
                   control={control}
-                  rules={{ required: "Le prénom est requis" }}
-                  render={({ field }) => <Input id="firstName" {...field} />}
+                  rules={{ required: "L'identifiant est requis" }}
+                  render={({ field }) => <Input id="username" {...field} />}
                 />
-                {errors.firstName && (
+                {errors.username && (
                   <p className="text-sm text-destructive mt-1">
-                    {errors.firstName.message}
+                    {errors.username.message}
                   </p>
                 )}
               </div>
               <div>
-                <Label htmlFor="lastName">Nom</Label>
+                <Label htmlFor="password">Mot de passe</Label>
                 <Controller
-                  name="lastName"
+                  name="password"
                   control={control}
-                  rules={{ required: "Le nom est requis" }}
-                  render={({ field }) => <Input id="lastName" {...field} />}
+                  rules={{ required: "Le mot de passe est requis" }}
+                  render={({ field }) => <Input id="password" type="password" {...field} />}
                 />
-                {errors.lastName && (
+                {errors.password && (
                   <p className="text-sm text-destructive mt-1">
-                    {errors.lastName.message}
+                    {errors.password.message}
                   </p>
                 )}
               </div>
@@ -91,6 +101,12 @@ export default function LoginPage() {
                 Se connecter
               </Button>
             </form>
+            <div className="mt-4 text-center text-sm">
+                Pas encore de compte?{" "}
+                <Link href="/signup" className="underline">
+                    Créer un compte
+                </Link>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -1,19 +1,19 @@
 "use client";
 
 import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
-import type { Article, Tier, Document, Movement, DocumentLine } from '@/lib/types';
+import type { Article, Tier, Document, Movement, User, UserProfile } from '@/lib/types';
 import { initialArticles } from '@/lib/articles-data';
-import { useRouter } from 'next/navigation';
 
 interface WmsState {
   articles: Map<string, Article>;
   tiers: Map<number, Tier>;
   documents: Map<number, Document>;
   movements: Movement[];
+  users: Map<string, User>;
   tierIdCounter: number;
   docIdCounter: number;
   movementIdCounter: number;
-  currentUser: string | null;
+  currentUser: User | null;
 }
 
 const getInitialState = (): WmsState => {
@@ -27,11 +27,16 @@ const getInitialState = (): WmsState => {
     user: 'Système',
   }));
 
+  const initialUsers = new Map<string, User>();
+  initialUsers.set('admin', { username: 'admin', password: 'admin', profile: 'Administrateur' });
+
+
   return {
     articles: new Map(initialArticles.map(a => [a.id, a])),
     tiers: new Map(),
     documents: new Map(),
     movements: initialMovements,
+    users: initialUsers,
     tierIdCounter: 1,
     docIdCounter: 1,
     movementIdCounter: initialMovements.length + 1,
@@ -44,19 +49,35 @@ type WmsAction =
   | { type: 'CREATE_DOCUMENT'; payload: Omit<Document, 'id' | 'createdAt'> }
   | { type: 'UPDATE_DOCUMENT'; payload: Document }
   | { type: 'ADJUST_INVENTORY'; payload: { articleId: string; newStock: number; oldStock: number } }
-  | { type: 'LOGIN'; payload: string }
+  | { type: 'LOGIN'; payload: { username: string, password: string} }
   | { type: 'LOGOUT' }
+  | { type: 'REGISTER_USER', payload: { username: string, password: string, profile: UserProfile } }
   | { type: 'SET_STATE'; payload: WmsState };
 
 
 const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
   switch (action.type) {
-    case 'LOGIN':
-      return { ...state, currentUser: action.payload };
+    case 'LOGIN': {
+      const { username, password } = action.payload;
+      const user = state.users.get(username);
+      if (user && user.password === password) {
+        return { ...state, currentUser: user };
+      }
+      throw new Error("Identifiant ou mot de passe incorrect.");
+    }
     case 'LOGOUT':
-      // Reset the entire state but keep the user
+      // Reset the entire state but keep users and articles
       const freshState = getInitialState();
-      return { ...freshState, currentUser: null };
+      return { ...freshState, currentUser: null, users: state.users, articles: state.articles, movements: state.movements };
+    case 'REGISTER_USER': {
+        const { username, password, profile } = action.payload;
+        if (state.users.has(username)) {
+            throw new Error("Cet identifiant existe déjà.");
+        }
+        const newUsers = new Map(state.users);
+        newUsers.set(username, { username, password, profile });
+        return { ...state, users: newUsers };
+    }
     case 'SET_STATE':
         return action.payload;
     case 'ADD_TIER': {
@@ -97,7 +118,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         type: 'Entrée (Réception BC)',
                         quantity: line.quantity,
                         stockAfter: newStock,
-                        user: state.currentUser || 'Inconnu',
+                        user: state.currentUser?.username || 'Inconnu',
                     });
                 }
             });
@@ -117,7 +138,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         type: 'Sortie (Expédition BL)',
                         quantity: -line.quantity,
                         stockAfter: newStock,
-                        user: state.currentUser || 'Inconnu',
+                        user: state.currentUser?.username || 'Inconnu',
                     });
                 }
             });
@@ -141,7 +162,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
           type: 'Ajustement Inventaire',
           quantity: newStock - oldStock,
           stockAfter: newStock,
-          user: state.currentUser || "Inconnu",
+          user: state.currentUser?.username || "Inconnu",
         };
         return {
           ...state,
@@ -178,9 +199,9 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
         const parsedState = JSON.parse(savedState);
         // Re-hydrate Maps from arrays
         parsedState.articles = new Map(parsedState.articles);
-        // Ensure tiers are mapped correctly by ID
         parsedState.tiers = new Map(parsedState.tiers.map((t: Tier) => [t.id, t]));
         parsedState.documents = new Map(parsedState.documents.map((d: Document) => [d.id, d]));
+        parsedState.users = new Map(parsedState.users);
         
         // Prevent user from being logged in on refresh
         parsedState.currentUser = null;
@@ -202,6 +223,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
           articles: Array.from(state.articles.entries()),
           tiers: Array.from(state.tiers.values()),
           documents: Array.from(state.documents.values()),
+          users: Array.from(state.users.entries()),
       };
       localStorage.setItem('wmsState', JSON.stringify(stateToSave));
     } catch (e) {

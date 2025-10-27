@@ -38,3 +38,11 @@ export type Movement = {
   stockAfter: number;
   user: string;
 };
+
+export type UserProfile = 'élève' | 'professeur' | 'Administrateur';
+
+export type User = {
+  username: string;
+  password: string; // In a real app, this should be a hash
+  profile: UserProfile;
+}

@@ -2,7 +2,7 @@
 
 import { useWms } from "@/context/WmsContext";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
@@ -148,7 +148,9 @@ function ViewMovements() {
 function AdjustInventory() {
     const { state, dispatch, getArticle } = useWms();
     const { toast } = useToast();
-    const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<{articleId: string, physicalStock: number}>();
+    const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<{articleId: string, physicalStock: number}>({
+        defaultValues: { articleId: "", physicalStock: 0 }
+    });
     const selectedArticleId = watch("articleId");
     const article = selectedArticleId ? getArticle(selectedArticleId) : null;
     
@@ -181,17 +183,29 @@ function AdjustInventory() {
       <CardContent className="space-y-4">
         <div className="flex-grow">
             <Label>Article</Label>
-            <Select onValueChange={(value) => setValue('articleId', value)}>
-                <SelectTrigger><SelectValue placeholder="Sélectionner un article..." /></SelectTrigger>
-                <SelectContent>{Array.from(state.articles.values()).map((a) => (<SelectItem key={a.id} value={a.id}>{a.name} ({a.id})</SelectItem>))}</SelectContent>
-            </Select>
+            <Controller
+                name="articleId"
+                control={control}
+                rules={{ required: "Article requis" }}
+                render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger><SelectValue placeholder="Sélectionner un article..." /></SelectTrigger>
+                        <SelectContent>{Array.from(state.articles.values()).map((a) => (<SelectItem key={a.id} value={a.id}>{a.name} ({a.id})</SelectItem>))}</SelectContent>
+                    </Select>
+                )}
+            />
         </div>
         {article && (
             <div className="space-y-4">
                 <p>Stock théorique (actuel): <span className="font-bold text-lg">{article.stock}</span></p>
                 <div>
                     <Label htmlFor="physicalStock">Stock physique réel compté</Label>
-                    <Input id="physicalStock" type="number" {...register("physicalStock", { required: true, min: 0 })} />
+                    <Controller
+                        name="physicalStock"
+                        control={control}
+                        rules={{ required: true, min: 0 }}
+                        render={({ field }) => <Input type="number" {...field} />}
+                    />
                     {errors.physicalStock && <p className="text-sm text-destructive mt-1">Veuillez entrer une valeur valide.</p>}
                 </div>
             </div>

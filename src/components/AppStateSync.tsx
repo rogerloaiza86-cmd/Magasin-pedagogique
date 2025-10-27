@@ -9,13 +9,15 @@ export function AppStateSync() {
   const router = useRouter();
   const pathname = usePathname();
 
+  const unprotectedRoutes = ['/login', '/signup'];
+
   useEffect(() => {
-    // Redirect to login if not authenticated and not on login page
-    if (!state.currentUser && pathname !== '/login') {
+    // Redirect to login if not authenticated and not on an unprotected page
+    if (!state.currentUser && !unprotectedRoutes.includes(pathname)) {
       router.replace('/login');
     }
-    // Redirect to dashboard if authenticated and on login page
-    else if (state.currentUser && pathname === '/login') {
+    // Redirect to dashboard if authenticated and on an unprotected page
+    else if (state.currentUser && unprotectedRoutes.includes(pathname)) {
       router.replace('/dashboard');
     }
   }, [state.currentUser, pathname, router]);

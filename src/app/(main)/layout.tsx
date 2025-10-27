@@ -11,6 +11,7 @@ import {
   BrainCircuit,
   Boxes,
   LogOut,
+  Badge,
 } from "lucide-react";
 
 import {
@@ -28,12 +29,12 @@ import { useWms } from "@/context/WmsContext";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: Home },
-  { href: "/tiers", label: "Gestion des Tiers", icon: Users },
-  { href: "/flux-entrant", label: "Flux Entrant", icon: ArrowDownToLine },
-  { href: "/flux-sortant", label: "Flux Sortant", icon: ArrowUpFromLine },
-  { href: "/stock", label: "Gestion des Stocks", icon: Warehouse },
-  { href: "/ia-tools", label: "Outils d'IA", icon: BrainCircuit },
+  { href: "/dashboard", label: "Dashboard", icon: Home, profiles: ["élève", "professeur", "Administrateur"] },
+  { href: "/tiers", label: "Gestion des Tiers", icon: Users, profiles: ["élève", "professeur", "Administrateur"] },
+  { href: "/flux-entrant", label: "Flux Entrant", icon: ArrowDownToLine, profiles: ["élève", "professeur", "Administrateur"] },
+  { href: "/flux-sortant", label: "Flux Sortant", icon: ArrowUpFromLine, profiles: ["élève", "professeur", "Administrateur"] },
+  { href: "/stock", label: "Gestion des Stocks", icon: Warehouse, profiles: ["élève", "professeur", "Administrateur"] },
+  { href: "/ia-tools", label: "Outils d'IA", icon: BrainCircuit, profiles: ["professeur", "Administrateur"] },
 ];
 
 export default function MainLayout({
@@ -48,7 +49,8 @@ export default function MainLayout({
     dispatch({ type: "LOGOUT" });
   };
   
-  const userInitials = state.currentUser?.split(' ').map(n => n[0]).join('') || '??';
+  const userInitials = state.currentUser?.username.substring(0, 2).toUpperCase() || '??';
+  const visibleNavItems = navItems.filter(item => state.currentUser && item.profiles.includes(state.currentUser.profile));
 
   return (
     <SidebarProvider>
@@ -65,7 +67,7 @@ export default function MainLayout({
           </SidebarHeader>
           <SidebarContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              {visibleNavItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <Link href={item.href} passHref>
                     <SidebarMenuButton
@@ -89,7 +91,8 @@ export default function MainLayout({
                     <AvatarFallback>{userInitials}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 overflow-hidden">
-                    <p className="text-sm font-semibold truncate">{state.currentUser}</p>
+                    <p className="text-sm font-semibold truncate">{state.currentUser?.username}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{state.currentUser?.profile}</p>
                 </div>
                 <Link href="/login" onClick={handleLogout}>
                     <SidebarMenuButton tooltip="Se déconnecter" className="w-auto">
