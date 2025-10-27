@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
-import type { Article, Tier, Document, Movement, User, UserProfile, Class } from '@/lib/types';
+import type { Article, Tier, Document, Movement, User, UserProfile, Class, Email } from '@/lib/types';
 import { initialArticles } from '@/lib/articles-data';
 
 interface WmsState {
@@ -11,10 +11,12 @@ interface WmsState {
   movements: Movement[];
   users: Map<string, User>;
   classes: Map<number, Class>;
+  emails: Map<number, Email>;
   tierIdCounter: number;
   docIdCounter: number;
   movementIdCounter: number;
   classIdCounter: number;
+  emailIdCounter: number;
   currentUser: User | null;
 }
 
@@ -48,10 +50,12 @@ const getInitialState = (): WmsState => {
     movements: initialMovements,
     users: initialUsers,
     classes: initialClasses,
+    emails: new Map(),
     tierIdCounter: 1,
     docIdCounter: 1,
     movementIdCounter: initialMovements.length + 1,
     classIdCounter: 5,
+    emailIdCounter: 1,
     currentUser: null,
   };
 };
@@ -65,6 +69,8 @@ type WmsAction =
   | { type: 'LOGOUT' }
   | { type: 'REGISTER_USER', payload: Omit<User, 'password'> & { password?: string, classId?: number } }
   | { type: 'ASSIGN_TEACHER_TO_CLASS', payload: { classId: number, teacherId: string } }
+  | { type: 'SEND_EMAIL'; payload: Omit<Email, 'id' | 'timestamp' | 'isRead'> }
+  | { type: 'MARK_EMAIL_AS_READ'; payload: { emailId: number } }
   | { type: 'SET_STATE'; payload: WmsState };
 
 
@@ -81,7 +87,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
     case 'LOGOUT':
       // Reset the entire state but keep users and articles
       const freshState = getInitialState();
-      return { ...freshState, currentUser: null, users: state.users, articles: state.articles, movements: state.movements, classes: state.classes };
+      return { ...freshState, currentUser: null, users: state.users, articles: state.articles, movements: state.movements, classes: state.classes, emails: state.emails };
     case 'REGISTER_USER': {
         const { username, password, profile, classId } = action.payload;
         if (state.users.has(username)) {
@@ -114,6 +120,46 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
             return { ...state, classes: newClasses };
         }
         return state;
+    }
+    case 'SEND_EMAIL': {
+      const newEmailData = action.payload;
+      const newEmails = new Map(state.emails);
+      let emailIdCounter = state.emailIdCounter;
+
+      // Main email
+      const mainEmail: Email = {
+        ...newEmailData,
+        id: emailIdCounter++,
+        timestamp: new Date().toISOString(),
+        isRead: false,
+      };
+      newEmails.set(mainEmail.id, mainEmail);
+
+      // CC to teacher if applicable
+      if (newEmailData.cc && newEmailData.cc.length > 0) {
+        newEmailData.cc.forEach(ccRecipient => {
+          const ccEmail: Email = {
+            ...newEmailData,
+            id: emailIdCounter++,
+            recipient: ccRecipient, // The recipient is the teacher
+            subject: `[Copie] ${newEmailData.subject}`,
+            timestamp: new Date().toISOString(),
+            isRead: false,
+          };
+          newEmails.set(ccEmail.id, ccEmail);
+        });
+      }
+      
+      return { ...state, emails: newEmails, emailIdCounter };
+    }
+    case 'MARK_EMAIL_AS_READ': {
+      const newEmails = new Map(state.emails);
+      const email = newEmails.get(action.payload.emailId);
+      if (email) {
+        newEmails.set(action.payload.emailId, { ...email, isRead: true });
+        return { ...state, emails: newEmails };
+      }
+      return state;
     }
     case 'SET_STATE':
         return action.payload;
@@ -241,6 +287,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
         parsedState.documents = new Map(parsedState.documents.map((d: Document) => [d.id, d]));
         parsedState.users = new Map(parsedState.users);
         parsedState.classes = parsedState.classes ? new Map(parsedState.classes.map((c: Class) => [c.id, c])) : getInitialState().classes;
+        parsedState.emails = parsedState.emails ? new Map(parsedState.emails.map((e: Email) => [e.id, e])) : new Map();
         
         // Prevent user from being logged in on refresh
         parsedState.currentUser = null;
@@ -264,6 +311,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
           documents: Array.from(state.documents.values()),
           users: Array.from(state.users.entries()),
           classes: Array.from(state.classes.values()),
+          emails: Array.from(state.emails.values()),
       };
       localStorage.setItem('wmsState', JSON.stringify(stateToSave));
     } catch (e) {

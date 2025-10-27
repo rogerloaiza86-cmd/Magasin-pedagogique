@@ -13,6 +13,7 @@ import {
   LogOut,
   FileText,
   BookUser,
+  Mail,
 } from "lucide-react";
 
 import {
@@ -36,6 +37,7 @@ const navItems = [
   { href: "/flux-sortant", label: "Flux Sortant", icon: ArrowUpFromLine, profiles: ["élève", "professeur", "Administrateur"] },
   { href: "/stock", label: "Gestion des Stocks", icon: Warehouse, profiles: ["élève", "professeur", "Administrateur"] },
   { href: "/documents", label: "Documents", icon: FileText, profiles: ["élève", "professeur", "Administrateur"] },
+  { href: "/messaging", label: "Messagerie", icon: Mail, profiles: ["élève", "professeur", "Administrateur"] },
   { href: "/classes", label: "Gestion des Classes", icon: BookUser, profiles: ["professeur", "Administrateur"] },
   { href: "/ia-tools", label: "Outils d'IA", icon: BrainCircuit, profiles: ["professeur", "Administrateur"] },
 ];
@@ -54,6 +56,9 @@ export default function MainLayout({
   
   const userInitials = state.currentUser?.username.substring(0, 2).toUpperCase() || '??';
   const visibleNavItems = navItems.filter(item => state.currentUser && item.profiles.includes(state.currentUser.profile));
+
+  const unreadMessages = Array.from(state.emails.values()).filter(email => email.recipient === state.currentUser?.username && !email.isRead).length;
+
 
   return (
     <SidebarProvider>
@@ -78,9 +83,16 @@ export default function MainLayout({
                       isActive={pathname.startsWith(item.href)}
                       tooltip={item.label}
                     >
-                      <div>
+                      <div className="relative">
                         <item.icon />
                         <span>{item.label}</span>
+                        {item.href === '/messaging' && unreadMessages > 0 && (
+                           <span className="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2">
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-destructive-foreground">
+                              {unreadMessages}
+                            </span>
+                          </span>
+                        )}
                       </div>
                     </SidebarMenuButton>
                   </Link>

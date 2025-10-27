@@ -53,3 +53,14 @@ export type Class = {
     name: string;
     teacherId?: string; // username of the teacher
 }
+
+export type Email = {
+  id: number;
+  sender: string; // username
+  recipient: string; // username
+  cc?: string[]; // for the teacher copy
+  subject: string;
+  body: string;
+  timestamp: string;
+  isRead: boolean;
+};
