@@ -7,7 +7,7 @@ import { Toaster } from '@/components/ui/toaster';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'LogiSim WMS',
+  title: 'Magasin pédagogique - Lycée Gaspard Monge',
   description: 'Simulateur de WMS pédagogique',
 };
 

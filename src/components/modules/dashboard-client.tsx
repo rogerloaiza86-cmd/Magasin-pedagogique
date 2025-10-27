@@ -20,7 +20,7 @@ export function DashboardClient() {
       {!welcomeMessageShown && (
         <Alert className="bg-primary/10 border-primary/20">
           <Boxes className="h-4 w-4" />
-          <AlertTitle className="font-bold text-primary">Bienvenue dans LogiSim !</AlertTitle>
+          <AlertTitle className="font-bold text-primary">Bienvenue dans le Magasin Pédagogique !</AlertTitle>
           <AlertDescription>
             J'ai chargé avec succès {articles.size} articles dans la base de données. Que souhaitez-vous faire ?
           </AlertDescription>
@@ -90,7 +90,7 @@ export function DashboardClient() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p>
-            LogiSim est un outil pédagogique pour simuler les opérations d'un entrepôt. Voici les étapes typiques d'un flux logistique :
+            Ceci est un outil pédagogique pour simuler les opérations d'un entrepôt. Voici les étapes typiques d'un flux logistique :
           </p>
           <ol className="list-decimal list-inside space-y-2">
             <li>

@@ -413,7 +413,7 @@ function ShipOrder() {
                     <Card>
                         <CardHeader><CardTitle>Lettre de Voiture (CMR) #{finalDoc?.cmr.id}</CardTitle></CardHeader>
                         <CardContent className="space-y-2">
-                             <p><strong>Expéditeur:</strong> Lycée LogiSim</p>
+                             <p><strong>Expéditeur:</strong> Lycée Gaspard Monge</p>
                              <p><strong>Destinataire:</strong> {getTier(finalDoc?.cmr.tierId || 0)?.name} - {getTier(finalDoc?.cmr.tierId || 0)?.address}</p>
                              <p><strong>Transporteur:</strong> {getTier(finalDoc?.cmr.transporterId || 0)?.name}</p>
                              <h4 className="font-bold mt-4">Marchandise:</h4>

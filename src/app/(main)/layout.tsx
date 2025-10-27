@@ -46,7 +46,10 @@ export default function MainLayout({
           <SidebarHeader>
             <div className="flex items-center gap-2 p-2">
               <Boxes className="h-8 w-8 text-primary" />
-              <h1 className="text-xl font-bold">LogiSim</h1>
+              <div>
+                <h1 className="text-lg font-bold">Magasin Pédagogique</h1>
+                <p className="text-xs text-muted-foreground">Lycée Gaspard Monge</p>
+              </div>
             </div>
           </SidebarHeader>
           <SidebarContent>
