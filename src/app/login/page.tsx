@@ -27,7 +27,12 @@ export default function LoginPage() {
     control,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginFormData>();
+  } = useForm<LoginFormData>({
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+    },
+  });
 
   const onSubmit = (data: LoginFormData) => {
     const fullName = `${data.firstName} ${data.lastName}`;
