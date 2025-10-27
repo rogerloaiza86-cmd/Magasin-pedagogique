@@ -36,4 +36,5 @@ export type Movement = {
   type: 'Entrée (Réception BC)' | 'Sortie (Expédition BL)' | 'Ajustement Inventaire' | 'Initial';
   quantity: number;
   stockAfter: number;
+  user: string;
 };

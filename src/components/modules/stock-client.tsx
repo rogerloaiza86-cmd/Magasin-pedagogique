@@ -120,6 +120,7 @@ function ViewMovements() {
                 <TableHead>Type</TableHead>
                 <TableHead>Quantité</TableHead>
                 <TableHead>Stock Après Mvt.</TableHead>
+                <TableHead>Utilisateur</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -131,9 +132,10 @@ function ViewMovements() {
                     {m.quantity > 0 ? `+${m.quantity}`: m.quantity}
                   </TableCell>
                   <TableCell>{m.stockAfter}</TableCell>
+                  <TableCell>{m.user}</TableCell>
                 </TableRow>
               )) : (
-                <TableRow><TableCell colSpan={4} className="h-24 text-center">Aucun mouvement pour cet article.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="h-24 text-center">Aucun mouvement pour cet article.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

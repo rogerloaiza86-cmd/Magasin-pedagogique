@@ -1,8 +1,9 @@
 "use client";
 
-import React, { createContext, useContext, useReducer, ReactNode, useMemo } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
 import type { Article, Tier, Document, Movement, DocumentLine } from '@/lib/types';
 import { initialArticles } from '@/lib/articles-data';
+import { useRouter } from 'next/navigation';
 
 interface WmsState {
   articles: Map<string, Article>;
@@ -12,35 +13,50 @@ interface WmsState {
   tierIdCounter: number;
   docIdCounter: number;
   movementIdCounter: number;
+  currentUser: string | null;
 }
 
-const initialMovements: Movement[] = initialArticles.map((article, index) => ({
+const getInitialState = (): WmsState => {
+  const initialMovements: Movement[] = initialArticles.map((article, index) => ({
     id: index + 1,
     timestamp: new Date().toISOString(),
     articleId: article.id,
     type: 'Initial',
     quantity: article.stock,
     stockAfter: article.stock,
-}));
+    user: 'Système',
+  }));
 
-const initialState: WmsState = {
-  articles: new Map(initialArticles.map(a => [a.id, a])),
-  tiers: new Map(),
-  documents: new Map(),
-  movements: initialMovements,
-  tierIdCounter: 1,
-  docIdCounter: 1,
-  movementIdCounter: initialMovements.length + 1,
+  return {
+    articles: new Map(initialArticles.map(a => [a.id, a])),
+    tiers: new Map(),
+    documents: new Map(),
+    movements: initialMovements,
+    tierIdCounter: 1,
+    docIdCounter: 1,
+    movementIdCounter: initialMovements.length + 1,
+    currentUser: null,
+  };
 };
 
 type WmsAction =
   | { type: 'ADD_TIER'; payload: Omit<Tier, 'id'> }
   | { type: 'CREATE_DOCUMENT'; payload: Omit<Document, 'id' | 'createdAt'> }
   | { type: 'UPDATE_DOCUMENT'; payload: Document }
-  | { type: 'ADJUST_INVENTORY'; payload: { articleId: string; newStock: number; oldStock: number } };
+  | { type: 'ADJUST_INVENTORY'; payload: { articleId: string; newStock: number; oldStock: number } }
+  | { type: 'LOGIN'; payload: string }
+  | { type: 'LOGOUT' }
+  | { type: 'SET_STATE'; payload: WmsState };
+
 
 const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
   switch (action.type) {
+    case 'LOGIN':
+      return { ...state, currentUser: action.payload };
+    case 'LOGOUT':
+      return { ...state, currentUser: null };
+    case 'SET_STATE':
+        return action.payload;
     case 'ADD_TIER': {
       const newTier: Tier = { ...action.payload, id: state.tierIdCounter };
       const newTiers = new Map(state.tiers);
@@ -79,6 +95,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         type: 'Entrée (Réception BC)',
                         quantity: line.quantity,
                         stockAfter: newStock,
+                        user: state.currentUser || 'Inconnu',
                     });
                 }
             });
@@ -98,6 +115,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         type: 'Sortie (Expédition BL)',
                         quantity: -line.quantity,
                         stockAfter: newStock,
+                        user: state.currentUser || 'Inconnu',
                     });
                 }
             });
@@ -121,6 +139,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
           type: 'Ajustement Inventaire',
           quantity: newStock - oldStock,
           stockAfter: newStock,
+          user: state.currentUser || "Inconnu",
         };
         return {
           ...state,
@@ -147,7 +166,41 @@ interface WmsContextType {
 const WmsContext = createContext<WmsContextType | undefined>(undefined);
 
 export const WmsProvider = ({ children }: { children: ReactNode }) => {
-  const [state, dispatch] = useReducer(wmsReducer, initialState);
+  const [state, dispatch] = useReducer(wmsReducer, getInitialState());
+
+  // Load state from localStorage on startup
+  useEffect(() => {
+    const savedState = localStorage.getItem('wmsState');
+    if (savedState) {
+        try {
+            const parsedState = JSON.parse(savedState);
+            // Re-hydrate Maps from arrays
+            parsedState.articles = new Map(parsedState.articles);
+            parsedState.tiers = new Map(parsedState.tiers.map((t: Tier) => [t.id, t]));
+            parsedState.documents = new Map(parsedState.documents.map((d: Document) => [d.id, d]));
+            
+            // Set currentUser to null on refresh
+            parsedState.currentUser = null;
+
+            dispatch({ type: 'SET_STATE', payload: parsedState });
+        } catch (e) {
+            console.error("Failed to parse saved state", e);
+        }
+    }
+  }, []);
+
+  // Save state to localStorage whenever it changes
+  useEffect(() => {
+    const stateToSave = {
+        ...state,
+        // Convert Maps to arrays for JSON serialization
+        articles: Array.from(state.articles.entries()),
+        tiers: Array.from(state.tiers.values()),
+        documents: Array.from(state.documents.values()),
+    };
+    localStorage.setItem('wmsState', JSON.stringify(stateToSave));
+  }, [state]);
+
 
   const contextValue = useMemo(() => ({
     state,

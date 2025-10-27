@@ -10,6 +10,7 @@ import {
   ArrowUpFromLine,
   BrainCircuit,
   Boxes,
+  LogOut,
 } from "lucide-react";
 
 import {
@@ -21,7 +22,10 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarInset,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
+import { useWms } from "@/context/WmsContext";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
@@ -38,6 +42,13 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { state, dispatch } = useWms();
+
+  const handleLogout = () => {
+    dispatch({ type: "LOGOUT" });
+  };
+  
+  const userInitials = state.currentUser?.split(' ').map(n => n[0]).join('') || '??';
 
   return (
     <SidebarProvider>
@@ -69,6 +80,21 @@ export default function MainLayout({
               ))}
             </SidebarMenu>
           </SidebarContent>
+          <SidebarFooter>
+             <div className="flex items-center gap-2 p-2">
+                <Avatar>
+                    <AvatarFallback>{userInitials}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 overflow-hidden">
+                    <p className="text-sm font-semibold truncate">{state.currentUser}</p>
+                </div>
+                <Link href="/login" onClick={handleLogout} legacyBehavior>
+                    <SidebarMenuButton tooltip="Se déconnecter" className="w-auto">
+                        <LogOut />
+                    </SidebarMenuButton>
+                </Link>
+             </div>
+          </SidebarFooter>
         </Sidebar>
         <SidebarInset>
           <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>

@@ -3,6 +3,8 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { WmsProvider } from '@/context/WmsContext';
 import { Toaster } from '@/components/ui/toaster';
+import { AppStateSync } from '@/components/AppStateSync';
+
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -20,6 +22,7 @@ export default function RootLayout({
     <html lang="fr">
       <body className={`${inter.variable} font-body antialiased`}>
         <WmsProvider>
+          <AppStateSync />
           {children}
           <Toaster />
         </WmsProvider>
