@@ -12,6 +12,8 @@ export type Tier = {
   type: 'Client' | 'Fournisseur' | 'Transporteur';
   name: string;
   address: string;
+  createdAt: string;
+  createdBy: string;
 };
 
 export type DocumentLine = {
@@ -26,6 +28,7 @@ export type Document = {
   status: 'En préparation' | 'Validé' | 'Expédié' | 'Réceptionné';
   lines: DocumentLine[];
   createdAt: string;
+  createdBy: string;
   transporterId?: number; // For CMR
 };
 
@@ -46,6 +49,7 @@ export type User = {
   password: string; // In a real app, this should be a hash
   profile: UserProfile;
   classId?: number;
+  createdAt: string;
 }
 
 export type Class = {
@@ -64,3 +68,5 @@ export type Email = {
   timestamp: string;
   isRead: boolean;
 };
+
+    

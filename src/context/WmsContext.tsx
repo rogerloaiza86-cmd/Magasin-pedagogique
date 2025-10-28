@@ -32,8 +32,8 @@ const getInitialState = (): WmsState => {
   }));
 
   const initialUsers = new Map<string, User>();
-  initialUsers.set('admin', { username: 'admin', password: 'admin', profile: 'Administrateur' });
-  initialUsers.set('prof', { username: 'prof', password: 'prof', profile: 'professeur' });
+  initialUsers.set('admin', { username: 'admin', password: 'admin', profile: 'Administrateur', createdAt: new Date().toISOString() });
+  initialUsers.set('prof', { username: 'prof', password: 'prof', profile: 'professeur', createdAt: new Date().toISOString() });
 
 
   const initialClasses = new Map<number, Class>();
@@ -63,13 +63,13 @@ const getInitialState = (): WmsState => {
 };
 
 type WmsAction =
-  | { type: 'ADD_TIER'; payload: Omit<Tier, 'id'> }
-  | { type: 'CREATE_DOCUMENT'; payload: Omit<Document, 'id' | 'createdAt'> }
+  | { type: 'ADD_TIER'; payload: Omit<Tier, 'id' | 'createdAt' | 'createdBy'> }
+  | { type: 'CREATE_DOCUMENT'; payload: Omit<Document, 'id' | 'createdAt' | 'createdBy'> }
   | { type: 'UPDATE_DOCUMENT'; payload: Document }
   | { type: 'ADJUST_INVENTORY'; payload: { articleId: string; newStock: number; oldStock: number } }
   | { type: 'LOGIN'; payload: { username: string, password: string} }
   | { type: 'LOGOUT' }
-  | { type: 'REGISTER_USER', payload: Omit<User, 'password'> & { password?: string, classId?: number } }
+  | { type: 'REGISTER_USER', payload: Omit<User, 'password' | 'createdAt'> & { password?: string, classId?: number } }
   | { type: 'TOGGLE_TEACHER_CLASS_ASSIGNMENT', payload: { classId: number, teacherId: string } }
   | { type: 'SEND_EMAIL'; payload: Omit<Email, 'id' | 'timestamp' | 'isRead'> }
   | { type: 'MARK_EMAIL_AS_READ'; payload: { emailId: number } }
@@ -99,7 +99,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
             throw new Error("Le mot de passe est requis.");
         }
         const newUsers = new Map(state.users);
-        const newUser: User = { username, password, profile };
+        const newUser: User = { username, password, profile, createdAt: new Date().toISOString() };
         if (profile === 'élève' && classId) {
             newUser.classId = classId;
         }
@@ -177,13 +177,23 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
     case 'SET_STATE':
         return action.payload;
     case 'ADD_TIER': {
-      const newTier: Tier = { ...action.payload, id: state.tierIdCounter };
+      const newTier: Tier = { 
+        ...action.payload, 
+        id: state.tierIdCounter,
+        createdAt: new Date().toISOString(),
+        createdBy: state.currentUser?.username || 'Inconnu'
+      };
       const newTiers = new Map(state.tiers);
       newTiers.set(newTier.id, newTier);
       return { ...state, tiers: newTiers, tierIdCounter: state.tierIdCounter + 1 };
     }
     case 'CREATE_DOCUMENT': {
-        const newDoc: Document = { ...action.payload, id: state.docIdCounter, createdAt: new Date().toISOString() };
+        const newDoc: Document = { 
+            ...action.payload, 
+            id: state.docIdCounter, 
+            createdAt: new Date().toISOString(),
+            createdBy: state.currentUser?.username || 'Inconnu'
+        };
         const newDocuments = new Map(state.documents);
         newDocuments.set(newDoc.id, newDoc);
         return { ...state, documents: newDocuments, docIdCounter: state.docIdCounter + 1 };

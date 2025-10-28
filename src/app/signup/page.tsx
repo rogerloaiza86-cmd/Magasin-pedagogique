@@ -61,7 +61,8 @@ export default function SignUpPage() {
       const payload: any = { 
             username: data.username, 
             password: data.password, 
-            profile: data.profile 
+            profile: data.profile,
+            createdAt: new Date().toISOString()
       };
       if (data.profile === 'élève') {
         payload.classId = parseInt(data.classId, 10);
@@ -218,3 +219,5 @@ export default function SignUpPage() {
     </div>
   );
 }
+
+    
