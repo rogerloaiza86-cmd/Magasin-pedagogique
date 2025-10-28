@@ -56,7 +56,7 @@ function CreatePurchaseOrder() {
   const { state, dispatch, getArticle } = useWms();
   const { toast } = useToast();
   const suppliers = Array.from(state.tiers.values()).filter(
-    (t) => t.type === "Fournisseur"
+    (t) => t.type === "Fournisseur" && t.createdBy === state.currentUser?.username
   );
   const articles = Array.from(state.articles.values());
 
@@ -99,7 +99,7 @@ function CreatePurchaseOrder() {
       <CardHeader>
         <CardTitle>Créer un Bon de Commande (BC)</CardTitle>
         <CardDescription>
-          Passez une commande auprès d'un fournisseur.
+          Passez une commande auprès d'un fournisseur que vous avez créé.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -193,7 +193,7 @@ function ReceivePurchaseOrder() {
   const { toast } = useToast();
   const pendingPOs = Array.from(state.documents.values()).filter(
     (d) =>
-      d.type === "Bon de Commande Fournisseur" && d.status === "En préparation"
+      d.type === "Bon de Commande Fournisseur" && d.status === "En préparation" && d.createdBy === state.currentUser?.username
   );
   
   const handleReceive = (docId: number) => {

@@ -39,6 +39,9 @@ import {
 import { useForm, Controller } from "react-hook-form";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { Tier } from "@/lib/types";
+
 
 type TierFormData = {
   name: string;
@@ -46,11 +49,50 @@ type TierFormData = {
   type: "Client" | "Fournisseur" | "Transporteur";
 };
 
+function TiersTable({ tiers, type }: { tiers: Tier[], type: string }) {
+    return (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[100px]">ID</TableHead>
+              <TableHead>Nom</TableHead>
+              <TableHead>Adresse</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {tiers.length > 0 ? (
+              tiers.map((tier) => (
+                <TableRow key={tier.id}>
+                  <TableCell className="font-medium">{tier.id}</TableCell>
+                  <TableCell>{tier.name}</TableCell>
+                  <TableCell>{tier.address}</TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={3} className="h-24 text-center">
+                  Aucun {type} trouvé.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+    )
+}
+
 export function TiersClient() {
   const { state, dispatch } = useWms();
-  const tiers = Array.from(state.tiers.values());
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  const currentUserTiers = Array.from(state.tiers.values()).filter(
+    (tier) => tier.createdBy === state.currentUser?.username
+  );
+
+  const clients = currentUserTiers.filter(t => t.type === 'Client');
+  const fournisseurs = currentUserTiers.filter(t => t.type === 'Fournisseur');
+  const transporteurs = currentUserTiers.filter(t => t.type === 'Transporteur');
+
 
   const {
     control,
@@ -75,9 +117,9 @@ export function TiersClient() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
-          <CardTitle>Liste des Tiers</CardTitle>
+          <CardTitle>Gestion des Tiers</CardTitle>
           <CardDescription>
-            Consultez et ajoutez des clients, fournisseurs et transporteurs.
+            Consultez et ajoutez vos clients, fournisseurs et transporteurs.
           </CardDescription>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -89,7 +131,7 @@ export function TiersClient() {
                 <DialogHeader>
                 <DialogTitle>Ajouter un nouveau Tiers</DialogTitle>
                 <DialogDescription>
-                    Remplissez les informations ci-dessous.
+                    Remplissez les informations ci-dessous. Le nouveau tiers ne sera visible que par vous.
                 </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
@@ -150,34 +192,22 @@ export function TiersClient() {
         </Dialog>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[100px]">ID</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Nom</TableHead>
-              <TableHead>Adresse</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tiers.length > 0 ? (
-              tiers.map((tier) => (
-                <TableRow key={tier.id}>
-                  <TableCell className="font-medium">{tier.id}</TableCell>
-                  <TableCell>{tier.type}</TableCell>
-                  <TableCell>{tier.name}</TableCell>
-                  <TableCell>{tier.address}</TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={4} className="h-24 text-center">
-                  Aucun tiers trouvé. Commencez par en ajouter un.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+        <Tabs defaultValue="clients">
+            <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="clients">Clients</TabsTrigger>
+                <TabsTrigger value="fournisseurs">Fournisseurs</TabsTrigger>
+                <TabsTrigger value="transporteurs">Transporteurs</TabsTrigger>
+            </TabsList>
+            <TabsContent value="clients" className="mt-4">
+                <TiersTable tiers={clients} type="client"/>
+            </TabsContent>
+            <TabsContent value="fournisseurs" className="mt-4">
+                <TiersTable tiers={fournisseurs} type="fournisseur"/>
+            </TabsContent>
+            <TabsContent value="transporteurs" className="mt-4">
+                <TiersTable tiers={transporteurs} type="transporteur"/>
+            </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );

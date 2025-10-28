@@ -55,7 +55,7 @@ type DeliveryNoteFormData = {
 function CreateDeliveryNote() {
   const { state, dispatch, getArticle } = useWms();
   const { toast } = useToast();
-  const clients = Array.from(state.tiers.values()).filter((t) => t.type === "Client");
+  const clients = Array.from(state.tiers.values()).filter((t) => t.type === "Client" && t.createdBy === state.currentUser?.username);
   const articles = Array.from(state.articles.values());
 
   const { control, handleSubmit, reset, watch, setError, clearErrors, formState: { errors } } =
@@ -123,7 +123,7 @@ function CreateDeliveryNote() {
     <Card>
       <CardHeader>
         <CardTitle>Créer un Bon de Livraison (BL)</CardTitle>
-        <CardDescription>Créez une commande pour un client. Le stock sera vérifié.</CardDescription>
+        <CardDescription>Créez une commande pour un client que vous avez créé. Le stock sera vérifié.</CardDescription>
       </CardHeader>
       <CardContent>
         {clients.length === 0 ? (
@@ -193,7 +193,7 @@ function CreateDeliveryNote() {
 function PrepareOrder() {
   const { state, dispatch, getTier, getArticle } = useWms();
   const { toast } = useToast();
-  const pendingDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "En préparation");
+  const pendingDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "En préparation" && d.createdBy === state.currentUser?.username);
   
   const [isLoading, setIsLoading] = useState(false);
   const [pickingList, setPickingList] = useState<Article[] | null>(null);
@@ -324,9 +324,9 @@ function PrepareOrder() {
 function ShipOrder() {
     const { state, dispatch, getTier, getArticle } = useWms();
     const { toast } = useToast();
-    const transporters = Array.from(state.tiers.values()).filter(t => t.type === 'Transporteur');
+    const transporters = Array.from(state.tiers.values()).filter(t => t.type === 'Transporteur' && t.createdBy === state.currentUser?.username);
     // For shipping, we consider orders that are "En préparation" as ready, assuming picking is a sub-step.
-    const shippableDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "En préparation");
+    const shippableDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "En préparation" && d.createdBy === state.currentUser?.username);
 
     const [selectedTransporter, setSelectedTransporter] = useState<string>("");
     const [finalDoc, setFinalDoc] = useState<{bl: WmsDocument, cmr: WmsDocument} | null>(null);
@@ -363,7 +363,7 @@ function ShipOrder() {
         <Card>
             <CardHeader><CardTitle>Expédier une Commande et Générer Documents</CardTitle><CardDescription>Finalisez l'expédition et générez le BL final et la Lettre de Voiture (CMR).</CardDescription></CardHeader>
             <CardContent>
-            {transporters.length === 0 ? (<p className="text-muted-foreground">Veuillez d'abord ajouter un transporteur.</p>) : (
+            {transporters.length === 0 ? (<p className="text-muted-foreground">Veuillez d'abord ajouter un transporteur que vous avez créé.</p>) : (
                 <div className="space-y-4">
                     <div>
                         <Label>Transporteur</Label>

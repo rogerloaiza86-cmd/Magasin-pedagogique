@@ -24,7 +24,9 @@ import { Document } from "@/lib/types";
 
 export function DocumentsClient() {
   const { state, getTier } = useWms();
-  const documents = Array.from(state.documents.values()).sort((a,b) => b.id - a.id);
+  const documents = Array.from(state.documents.values())
+    .filter(doc => doc.createdBy === state.currentUser?.username)
+    .sort((a,b) => b.id - a.id);
 
   const getStatusVariant = (status: Document['status']): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
@@ -40,9 +42,9 @@ export function DocumentsClient() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Tous les documents</CardTitle>
+        <CardTitle>Vos documents</CardTitle>
         <CardDescription>
-          Consultez tous les bons de commande, bons de livraison et lettres de voiture créés.
+          Consultez tous les bons de commande, bons de livraison et lettres de voiture que vous avez créés.
         </CardDescription>
       </CardHeader>
       <CardContent>
