@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useWms } from "@/context/WmsContext";
@@ -54,7 +55,7 @@ export default function SignUpPage() {
 
   const password = watch("password");
   const profile = watch("profile");
-  const classes = Array.from(state.classes.values());
+  const classes = Array.from(state.classes.values()).sort((a,b) => a.name.localeCompare(b.name));
 
   const onSubmit = (data: SignUpFormData) => {
     try {
@@ -65,6 +66,14 @@ export default function SignUpPage() {
             createdAt: new Date().toISOString()
       };
       if (data.profile === 'élève') {
+        if (!data.classId) {
+            toast({
+                variant: "destructive",
+                title: "Classe manquante",
+                description: "Veuillez sélectionner une classe.",
+            });
+            return;
+        }
         payload.classId = parseInt(data.classId, 10);
       }
       dispatch({ 
@@ -176,25 +185,29 @@ export default function SignUpPage() {
               </div>
 
               {profile === 'élève' && (
-                <div>
+                 <div>
                     <Label htmlFor="classId">Classe</Label>
-                    <Controller
-                        name="classId"
-                        control={control}
-                        rules={{ required: "La classe est requise pour un élève" }}
-                        render={({ field }) => (
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <SelectTrigger id="classId">
-                                    <SelectValue placeholder="Sélectionner une classe..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {classes.map(c => (
-                                        <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        )}
-                    />
+                    {classes.length > 0 ? (
+                        <Controller
+                            name="classId"
+                            control={control}
+                            rules={{ required: "La classe est requise pour un élève" }}
+                            render={({ field }) => (
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <SelectTrigger id="classId">
+                                        <SelectValue placeholder="Sélectionner une classe..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {classes.map(c => (
+                                            <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
+                        />
+                    ) : (
+                        <p className="text-sm text-muted-foreground mt-2">Aucune classe n'a été créée. Demandez à un professeur d'en créer une.</p>
+                    )}
                     {errors.classId && (
                         <p className="text-sm text-destructive mt-1">
                             {errors.classId.message}
@@ -219,5 +232,3 @@ export default function SignUpPage() {
     </div>
   );
 }
-
-    

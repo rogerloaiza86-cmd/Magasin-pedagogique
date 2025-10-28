@@ -38,12 +38,6 @@ const getInitialState = (): WmsState => {
 
 
   const initialClasses = new Map<number, Class>();
-  initialClasses.set(1, { id: 1, name: '2GATL1 A', teacherIds: [] });
-  initialClasses.set(2, { id: 2, name: '2GATL1 B', teacherIds: [] });
-  initialClasses.set(3, { id: 3, name: '2GATL2 A', teacherIds: [] });
-  initialClasses.set(4, { id: 4, name: '2GATL2 B', teacherIds: [] });
-  initialClasses.set(5, { id: 5, name: '2GATL3 A', teacherIds: [] });
-  initialClasses.set(6, { id: 6, name: '2GATL3 B', teacherIds: [] });
 
 
   return {
@@ -57,7 +51,7 @@ const getInitialState = (): WmsState => {
     tierIdCounter: 1,
     docIdCounter: 1,
     movementIdCounter: initialMovements.length + 1,
-    classIdCounter: 7,
+    classIdCounter: 1,
     emailIdCounter: 1,
     currentUser: null,
   };
@@ -71,6 +65,7 @@ type WmsAction =
   | { type: 'LOGIN'; payload: { username: string, password: string} }
   | { type: 'LOGOUT' }
   | { type: 'REGISTER_USER', payload: Omit<User, 'password' | 'createdAt'> & { password?: string, classId?: number } }
+  | { type: 'ADD_CLASS', payload: { name: string } }
   | { type: 'TOGGLE_TEACHER_CLASS_ASSIGNMENT', payload: { classId: number, teacherId: string } }
   | { type: 'SEND_EMAIL'; payload: Omit<Email, 'id' | 'timestamp' | 'isRead'> }
   | { type: 'MARK_EMAIL_AS_READ'; payload: { emailId: number } }
@@ -99,6 +94,9 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         if (!password) {
             throw new Error("Le mot de passe est requis.");
         }
+        if (profile === 'élève' && !classId) {
+             throw new Error("Aucune classe n'a été créée par un professeur pour le moment. Inscription impossible.");
+        }
         const newUsers = new Map(state.users);
         const newUser: User = { username, password, profile, createdAt: new Date().toISOString() };
         if (profile === 'élève' && classId) {
@@ -106,6 +104,19 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         }
         newUsers.set(username, newUser);
         return { ...state, users: newUsers };
+    }
+    case 'ADD_CLASS': {
+        if (!state.currentUser || (state.currentUser.profile !== 'professeur' && state.currentUser.profile !== 'Administrateur')) {
+            return state;
+        }
+        const newClass: Class = {
+            id: state.classIdCounter,
+            name: action.payload.name,
+            teacherIds: [state.currentUser.username]
+        };
+        const newClasses = new Map(state.classes);
+        newClasses.set(newClass.id, newClass);
+        return { ...state, classes: newClasses, classIdCounter: state.classIdCounter + 1 };
     }
     case 'TOGGLE_TEACHER_CLASS_ASSIGNMENT': {
         const { classId, teacherId } = action.payload;
@@ -397,5 +408,3 @@ export const useWms = () => {
   }
   return context;
 };
-
-    
