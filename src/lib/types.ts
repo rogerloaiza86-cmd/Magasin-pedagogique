@@ -44,12 +44,38 @@ export type Movement = {
 
 export type UserProfile = 'élève' | 'professeur' | 'Administrateur';
 
+export type Permissions = {
+    isSuperAdmin: boolean;
+    canViewDashboard: boolean;
+    canManageTiers: boolean;
+    canViewTiers: boolean;
+    canCreateBC: boolean;
+    canReceiveBC: boolean;
+    canCreateBL: boolean;
+    canPrepareBL: boolean;
+    canShipBL: boolean;
+    canManageStock: boolean;
+    canViewStock: boolean;
+    canManageClasses: boolean;
+    canUseIaTools: boolean;
+    canUseMessaging: boolean;
+}
+
+export type Role = {
+    id: string;
+    name: string;
+    description: string;
+    isStudentRole: boolean;
+    permissions: Permissions;
+}
+
 export type User = {
   username: string;
   password: string; // In a real app, this should be a hash
   profile: UserProfile;
   classId?: number;
   createdAt: string;
+  roleId: string; // Link to a Role
 }
 
 export type Class = {

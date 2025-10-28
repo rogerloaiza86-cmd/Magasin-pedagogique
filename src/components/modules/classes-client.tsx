@@ -87,9 +87,22 @@ function CreateClassForm() {
 
 export function ClassesClient() {
   const { state, dispatch } = useWms();
-  const { classes, users, currentUser } = state;
+  const { classes, users, currentUser, currentUserPermissions } = state;
   const { toast } = useToast();
   const [openClassId, setOpenClassId] = useState<number | null>(null);
+
+  if (!currentUserPermissions?.canManageClasses) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Gestion des Classes</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p>Vous n'avez pas les permissions nécessaires pour voir cette page.</p>
+            </CardContent>
+        </Card>
+    )
+  }
 
   const handleToggleAssignment = (classId: number) => {
     if (currentUser?.profile === "professeur") {
@@ -137,98 +150,96 @@ export function ClassesClient() {
 
   return (
     <div className="space-y-6">
-      {(currentUser?.profile === "professeur" || currentUser?.profile === "Administrateur") && (
-        <>
-            <CreateClassForm />
-            <Card>
-                <CardHeader>
-                    <CardTitle>Liste des Classes</CardTitle>
-                    <CardDescription>
-                    {currentUser.profile === 'professeur' 
-                        ? "Assignez-vous aux classes que vous supervisez et consultez la liste des élèves." 
-                        : "Vue d'ensemble de toutes les classes, des professeurs assignés et des élèves."}
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {sortedClasses.length > 0 ? sortedClasses.map(c => {
-                    const isTeacherAssigned = currentUser?.profile === 'professeur' && c.teacherIds?.includes(currentUser.username);
-                    const teachers = getTeachersForClass(c.id);
+        <CreateClassForm />
+        <Card>
+            <CardHeader>
+                <CardTitle>Liste des Classes</CardTitle>
+                <CardDescription>
+                {currentUser?.profile === 'professeur' 
+                    ? "Assignez-vous aux classes que vous supervisez et consultez la liste des élèves." 
+                    : "Vue d'ensemble de toutes les classes, des professeurs assignés et des élèves."}
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {sortedClasses.length > 0 ? sortedClasses.map(c => {
+                const isTeacherAssigned = currentUser?.profile === 'professeur' && c.teacherIds?.includes(currentUser.username);
+                const teachers = getTeachersForClass(c.id);
 
-                    return (
-                        <Collapsible key={c.id} open={openClassId === c.id} onOpenChange={() => setOpenClassId(prev => prev === c.id ? null : c.id)}>
-                        <div className="border p-4 rounded-lg">
-                            <div className="flex justify-between items-center">
-                            <div>
-                                <h3 className="font-bold text-lg">{c.name}</h3>
-                                <div className="text-xs text-muted-foreground flex gap-1 flex-wrap mt-1">
-                                {teachers.map(t => <Badge key={t.username} variant="secondary">{t.username}</Badge>)}
-                                {teachers.length === 0 && <Badge variant="outline">Aucun professeur</Badge>}
-                                </div>
+                return (
+                    <Collapsible key={c.id} open={openClassId === c.id} onOpenChange={() => setOpenClassId(prev => prev === c.id ? null : c.id)}>
+                    <div className="border p-4 rounded-lg">
+                        <div className="flex justify-between items-center">
+                        <div>
+                            <h3 className="font-bold text-lg">{c.name}</h3>
+                            <div className="text-xs text-muted-foreground flex gap-1 flex-wrap mt-1">
+                            {teachers.map(t => <Badge key={t.username} variant="secondary">{t.username}</Badge>)}
+                            {teachers.length === 0 && <Badge variant="outline">Aucun professeur</Badge>}
                             </div>
-                            <div className="flex items-center gap-2">
-                                {currentUser?.profile === 'professeur' && (
-                                    <Button 
-                                    variant={isTeacherAssigned ? 'outline' : 'default'}
-                                    size="sm" 
-                                    onClick={(e) => { e.stopPropagation(); handleToggleAssignment(c.id); }}
-                                    >
-                                    {isTeacherAssigned ? 'Quitter la classe' : 'Gérer cette classe'}
-                                    </Button>
-                                )}
-                                {currentUser?.profile === 'Administrateur' && (
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <Button variant="destructive" size="icon" onClick={(e) => e.stopPropagation()}>
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Voulez-vous vraiment supprimer cette classe ?</AlertDialogTitle>
-                                                <AlertDialogDescription>
-                                                    Cette action est irréversible. La classe "{c.name}" sera supprimée. Les élèves de cette classe ne seront plus assignés.
-                                                </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Annuler</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => handleDeleteClass(c.id)}>Supprimer</AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                )}
-                                <CollapsibleTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                    <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
-                                    <span className="sr-only">Toggle</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {currentUser?.profile === 'professeur' && (
+                                <Button 
+                                variant={isTeacherAssigned ? 'outline' : 'default'}
+                                size="sm" 
+                                onClick={(e) => { e.stopPropagation(); handleToggleAssignment(c.id); }}
+                                >
+                                {isTeacherAssigned ? 'Quitter la classe' : 'Gérer cette classe'}
                                 </Button>
-                                </CollapsibleTrigger>
-                            </div>
-                            </div>
-                            <CollapsibleContent className="mt-4">
-                            <StudentListTable students={getStudentsInClass(c.id)} />
-                            </CollapsibleContent>
+                            )}
+                            {currentUserPermissions?.isSuperAdmin && (
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="destructive" size="icon" onClick={(e) => e.stopPropagation()}>
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Voulez-vous vraiment supprimer cette classe ?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                Cette action est irréversible. La classe "{c.name}" sera supprimée. Les élèves de cette classe ne seront plus assignés.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteClass(c.id)}>Supprimer</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            )}
+                            <CollapsibleTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                                <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                                <span className="sr-only">Toggle</span>
+                            </Button>
+                            </CollapsibleTrigger>
                         </div>
-                        </Collapsible>
-                    )
-                    }) : (
-                        <div className="text-center text-muted-foreground py-8">
-                            Aucune classe n'a été créée pour le moment.
                         </div>
-                    )}
-                </CardContent>
-            </Card>
-        </>
-      )}
+                        <CollapsibleContent className="mt-4">
+                        <StudentListTable students={getStudentsInClass(c.id)} />
+                        </CollapsibleContent>
+                    </div>
+                    </Collapsible>
+                )
+                }) : (
+                    <div className="text-center text-muted-foreground py-8">
+                        Aucune classe n'a été créée pour le moment.
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     </div>
   );
 }
 
 function StudentListTable({ students }: { students: User[] }) {
+    const { state } = useWms();
     return (
          <Table>
             <TableHeader>
                 <TableRow>
                     <TableHead>Identifiant de l'élève</TableHead>
+                    <TableHead>Rôle</TableHead>
                     <TableHead>Profil</TableHead>
                 </TableRow>
             </TableHeader>
@@ -237,12 +248,13 @@ function StudentListTable({ students }: { students: User[] }) {
                 students.map((student) => (
                     <TableRow key={student.username}>
                     <TableCell className="font-medium">{student.username}</TableCell>
+                    <TableCell>{state.roles.get(student.roleId)?.name || 'N/A'}</TableCell>
                     <TableCell><Badge variant="outline">{student.profile}</Badge></TableCell>
                     </TableRow>
                 ))
                 ) : (
                 <TableRow>
-                    <TableCell colSpan={2} className="h-24 text-center">
+                    <TableCell colSpan={3} className="h-24 text-center">
                     Aucun élève n'est encore inscrit dans cette classe.
                     </TableCell>
                 </TableRow>

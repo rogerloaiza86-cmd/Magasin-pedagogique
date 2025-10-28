@@ -54,12 +54,10 @@ function ComposeEmail() {
         const userClassId = currentUser.classId;
         if (userClassId) {
             const studentClass = classes.get(userClassId);
-            // Other students in the same class
             const otherStudents = Array.from(users.values()).filter(u => 
                 u.profile === 'élève' && u.classId === userClassId && u.username !== currentUser.username
             );
             userRecipients.push(...otherStudents);
-            // Teachers of the class
             if (studentClass?.teacherIds) {
                studentClass.teacherIds.forEach(teacherId => {
                     const teacher = users.get(teacherId);
@@ -132,7 +130,7 @@ function ComposeEmail() {
                           {userRecipients.length > 0 && (
                             <SelectGroup>
                               <SelectLabel>Utilisateurs</SelectLabel>
-                              {userRecipients.map(r => <SelectItem key={r.username} value={r.username}>{r.username} ({r.profile})</SelectItem>)}
+                              {userRecipients.map(r => <SelectItem key={r.username} value={r.username}>{r.username} ({state.roles.get(r.roleId)?.name || r.profile})</SelectItem>)}
                             </SelectGroup>
                           )}
                            {tierRecipients.length > 0 && (
@@ -164,7 +162,7 @@ function ComposeEmail() {
 
 function Mailbox({ boxType }: { boxType: 'inbox' | 'sent' }) {
     const { state, dispatch } = useWms();
-    const { currentUser, emails, users, tiers } = state;
+    const { currentUser, emails, tiers } = state;
     const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
 
     if (!currentUser) return <p>Veuillez vous connecter.</p>
@@ -237,7 +235,18 @@ function Mailbox({ boxType }: { boxType: 'inbox' | 'sent' }) {
 
 export function MessagingClient() {
   const { state } = useWms();
-  const unreadCount = Array.from(state.emails.values()).filter(e => e.recipient === state.currentUser?.username && !e.isRead).length;
+  const { currentUser, currentUserPermissions, emails } = state;
+  
+  if (!currentUserPermissions?.canUseMessaging) {
+      return (
+        <Card>
+            <CardHeader><CardTitle>Messagerie</CardTitle></CardHeader>
+            <CardContent><p>Vous n'avez pas les permissions nécessaires pour voir cette page.</p></CardContent>
+        </Card>
+      )
+  }
+  
+  const unreadCount = Array.from(emails.values()).filter(e => e.recipient === currentUser?.username && !e.isRead).length;
 
   return (
     <Tabs defaultValue="inbox" className="w-full">

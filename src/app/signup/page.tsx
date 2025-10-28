@@ -63,7 +63,6 @@ export default function SignUpPage() {
             username: data.username, 
             password: data.password, 
             profile: data.profile,
-            createdAt: new Date().toISOString()
       };
       if (data.profile === 'élève') {
         if (!data.classId) {

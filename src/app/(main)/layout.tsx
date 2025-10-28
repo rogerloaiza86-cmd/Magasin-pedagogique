@@ -30,16 +30,34 @@ import {
 import { useWms } from "@/context/WmsContext";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: Home, profiles: ["élève", "professeur", "Administrateur"] },
-  { href: "/tiers", label: "Gestion des Tiers", icon: Users, profiles: ["élève", "professeur", "Administrateur"] },
-  { href: "/flux-entrant", label: "Flux Entrant", icon: ArrowDownToLine, profiles: ["élève", "professeur", "Administrateur"] },
-  { href: "/flux-sortant", label: "Flux Sortant", icon: ArrowUpFromLine, profiles: ["élève", "professeur", "Administrateur"] },
-  { href: "/stock", label: "Gestion des Stocks", icon: Warehouse, profiles: ["élève", "professeur", "Administrateur"] },
-  { href: "/documents", label: "Documents", icon: FileText, profiles: ["élève", "professeur", "Administrateur"] },
-  { href: "/messaging", label: "Messagerie", icon: Mail, profiles: ["élève", "professeur", "Administrateur"] },
-  { href: "/classes", label: "Gestion des Classes", icon: BookUser, profiles: ["professeur", "Administrateur"] },
-  { href: "/ia-tools", label: "Outils d'IA", icon: BrainCircuit, profiles: ["professeur", "Administrateur"] },
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  permission: 
+    | 'canViewDashboard' 
+    | 'canViewTiers' 
+    | 'canCreateBC' 
+    | 'canReceiveBC' 
+    | 'canCreateBL' 
+    | 'canPrepareBL' 
+    | 'canShipBL'
+    | 'canViewStock'
+    | 'canManageClasses'
+    | 'canUseIaTools'
+    | 'canUseMessaging';
+};
+
+const navItems: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: Home, permission: 'canViewDashboard' },
+  { href: "/tiers", label: "Gestion des Tiers", icon: Users, permission: 'canViewTiers' },
+  { href: "/flux-entrant", label: "Flux Entrant", icon: ArrowDownToLine, permission: 'canCreateBC' }, // Simplified for grouping
+  { href: "/flux-sortant", label: "Flux Sortant", icon: ArrowUpFromLine, permission: 'canCreateBL' }, // Simplified for grouping
+  { href: "/stock", label: "Gestion des Stocks", icon: Warehouse, permission: 'canViewStock' },
+  { href: "/documents", label: "Documents", icon: FileText, permission: 'canViewDashboard' }, // Everyone can see their docs
+  { href: "/messaging", label: "Messagerie", icon: Mail, permission: 'canUseMessaging' },
+  { href: "/classes", label: "Gestion des Classes", icon: BookUser, permission: 'canManageClasses' },
+  { href: "/ia-tools", label: "Outils d'IA", icon: BrainCircuit, permission: 'canUseIaTools' },
 ];
 
 export default function MainLayout({
@@ -49,15 +67,29 @@ export default function MainLayout({
 }) {
   const pathname = usePathname();
   const { state, dispatch } = useWms();
+  const { currentUser, currentUserPermissions, emails } = state;
 
   const handleLogout = () => {
     dispatch({ type: "LOGOUT" });
   };
   
-  const userInitials = state.currentUser?.username.substring(0, 2).toUpperCase() || '??';
-  const visibleNavItems = navItems.filter(item => state.currentUser && item.profiles.includes(state.currentUser.profile));
+  const userInitials = currentUser?.username.substring(0, 2).toUpperCase() || '??';
 
-  const unreadMessages = Array.from(state.emails.values()).filter(email => email.recipient === state.currentUser?.username && !email.isRead).length;
+  const visibleNavItems = navItems.filter(item => {
+    if (!currentUserPermissions) return false;
+
+    // Special logic for grouped menus
+    if (item.href === "/flux-entrant") {
+      return currentUserPermissions.canCreateBC || currentUserPermissions.canReceiveBC;
+    }
+    if (item.href === "/flux-sortant") {
+      return currentUserPermissions.canCreateBL || currentUserPermissions.canPrepareBL || currentUserPermissions.canShipBL;
+    }
+
+    return currentUserPermissions[item.permission];
+  });
+
+  const unreadMessages = Array.from(emails.values()).filter(email => email.recipient === currentUser?.username && !email.isRead).length;
 
 
   return (
@@ -86,7 +118,7 @@ export default function MainLayout({
                       <div className="relative">
                         <item.icon />
                         <span>{item.label}</span>
-                        {item.href === '/messaging' && unreadMessages > 0 && (
+                        {item.href === '/messaging' && currentUserPermissions?.canUseMessaging && unreadMessages > 0 && (
                            <span className="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2">
                             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-destructive-foreground">
                               {unreadMessages}
@@ -106,8 +138,8 @@ export default function MainLayout({
                     <AvatarFallback>{userInitials}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 overflow-hidden">
-                    <p className="text-sm font-semibold truncate">{state.currentUser?.username}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{state.currentUser?.profile}</p>
+                    <p className="text-sm font-semibold truncate">{currentUser?.username}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{state.roles.get(currentUser?.roleId || '')?.name || currentUser?.profile}</p>
                 </div>
                 <Link href="/login" onClick={handleLogout}>
                     <SidebarMenuButton tooltip="Se déconnecter" className="w-auto">

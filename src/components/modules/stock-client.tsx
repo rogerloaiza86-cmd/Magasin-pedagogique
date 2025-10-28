@@ -218,12 +218,27 @@ function AdjustInventory() {
 }
 
 export function StockClient() {
+  const { state } = useWms();
+  const perms = state.currentUserPermissions;
+
+  if (!perms?.canViewStock) {
+    return (
+        <Card>
+            <CardHeader><CardTitle>Gestion des Stocks</CardTitle></CardHeader>
+            <CardContent><p>Vous n'avez pas les permissions nécessaires pour voir cette page.</p></CardContent>
+        </Card>
+    )
+  }
+
+  const tabs = [];
+  tabs.push({ value: "view", label: "Consulter le Stock" });
+  tabs.push({ value: "movements", label: "Consulter les Mouvements" });
+  if(perms.canManageStock) tabs.push({ value: "adjust", label: "Ajustement d'Inventaire" });
+
   return (
     <Tabs defaultValue="view" className="w-full">
-      <TabsList className="grid w-full grid-cols-3">
-        <TabsTrigger value="view">Consulter le Stock</TabsTrigger>
-        <TabsTrigger value="movements">Consulter les Mouvements</TabsTrigger>
-        <TabsTrigger value="adjust">Ajustement d'Inventaire</TabsTrigger>
+      <TabsList className={`grid w-full grid-cols-${tabs.length}`}>
+        {tabs.map(tab => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
       </TabsList>
       <TabsContent value="view">
         <ViewStock />
@@ -231,9 +246,7 @@ export function StockClient() {
       <TabsContent value="movements">
         <ViewMovements />
       </TabsContent>
-      <TabsContent value="adjust">
-        <AdjustInventory />
-      </TabsContent>
+      {perms.canManageStock && <TabsContent value="adjust"><AdjustInventory /></TabsContent>}
     </Tabs>
   );
 }

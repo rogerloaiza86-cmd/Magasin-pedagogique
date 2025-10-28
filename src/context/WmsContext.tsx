@@ -2,8 +2,48 @@
 "use client";
 
 import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
-import type { Article, Tier, Document, Movement, User, UserProfile, Class, Email } from '@/lib/types';
+import type { Article, Tier, Document, Movement, User, UserProfile, Class, Email, Role, Permissions } from '@/lib/types';
 import { initialArticles } from '@/lib/articles-data';
+
+// --- ROLES & PERMISSIONS DEFINITION ---
+const ROLES: Map<string, Role> = new Map();
+
+ROLES.set('super_admin', {
+    id: 'super_admin',
+    name: "Superviseur (Enseignant/Admin)",
+    description: "Accès total à l'application.",
+    isStudentRole: false,
+    permissions: {
+        isSuperAdmin: true,
+        canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true, canReceiveBC: true,
+        canCreateBL: true, canPrepareBL: true, canShipBL: true, canManageStock: true, canViewStock: true,
+        canManageClasses: true, canUseIaTools: true, canUseMessaging: true,
+    }
+});
+
+ROLES.set('equipe_reception', {
+    id: 'equipe_reception',
+    name: "Équipe Réception & Achat",
+    description: "Gère les flux entrants (Fournisseurs, BC, Réceptions).",
+    isStudentRole: true,
+    permissions: {
+        isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true,
+        canReceiveBC: true, canCreateBL: false, canPrepareBL: false, canShipBL: false,
+        canManageStock: true, canViewStock: true, canManageClasses: false, canUseIaTools: false, canUseMessaging: true,
+    }
+});
+
+ROLES.set('equipe_preparation', {
+    id: 'equipe_preparation',
+    name: "Équipe Préparation & Expé",
+    description: "Gère les flux sortants (Clients, BL, Expéditions).",
+    isStudentRole: true,
+    permissions: {
+        isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: false,
+        canReceiveBC: false, canCreateBL: true, canPrepareBL: true, canShipBL: true,
+        canManageStock: false, canViewStock: true, canManageClasses: false, canUseIaTools: false, canUseMessaging: true,
+    }
+});
 
 interface WmsState {
   articles: Map<string, Article>;
@@ -13,12 +53,14 @@ interface WmsState {
   users: Map<string, User>;
   classes: Map<number, Class>;
   emails: Map<number, Email>;
+  roles: Map<string, Role>;
   tierIdCounter: number;
   docIdCounter: number;
   movementIdCounter: number;
   classIdCounter: number;
   emailIdCounter: number;
   currentUser: User | null;
+  currentUserPermissions: Permissions | null;
 }
 
 const getInitialState = (): WmsState => {
@@ -33,12 +75,10 @@ const getInitialState = (): WmsState => {
   }));
 
   const initialUsers = new Map<string, User>();
-  initialUsers.set('admin', { username: 'admin', password: 'admin', profile: 'Administrateur', createdAt: new Date().toISOString() });
-  initialUsers.set('prof', { username: 'prof', password: 'prof', profile: 'professeur', createdAt: new Date().toISOString() });
-
+  initialUsers.set('admin', { username: 'admin', password: 'admin', profile: 'Administrateur', createdAt: new Date().toISOString(), roleId: 'super_admin' });
+  initialUsers.set('prof', { username: 'prof', password: 'prof', profile: 'professeur', createdAt: new Date().toISOString(), roleId: 'super_admin' });
 
   const initialClasses = new Map<number, Class>();
-
 
   return {
     articles: new Map(initialArticles.map(a => [a.id, a])),
@@ -48,12 +88,14 @@ const getInitialState = (): WmsState => {
     users: initialUsers,
     classes: initialClasses,
     emails: new Map(),
+    roles: ROLES,
     tierIdCounter: 1,
     docIdCounter: 1,
     movementIdCounter: initialMovements.length + 1,
     classIdCounter: 1,
     emailIdCounter: 1,
     currentUser: null,
+    currentUserPermissions: null,
   };
 };
 
@@ -64,7 +106,7 @@ type WmsAction =
   | { type: 'ADJUST_INVENTORY'; payload: { articleId: string; newStock: number; oldStock: number } }
   | { type: 'LOGIN'; payload: { username: string, password: string} }
   | { type: 'LOGOUT' }
-  | { type: 'REGISTER_USER', payload: Omit<User, 'password' | 'createdAt'> & { password?: string, classId?: number } }
+  | { type: 'REGISTER_USER', payload: Omit<User, 'password' | 'createdAt' | 'roleId'> & { password?: string, classId?: number } }
   | { type: 'ADD_CLASS', payload: { name: string } }
   | { type: 'DELETE_CLASS', payload: { classId: number } }
   | { type: 'TOGGLE_TEACHER_CLASS_ASSIGNMENT', payload: { classId: number, teacherId: string } }
@@ -79,14 +121,25 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       const { username, password } = action.payload;
       const user = state.users.get(username);
       if (user && user.password === password) {
-        return { ...state, currentUser: user };
+        const permissions = state.roles.get(user.roleId)?.permissions || null;
+        return { ...state, currentUser: user, currentUserPermissions: permissions };
       }
       throw new Error("Identifiant ou mot de passe incorrect.");
     }
     case 'LOGOUT':
-      // Reset the entire state but keep users and articles
+      // Reset the entire state but keep users, roles, and initial data
       const freshState = getInitialState();
-      return { ...freshState, currentUser: null, users: state.users, articles: state.articles, movements: state.movements, classes: state.classes, emails: state.emails };
+      return { 
+        ...freshState, 
+        currentUser: null, 
+        currentUserPermissions: null,
+        users: state.users, 
+        articles: state.articles, 
+        movements: state.movements, 
+        classes: state.classes,
+        roles: state.roles,
+        emails: state.emails 
+      };
     case 'REGISTER_USER': {
         const { username, password, profile, classId } = action.payload;
         if (state.users.has(username)) {
@@ -95,11 +148,17 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         if (!password) {
             throw new Error("Le mot de passe est requis.");
         }
-        if (profile === 'élève' && !classId) {
-             throw new Error("Aucune classe n'a été créée par un professeur pour le moment. Inscription impossible.");
+        if (profile === 'élève' && (state.classes.size === 0 || !classId)) {
+             throw new Error("Aucune classe n'a été créée. Inscription impossible.");
         }
         const newUsers = new Map(state.users);
-        const newUser: User = { username, password, profile, createdAt: new Date().toISOString() };
+        const newUser: User = { 
+            username, 
+            password, 
+            profile, 
+            createdAt: new Date().toISOString(),
+            roleId: profile === 'élève' ? 'equipe_preparation' : 'super_admin' // Default role
+        };
         if (profile === 'élève' && classId) {
             newUser.classId = classId;
         }
@@ -107,22 +166,18 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         return { ...state, users: newUsers };
     }
     case 'ADD_CLASS': {
-        if (!state.currentUser || (state.currentUser.profile !== 'professeur' && state.currentUser.profile !== 'Administrateur')) {
-            return state;
-        }
+        if (!state.currentUserPermissions?.canManageClasses) return state;
         const newClass: Class = {
             id: state.classIdCounter,
             name: action.payload.name,
-            teacherIds: state.currentUser.profile === 'professeur' ? [state.currentUser.username] : []
+            teacherIds: (state.currentUser?.profile === 'professeur') ? [state.currentUser.username] : []
         };
         const newClasses = new Map(state.classes);
         newClasses.set(newClass.id, newClass);
         return { ...state, classes: newClasses, classIdCounter: state.classIdCounter + 1 };
     }
     case 'DELETE_CLASS': {
-        if (state.currentUser?.profile !== 'Administrateur') {
-            return state;
-        }
+        if (!state.currentUserPermissions?.isSuperAdmin) return state;
         const { classId } = action.payload;
         const newClasses = new Map(state.classes);
         newClasses.delete(classId);
@@ -139,6 +194,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         return { ...state, classes: newClasses, users: newUsers };
     }
     case 'TOGGLE_TEACHER_CLASS_ASSIGNMENT': {
+        if (!state.currentUserPermissions?.canManageClasses) return state;
         const { classId, teacherId } = action.payload;
         const newClasses = new Map(state.classes);
         const classToUpdate = newClasses.get(classId);
@@ -148,11 +204,9 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
             const isAssigned = teacherIds.includes(teacherId);
 
             if (isAssigned) {
-                // Unassign
                 const newTeacherIds = teacherIds.filter(id => id !== teacherId);
                 newClasses.set(classId, { ...classToUpdate, teacherIds: newTeacherIds });
             } else {
-                // Assign
                 const newTeacherIds = [...teacherIds, teacherId];
                 newClasses.set(classId, { ...classToUpdate, teacherIds: newTeacherIds });
             }
@@ -167,22 +221,20 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       const newEmails = new Map(state.emails);
       let emailIdCounter = state.emailIdCounter;
     
-      // Create the original sent message for the sender's outbox
       const sentEmail: Email = {
         ...newEmailData,
         id: emailIdCounter++,
         timestamp: new Date().toISOString(),
-        isRead: true, // It's read for the sender
+        isRead: true, 
       };
       newEmails.set(sentEmail.id, sentEmail);
     
       const isRecipientTier = newEmailData.recipient.startsWith('tier-');
     
       if (isRecipientTier && state.currentUser.profile === 'élève') {
-        // Email to a Tier from a student -> redirect to teacher(s)
         const tierId = parseInt(newEmailData.recipient.split('-')[1]);
         const tier = state.tiers.get(tierId);
-        const studentClass = state.classes.get(state.currentUser.classId!);
+        const studentClass = state.currentUser.classId ? state.classes.get(state.currentUser.classId) : undefined;
         
         if (studentClass?.teacherIds && tier) {
           studentClass.teacherIds.forEach(teacherId => {
@@ -198,7 +250,6 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
           });
         }
       } else {
-        // Standard user-to-user email
         const inboxEmail: Email = {
           ...newEmailData,
           id: emailIdCounter++,
@@ -207,10 +258,9 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         };
         newEmails.set(inboxEmail.id, inboxEmail);
     
-        // CC to teacher if student-to-student communication
         const recipientUser = state.users.get(newEmailData.recipient);
         if (state.currentUser.profile === 'élève' && recipientUser?.profile === 'élève') {
-          const studentClass = state.classes.get(state.currentUser.classId!);
+          const studentClass = state.currentUser.classId ? state.classes.get(state.currentUser.classId) : undefined;
           if (studentClass?.teacherIds) {
             studentClass.teacherIds.forEach(teacherId => {
               if (newEmailData.recipient !== teacherId && newEmailData.sender !== teacherId) {
@@ -241,8 +291,16 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       return state;
     }
     case 'SET_STATE':
-        return action.payload;
+        const newState = action.payload;
+        if(newState.currentUser) {
+            newState.currentUserPermissions = newState.roles.get(newState.currentUser.roleId)?.permissions || null;
+        } else {
+            newState.currentUserPermissions = null;
+        }
+        return newState;
+
     case 'ADD_TIER': {
+      if (!state.currentUserPermissions?.canManageTiers) return state;
       const newTier: Tier = { 
         ...action.payload, 
         id: state.tierIdCounter,
@@ -254,6 +312,11 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       return { ...state, tiers: newTiers, tierIdCounter: state.tierIdCounter + 1 };
     }
     case 'CREATE_DOCUMENT': {
+        const { type } = action.payload;
+        const perms = state.currentUserPermissions;
+        if ((type === 'Bon de Commande Fournisseur' && !perms?.canCreateBC) || (type === 'Bon de Livraison Client' && !perms?.canCreateBL)) {
+            return state; // Action non autorisée
+        }
         const newDoc: Document = { 
             ...action.payload, 
             id: state.docIdCounter, 
@@ -268,7 +331,6 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         const updatedDocuments = new Map(state.documents);
         const docToUpdate = action.payload;
 
-        // Handle stock updates and movements
         const oldDoc = state.documents.get(docToUpdate.id);
         if(!oldDoc) return state;
 
@@ -276,8 +338,8 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         const newMovements = [...state.movements];
         let newMovementIdCounter = state.movementIdCounter;
 
-        // On Purchase Order reception
         if (oldDoc.type === 'Bon de Commande Fournisseur' && oldDoc.status !== 'Réceptionné' && docToUpdate.status === 'Réceptionné') {
+            if (!state.currentUserPermissions?.canReceiveBC) return state;
             docToUpdate.lines.forEach(line => {
                 const article = newArticles.get(line.articleId);
                 if (article) {
@@ -296,8 +358,8 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
             });
         }
 
-        // On Delivery Note shipment
         if (oldDoc.type === 'Bon de Livraison Client' && oldDoc.status !== 'Expédié' && docToUpdate.status === 'Expédié') {
+             if (!state.currentUserPermissions?.canShipBL) return state;
             docToUpdate.lines.forEach(line => {
                 const article = newArticles.get(line.articleId);
                 if (article) {
@@ -321,6 +383,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         return { ...state, documents: updatedDocuments, articles: newArticles, movements: newMovements, movementIdCounter: newMovementIdCounter };
     }
     case 'ADJUST_INVENTORY': {
+      if (!state.currentUserPermissions?.canManageStock) return state;
       const { articleId, newStock, oldStock } = action.payload;
       const newArticles = new Map(state.articles);
       const article = newArticles.get(articleId);
@@ -364,22 +427,21 @@ const WmsContext = createContext<WmsContextType | undefined>(undefined);
 export const WmsProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(wmsReducer, getInitialState());
 
-  // Load state from localStorage on startup
   useEffect(() => {
     try {
       const savedState = localStorage.getItem('wmsState');
       if (savedState) {
         const parsedState = JSON.parse(savedState);
-        // Re-hydrate Maps from arrays
         parsedState.articles = new Map(parsedState.articles);
         parsedState.tiers = new Map(parsedState.tiers.map((t: Tier) => [t.id, t]));
         parsedState.documents = new Map(parsedState.documents.map((d: Document) => [d.id, d]));
         parsedState.users = new Map(parsedState.users);
         parsedState.classes = parsedState.classes ? new Map(parsedState.classes.map((c: Class) => [c.id, c])) : getInitialState().classes;
         parsedState.emails = parsedState.emails ? new Map(parsedState.emails.map((e: Email) => [e.id, e])) : new Map();
+        parsedState.roles = ROLES;
         
-        // Prevent user from being logged in on refresh
         parsedState.currentUser = null;
+        parsedState.currentUserPermissions = null;
 
         dispatch({ type: 'SET_STATE', payload: parsedState });
       }
@@ -389,18 +451,19 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Save state to localStorage whenever it changes
   useEffect(() => {
     try {
       const stateToSave = {
           ...state,
-          // Convert Maps to arrays for JSON serialization
           articles: Array.from(state.articles.entries()),
           tiers: Array.from(state.tiers.values()),
           documents: Array.from(state.documents.values()),
           users: Array.from(state.users.entries()),
           classes: Array.from(state.classes.values()),
           emails: Array.from(state.emails.values()),
+          roles: [], // Roles are static, no need to save them
+          currentUser: null, // Don't persist logged in user
+          currentUserPermissions: null, // Don't persist permissions
       };
       localStorage.setItem('wmsState', JSON.stringify(stateToSave));
     } catch (e) {

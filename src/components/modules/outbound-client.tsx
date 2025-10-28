@@ -428,16 +428,35 @@ function ShipOrder() {
 }
 
 export function OutboundClient() {
+  const { state } = useWms();
+  const perms = state.currentUserPermissions;
+
+  const tabs = [];
+  if (perms?.canCreateBL) tabs.push({ value: "create", label: "1. Créer un BL" });
+  if (perms?.canPrepareBL) tabs.push({ value: "prepare", label: "2. Préparer (Picking)" });
+  if (perms?.canShipBL) tabs.push({ value: "ship", label: "3. Expédier & Générer Docs" });
+
+  if (tabs.length === 0) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Flux Sortant</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p>Vous n'avez pas les permissions nécessaires pour gérer le flux sortant.</p>
+            </CardContent>
+        </Card>
+    )
+  }
+
   return (
-    <Tabs defaultValue="create" className="w-full">
-      <TabsList className="grid w-full grid-cols-3">
-        <TabsTrigger value="create">1. Créer un BL</TabsTrigger>
-        <TabsTrigger value="prepare">2. Préparer (Picking)</TabsTrigger>
-        <TabsTrigger value="ship">3. Expédier & Générer Docs</TabsTrigger>
+    <Tabs defaultValue={tabs[0].value} className="w-full">
+      <TabsList className={`grid w-full grid-cols-${tabs.length}`}>
+        {tabs.map(tab => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
       </TabsList>
-      <TabsContent value="create"><CreateDeliveryNote /></TabsContent>
-      <TabsContent value="prepare"><PrepareOrder /></TabsContent>
-      <TabsContent value="ship"><ShipOrder /></TabsContent>
+      {perms?.canCreateBL && <TabsContent value="create"><CreateDeliveryNote /></TabsContent>}
+      {perms?.canPrepareBL && <TabsContent value="prepare"><PrepareOrder /></TabsContent>}
+      {perms?.canShipBL && <TabsContent value="ship"><ShipOrder /></TabsContent>}
     </Tabs>
   );
 }

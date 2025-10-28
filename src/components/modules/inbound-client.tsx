@@ -277,18 +277,33 @@ function ReceivePurchaseOrder() {
 }
 
 export function InboundClient() {
+  const { state } = useWms();
+  const perms = state.currentUserPermissions;
+  
+  const tabs = [];
+  if (perms?.canCreateBC) tabs.push({ value: "create", label: "1. Créer un BC" });
+  if (perms?.canReceiveBC) tabs.push({ value: "receive", label: "2. Réceptionner un BC" });
+  
+  if (tabs.length === 0) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Flux Entrant</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p>Vous n'avez pas les permissions nécessaires pour gérer le flux entrant.</p>
+            </CardContent>
+        </Card>
+    )
+  }
+  
   return (
-    <Tabs defaultValue="create" className="w-full">
-      <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="create">1. Créer un BC</TabsTrigger>
-        <TabsTrigger value="receive">2. Réceptionner un BC</TabsTrigger>
+    <Tabs defaultValue={tabs[0].value} className="w-full">
+      <TabsList className={`grid w-full grid-cols-${tabs.length}`}>
+        {tabs.map(tab => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
       </TabsList>
-      <TabsContent value="create">
-        <CreatePurchaseOrder />
-      </TabsContent>
-      <TabsContent value="receive">
-        <ReceivePurchaseOrder />
-      </TabsContent>
+      {perms?.canCreateBC && <TabsContent value="create"><CreatePurchaseOrder /></TabsContent>}
+      {perms?.canReceiveBC && <TabsContent value="receive"><ReceivePurchaseOrder /></TabsContent>}
     </Tabs>
   );
 }

@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, Wand2 } from "lucide-react";
+import { useWms } from "@/context/WmsContext";
 
 type DocGenFormData = {
   documentType: string;
@@ -31,6 +32,8 @@ type DocGenFormData = {
 };
 
 export function AiToolsClient() {
+  const { state } = useWms();
+  const { currentUserPermissions } = state;
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<{
     suggestedVerbiage: string;
@@ -62,6 +65,19 @@ export function AiToolsClient() {
       setIsLoading(false);
     }
   };
+
+  if (!currentUserPermissions?.canUseIaTools) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Outils d'IA</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p>Vous n'avez pas les permissions nécessaires pour utiliser les outils d'IA.</p>
+            </CardContent>
+        </Card>
+    )
+  }
 
   return (
     <div className="space-y-6">
