@@ -129,37 +129,71 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         return state;
     }
     case 'SEND_EMAIL': {
+      if (!state.currentUser) return state;
+    
       const newEmailData = action.payload;
       const newEmails = new Map(state.emails);
       let emailIdCounter = state.emailIdCounter;
-
-      // Main email
-      const mainEmail: Email = {
+    
+      // Create the original sent message for the sender's outbox
+      const sentEmail: Email = {
         ...newEmailData,
         id: emailIdCounter++,
         timestamp: new Date().toISOString(),
-        isRead: false,
+        isRead: true, // It's read for the sender
       };
-      newEmails.set(mainEmail.id, mainEmail);
-
-      // CC to teachers if applicable
-      const recipientUser = state.users.get(newEmailData.recipient);
-      if (state.currentUser?.profile === 'élève' && recipientUser?.profile === 'élève') {
+      newEmails.set(sentEmail.id, sentEmail);
+    
+      const isRecipientTier = newEmailData.recipient.startsWith('tier-');
+    
+      if (isRecipientTier && state.currentUser.profile === 'élève') {
+        // Email to a Tier from a student -> redirect to teacher(s)
+        const tierId = parseInt(newEmailData.recipient.split('-')[1]);
+        const tier = state.tiers.get(tierId);
         const studentClass = state.classes.get(state.currentUser.classId!);
-        if (studentClass?.teacherIds && studentClass.teacherIds.length > 0) {
+        
+        if (studentClass?.teacherIds && tier) {
+          studentClass.teacherIds.forEach(teacherId => {
+            const teacherEmail: Email = {
+              ...newEmailData,
+              id: emailIdCounter++,
+              recipient: teacherId,
+              subject: `[Pour correction - E-mail à ${tier.name}] ${newEmailData.subject}`,
+              timestamp: new Date().toISOString(),
+              isRead: false,
+            };
+            newEmails.set(teacherEmail.id, teacherEmail);
+          });
+        }
+      } else {
+        // Standard user-to-user email
+        const inboxEmail: Email = {
+          ...newEmailData,
+          id: emailIdCounter++,
+          timestamp: new Date().toISOString(),
+          isRead: false,
+        };
+        newEmails.set(inboxEmail.id, inboxEmail);
+    
+        // CC to teacher if student-to-student communication
+        const recipientUser = state.users.get(newEmailData.recipient);
+        if (state.currentUser.profile === 'élève' && recipientUser?.profile === 'élève') {
+          const studentClass = state.classes.get(state.currentUser.classId!);
+          if (studentClass?.teacherIds) {
             studentClass.teacherIds.forEach(teacherId => {
-                 if (newEmailData.recipient !== teacherId && newEmailData.sender !== teacherId) {
-                    const ccEmail: Email = {
-                        ...newEmailData,
-                        id: emailIdCounter++,
-                        recipient: teacherId, // The recipient is the teacher
-                        subject: `[Copie de ${newEmailData.sender}] ${newEmailData.subject}`,
-                        timestamp: new Date().toISOString(),
-                        isRead: false,
-                    };
-                    newEmails.set(ccEmail.id, ccEmail);
-                 }
+              if (newEmailData.recipient !== teacherId && newEmailData.sender !== teacherId) {
+                const ccEmail: Email = {
+                  ...newEmailData,
+                  id: emailIdCounter++,
+                  recipient: teacherId,
+                  subject: `[Copie de ${newEmailData.sender}] ${newEmailData.subject}`,
+                  timestamp: new Date().toISOString(),
+                  isRead: false,
+                };
+                newEmails.set(ccEmail.id, ccEmail);
+              }
             });
+          }
         }
       }
       
@@ -362,5 +396,3 @@ export const useWms = () => {
   }
   return context;
 };
-
-    

@@ -20,6 +20,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
+  SelectLabel,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -29,8 +31,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Trash2, Archive, Inbox, Mail } from "lucide-react";
-import type { Email } from "@/lib/types";
+import { Send, Inbox, Mail } from "lucide-react";
+import type { Email, Tier, User } from "@/lib/types";
 
 type EmailFormData = {
   recipient: string;
@@ -41,28 +43,31 @@ type EmailFormData = {
 function ComposeEmail() {
   const { state, dispatch } = useWms();
   const { toast } = useToast();
-  const { currentUser, users, classes } = state;
+  const { currentUser, users, classes, tiers } = state;
 
   const getPossibleRecipients = () => {
-    if (!currentUser) return [];
+    if (!currentUser) return { users: [], tiers: [] };
+    
+    let userRecipients: User[] = [];
     
     if (currentUser.profile === 'élève') {
         const userClassId = currentUser.classId;
-        if (!userClassId) return [];
-        const studentClass = classes.get(userClassId);
-        const recipients = Array.from(users.values()).filter(u => 
-            (u.profile === 'élève' && u.classId === userClassId && u.username !== currentUser.username)
-        );
-        if (studentClass && studentClass.teacherIds) {
-           studentClass.teacherIds.forEach(teacherId => {
-                const teacher = users.get(teacherId);
-                if (teacher) recipients.push(teacher);
-           });
+        if (userClassId) {
+            const studentClass = classes.get(userClassId);
+            // Other students in the same class
+            const otherStudents = Array.from(users.values()).filter(u => 
+                u.profile === 'élève' && u.classId === userClassId && u.username !== currentUser.username
+            );
+            userRecipients.push(...otherStudents);
+            // Teachers of the class
+            if (studentClass?.teacherIds) {
+               studentClass.teacherIds.forEach(teacherId => {
+                    const teacher = users.get(teacherId);
+                    if (teacher) userRecipients.push(teacher);
+               });
+            }
         }
-        return recipients;
-    }
-    
-    if (currentUser.profile === 'professeur') {
+    } else if (currentUser.profile === 'professeur') {
         const teacherClasses = Array.from(classes.values()).filter(c => c.teacherIds?.includes(currentUser.username));
         const studentUsernames = new Set<string>();
         teacherClasses.forEach(c => {
@@ -72,18 +77,17 @@ function ComposeEmail() {
                 }
              })
         });
-        return Array.from(studentUsernames).map(username => users.get(username)).filter(Boolean) as any[];
+        userRecipients = Array.from(studentUsernames).map(username => users.get(username)).filter(Boolean) as any[];
+    } else if (currentUser.profile === 'Administrateur') {
+        userRecipients = Array.from(users.values()).filter(u => u.username !== currentUser.username);
     }
+    
+    const tierRecipients = Array.from(tiers.values()).filter(t => t.createdBy === currentUser.username);
 
-    // Admin can message anyone
-    if (currentUser.profile === 'Administrateur') {
-        return Array.from(users.values()).filter(u => u.username !== currentUser.username);
-    }
-
-    return [];
+    return { users: userRecipients, tiers: tierRecipients };
   };
 
-  const recipients = getPossibleRecipients();
+  const { users: userRecipients, tiers: tierRecipients } = getPossibleRecipients();
 
   const { control, handleSubmit, reset, formState: { errors } } = useForm<EmailFormData>({
     defaultValues: { recipient: "", subject: "", body: "" },
@@ -101,10 +105,14 @@ function ComposeEmail() {
             body: data.body,
         }
     });
+    
+    const recipientName = data.recipient.startsWith('tier-') 
+      ? state.tiers.get(parseInt(data.recipient.split('-')[1]))?.name
+      : data.recipient;
 
     toast({
         title: "E-mail envoyé",
-        description: `Votre message à ${data.recipient} a été envoyé.`
+        description: `Votre message à ${recipientName} a été envoyé.`
     });
     reset();
   }
@@ -121,7 +129,18 @@ function ComposeEmail() {
                     <Select onValueChange={field.onChange} value={field.value}>
                         <SelectTrigger id="recipient"><SelectValue placeholder="Sélectionner..." /></SelectTrigger>
                         <SelectContent>
-                            {recipients.map(r => <SelectItem key={r.username} value={r.username}>{r.username} ({r.profile})</SelectItem>)}
+                          {userRecipients.length > 0 && (
+                            <SelectGroup>
+                              <SelectLabel>Utilisateurs</SelectLabel>
+                              {userRecipients.map(r => <SelectItem key={r.username} value={r.username}>{r.username} ({r.profile})</SelectItem>)}
+                            </SelectGroup>
+                          )}
+                           {tierRecipients.length > 0 && (
+                            <SelectGroup>
+                              <SelectLabel>Tiers (Clients, Fournisseurs, Transporteurs)</SelectLabel>
+                              {tierRecipients.map(t => <SelectItem key={t.id} value={`tier-${t.id}`}>{t.name} ({t.type})</SelectItem>)}
+                            </SelectGroup>
+                          )}
                         </SelectContent>
                     </Select>
                 )}
@@ -145,7 +164,7 @@ function ComposeEmail() {
 
 function Mailbox({ boxType }: { boxType: 'inbox' | 'sent' }) {
     const { state, dispatch } = useWms();
-    const { currentUser, emails } = state;
+    const { currentUser, emails, users, tiers } = state;
     const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
 
     if (!currentUser) return <p>Veuillez vous connecter.</p>
@@ -160,6 +179,14 @@ function Mailbox({ boxType }: { boxType: 'inbox' | 'sent' }) {
             dispatch({ type: 'MARK_EMAIL_AS_READ', payload: { emailId: email.id } });
         }
     }
+    
+    const getParticipantName = (participantIdentifier: string) => {
+      if (participantIdentifier.startsWith('tier-')) {
+        const tierId = parseInt(participantIdentifier.split('-')[1]);
+        return tiers.get(tierId)?.name || 'Tiers Inconnu';
+      }
+      return participantIdentifier;
+    }
 
     if (selectedEmail) {
         return (
@@ -167,9 +194,9 @@ function Mailbox({ boxType }: { boxType: 'inbox' | 'sent' }) {
                 <Button variant="outline" onClick={() => setSelectedEmail(null)} className="mb-4">Retour</Button>
                 <Card>
                     <CardHeader>
-                        <CardTitle>{selectedEmail.subject}</CardTitle>
+                        <CardTitle>{selectedEmail.subject.replace(/\[Copie de .*?\] |\[Pour correction -.*?\] /g, '')}</CardTitle>
                         <CardDescription>
-                            {boxType === 'inbox' ? `De : ${selectedEmail.sender}` : `À : ${selectedEmail.recipient}`}
+                            {boxType === 'inbox' ? `De : ${getParticipantName(selectedEmail.sender)}` : `À : ${getParticipantName(selectedEmail.recipient)}`}
                             <span className="float-right">{new Date(selectedEmail.timestamp).toLocaleString()}</span>
                         </CardDescription>
                     </CardHeader>
@@ -189,8 +216,8 @@ function Mailbox({ boxType }: { boxType: 'inbox' | 'sent' }) {
                 {userEmails.length > 0 ? (
                     userEmails.map(email => (
                     <TableRow key={email.id} onClick={() => handleEmailClick(email)} className={`cursor-pointer ${!email.isRead && boxType === 'inbox' ? 'font-bold' : ''}`}>
-                        <TableCell className="w-1/4">{boxType === 'inbox' ? email.sender : email.recipient}</TableCell>
-                        <TableCell>{email.subject}</TableCell>
+                        <TableCell className="w-1/4">{getParticipantName(boxType === 'inbox' ? email.sender : email.recipient)}</TableCell>
+                        <TableCell>{email.subject.replace(/\[Copie de .*?\] |\[Pour correction -.*?\] /g, '')}</TableCell>
                         <TableCell className="text-right text-muted-foreground text-xs">{new Date(email.timestamp).toLocaleDateString()}</TableCell>
                     </TableRow>
                     ))
