@@ -66,6 +66,7 @@ type WmsAction =
   | { type: 'LOGOUT' }
   | { type: 'REGISTER_USER', payload: Omit<User, 'password' | 'createdAt'> & { password?: string, classId?: number } }
   | { type: 'ADD_CLASS', payload: { name: string } }
+  | { type: 'DELETE_CLASS', payload: { classId: number } }
   | { type: 'TOGGLE_TEACHER_CLASS_ASSIGNMENT', payload: { classId: number, teacherId: string } }
   | { type: 'SEND_EMAIL'; payload: Omit<Email, 'id' | 'timestamp' | 'isRead'> }
   | { type: 'MARK_EMAIL_AS_READ'; payload: { emailId: number } }
@@ -112,11 +113,30 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         const newClass: Class = {
             id: state.classIdCounter,
             name: action.payload.name,
-            teacherIds: [state.currentUser.username]
+            teacherIds: state.currentUser.profile === 'professeur' ? [state.currentUser.username] : []
         };
         const newClasses = new Map(state.classes);
         newClasses.set(newClass.id, newClass);
         return { ...state, classes: newClasses, classIdCounter: state.classIdCounter + 1 };
+    }
+    case 'DELETE_CLASS': {
+        if (state.currentUser?.profile !== 'Administrateur') {
+            return state;
+        }
+        const { classId } = action.payload;
+        const newClasses = new Map(state.classes);
+        newClasses.delete(classId);
+
+        const newUsers = new Map(state.users);
+        newUsers.forEach((user, username) => {
+            if (user.classId === classId) {
+                const updatedUser = { ...user };
+                delete updatedUser.classId;
+                newUsers.set(username, updatedUser);
+            }
+        });
+
+        return { ...state, classes: newClasses, users: newUsers };
     }
     case 'TOGGLE_TEACHER_CLASS_ASSIGNMENT': {
         const { classId, teacherId } = action.payload;

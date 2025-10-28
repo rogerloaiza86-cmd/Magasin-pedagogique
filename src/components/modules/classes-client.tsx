@@ -27,7 +27,18 @@ import { useToast } from "@/hooks/use-toast";
 import { User } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, PlusCircle } from "lucide-react";
+import { ChevronDown, PlusCircle, Trash2 } from "lucide-react";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type ClassFormData = {
     name: string;
@@ -53,7 +64,7 @@ function CreateClassForm() {
         <Card className="mb-6">
             <CardHeader>
                 <CardTitle>Créer une nouvelle classe</CardTitle>
-                <CardDescription>Ajoutez une nouvelle classe ou un nouveau groupe. Vous y serez automatiquement assigné.</CardDescription>
+                <CardDescription>Ajoutez une nouvelle classe ou un nouveau groupe. Vous y serez automatiquement assigné si vous êtes professeur.</CardDescription>
             </CardHeader>
              <form onSubmit={handleSubmit(onSubmit)}>
                 <CardContent>
@@ -99,6 +110,16 @@ export function ClassesClient() {
       });
     }
   };
+
+  const handleDeleteClass = (classId: number) => {
+    const classInfo = classes.get(classId);
+    dispatch({ type: 'DELETE_CLASS', payload: { classId } });
+    toast({
+        variant: "destructive",
+        title: "Classe supprimée",
+        description: `La classe "${classInfo?.name}" a été supprimée.`
+    })
+  }
 
   const getStudentsInClass = (classId: number): User[] => {
     return Array.from(users.values()).filter(
@@ -153,6 +174,27 @@ export function ClassesClient() {
                                     >
                                     {isTeacherAssigned ? 'Quitter la classe' : 'Gérer cette classe'}
                                     </Button>
+                                )}
+                                {currentUser?.profile === 'Administrateur' && (
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="destructive" size="icon" onClick={(e) => e.stopPropagation()}>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Voulez-vous vraiment supprimer cette classe ?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    Cette action est irréversible. La classe "{c.name}" sera supprimée. Les élèves de cette classe ne seront plus assignés.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleDeleteClass(c.id)}>Supprimer</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
                                 )}
                                 <CollapsibleTrigger asChild>
                                 <Button variant="ghost" size="icon">
