@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useWms } from "@/context/WmsContext";
@@ -26,14 +27,15 @@ function StudentDashboard() {
   }) : undefined;
   
   const studentTasks = currentUser && studentActiveScenario 
-    ? Array.from(tasks.values()).filter(t => t.userId === currentUser.username && t.scenarioId === studentActiveScenario.id).sort((a,b) => a.id - b.id)
+    ? Array.from(tasks.values()).filter(t => t.userId === currentUser.username && t.scenarioId === studentActiveScenario.id).sort((a,b) => a.taskOrder - b.taskOrder)
     : [];
 
   let welcomeMessageShown = false;
   if (isClient) {
-    welcomeMessageShown = sessionStorage.getItem('welcomeMessageShown') === 'true';
+    const welcomeKey = `welcomeMessageShown_${currentUser?.username}`;
+    welcomeMessageShown = sessionStorage.getItem(welcomeKey) === 'true';
     if (!welcomeMessageShown) {
-      sessionStorage.setItem('welcomeMessageShown', 'true');
+      sessionStorage.setItem(welcomeKey, 'true');
     }
   }
   
@@ -53,7 +55,7 @@ function StudentDashboard() {
           <Boxes className="h-4 w-4" />
           <AlertTitle className="font-bold text-primary">Bienvenue dans le Magasin Pédagogique !</AlertTitle>
           <AlertDescription>
-            J'ai chargé avec succès {articles.size} articles dans la base de données. Explorez l'application ou attendez que votre enseignant lance un scénario.
+             Vous pouvez commencer à explorer l'application ou attendre que votre enseignant lance un scénario pour votre classe.
           </AlertDescription>
         </Alert>
       )}
@@ -69,7 +71,7 @@ function StudentDashboard() {
             <CardContent>
                 <ul className="space-y-3">
                     {studentTasks.map(task => (
-                        <li key={task.id} className={`flex items-start gap-4 p-3 rounded-md ${task.status === 'todo' ? 'bg-background' : 'bg-transparent'}`}>
+                        <li key={task.id} className={`flex items-start gap-4 p-3 rounded-md ${task.status === 'todo' ? 'bg-background shadow-sm' : 'bg-transparent'}`}>
                            <TaskIcon status={task.status} />
                            <div className="flex-1">
                                 <p className={`font-medium ${task.status === 'completed' ? 'line-through text-muted-foreground' : ''} ${task.status === 'blocked' ? 'text-muted-foreground' : ''}`}>{task.description}</p>
@@ -314,3 +316,5 @@ export function DashboardClient() {
 
   return <StudentDashboard />;
 }
+
+    

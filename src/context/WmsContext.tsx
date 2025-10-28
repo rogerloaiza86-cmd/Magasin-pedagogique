@@ -141,6 +141,7 @@ const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState =>
     const todoTasks = userTasks.filter(t => t.status === 'todo');
 
     let completedTaskId: number | null = null;
+    let taskCompletedAction: WmsAction | null = null;
 
     for (const task of todoTasks) {
         let taskCompleted = false;
@@ -164,18 +165,15 @@ const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState =>
                  if (action.type === 'CREATE_DOCUMENT' && action.payload.type === 'Bon de Livraison Client') taskCompleted = true;
                 break;
             case 'PREPARE_BL':
-                // This is a manual action in the UI for now, so we need a dedicated action or a way to track it.
-                // For now, we'll assume it's part of SHIP_BL. Let's adjust if a 'preparation finished' action is added.
-                // A simple way is to consider it done when the shipping happens.
                 if (action.type === 'UPDATE_DOCUMENT' && action.payload.type === 'Bon de Livraison Client' && action.payload.status === 'Expédié') taskCompleted = true;
                 break;
             case 'SHIP_BL':
                 if (action.type === 'UPDATE_DOCUMENT' && action.payload.type === 'Bon de Livraison Client' && action.payload.status === 'Expédié') taskCompleted = true;
                 break;
-            // MANUAL_VALIDATION is ignored here
         }
         if (taskCompleted) {
             completedTaskId = task.id;
+            taskCompletedAction = action;
             break; 
         }
     }
@@ -186,8 +184,7 @@ const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState =>
         if (completedTask) {
             newTasks.set(completedTaskId, { ...completedTask, status: 'completed' });
 
-            // Unlock next tasks
-            userTasks.forEach(task => {
+            newTasks.forEach(task => {
                 if (task.prerequisiteTaskId === completedTaskId) {
                     const taskToUnlock = newTasks.get(task.id);
                     if (taskToUnlock) {
@@ -540,7 +537,6 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         const template = state.scenarioTemplates.get(templateId);
         if (!template) return state;
 
-        // Create active scenario
         const newActiveScenarioId = state.activeScenarioIdCounter;
         const newActiveScenario: ActiveScenario = {
             id: newActiveScenarioId,
@@ -552,7 +548,6 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         const newActiveScenarios = new Map(state.activeScenarios);
         newActiveScenarios.set(newActiveScenarioId, newActiveScenario);
 
-        // Assign roles and create tasks
         const studentsInClass = Array.from(state.users.values()).filter(u => u.classId === classId && u.profile === 'élève');
         const rolesToAssign = template.rolesRequis;
         const newUsers = new Map(state.users);
@@ -577,12 +572,13 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                     status: 'blocked',
                     details: taskTemplate.details,
                     taskOrder: taskTemplate.taskOrder,
+                    prerequisiteTaskId: undefined,
                 };
                 newTasks.set(taskIdCounter, newTask);
                 taskCreationMap.set(taskTemplate.taskOrder, taskIdCounter);
                 taskIdCounter++;
             });
-             // Link prerequisites and set initial tasks to 'todo'
+            
             newTasks.forEach(task => {
                 if (task.userId === student.username && task.scenarioId === newActiveScenarioId) {
                     const originalTemplate = template.tasks.find(t => t.taskOrder === task.taskOrder && t.roleId === roleId);
@@ -598,7 +594,6 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
             });
         });
 
-        // Update current user if they are part of the scenario
         const updatedCurrentUser = state.currentUser ? newUsers.get(state.currentUser.username) || state.currentUser : null;
         const updatedPermissions = updatedCurrentUser ? state.roles.get(updatedCurrentUser.roleId)?.permissions || null : null;
 
@@ -650,7 +645,6 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
       if (savedState) {
         const parsedState = JSON.parse(savedState);
         
-        // Deserialize Maps
         parsedState.articles = new Map(parsedState.articles);
         parsedState.tiers = new Map(parsedState.tiers.map((t: Tier) => [t.id, t]));
         parsedState.documents = new Map(parsedState.documents.map((d: Document) => [d.id, d]));
@@ -663,7 +657,6 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
 
         parsedState.roles = ROLES;
         
-        // Auto-login logic
         const lastUser = localStorage.getItem('wmsLastUser');
         if (lastUser) {
           const user = parsedState.users.get(lastUser);
@@ -700,6 +693,8 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
 
       if (state.currentUser) {
           localStorage.setItem('wmsLastUser', state.currentUser.username);
+      } else {
+          localStorage.removeItem('wmsLastUser');
       }
     } catch (e) {
       console.error("Could not save state to localStorage.", e);
@@ -726,3 +721,5 @@ export const useWms = () => {
   }
   return context;
 };
+
+    

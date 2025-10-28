@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useWms } from "@/context/WmsContext";
@@ -33,7 +34,7 @@ import {
 } from "@/components/ui/select";
 import { useState } from "react";
 import { PlusCircle, Trash2, Swords, Rocket, Play } from "lucide-react";
-import type { ScenarioTemplate, ScenarioTaskTemplate, TaskType } from "@/lib/types";
+import type { ScenarioTemplate, TaskType } from "@/lib/types";
 import { Badge } from "../ui/badge";
 
 const taskTypeLabels: Record<TaskType, string> = {
@@ -83,7 +84,7 @@ function ScenarioTemplateForm({ template, onSave, onCancel }: { template?: Scena
       </div>
       <div>
         <Label>Compétences visées (séparées par des virgules)</Label>
-        <Input {...register("competences", { setValueAs: v => v.split(',').map(c => c.trim()) })} />
+        <Input {...register("competences", { setValueAs: v => typeof v === 'string' ? v.split(',').map(c => c.trim()) : v })} />
       </div>
        <div>
         <Label>Rôles requis pour ce scénario</Label>
@@ -94,7 +95,7 @@ function ScenarioTemplateForm({ template, onSave, onCancel }: { template?: Scena
                 <div className="grid grid-cols-2 gap-2 p-2 border rounded-md">
                     {studentRoles.map(role => (
                         <label key={role.id} className="flex items-center gap-2">
-                            <input type="checkbox" {...field} value={role.id} checked={field.value.includes(role.id)}
+                            <input type="checkbox" value={role.id} checked={field.value.includes(role.id)}
                                 onChange={(e) => {
                                     const newRoles = e.target.checked
                                         ? [...field.value, role.id]
@@ -120,6 +121,7 @@ function ScenarioTemplateForm({ template, onSave, onCancel }: { template?: Scena
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
+             <Input {...register(`tasks.${index}.taskOrder`)} type="hidden" value={index + 1} />
              <Textarea {...register(`tasks.${index}.description`, { required: true })} placeholder="Description de la tâche..."/>
 
             <div className="grid grid-cols-3 gap-2">
@@ -147,7 +149,7 @@ function ScenarioTemplateForm({ template, onSave, onCancel }: { template?: Scena
                         control={control}
                         rules={{ required: true }}
                         render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value.toString()}>
                             <SelectTrigger><SelectValue placeholder="Choisir..."/></SelectTrigger>
                             <SelectContent>
                                 {studentRoles.map(role => (
@@ -313,3 +315,5 @@ export function ScenariosClient() {
     </div>
   );
 }
+
+    

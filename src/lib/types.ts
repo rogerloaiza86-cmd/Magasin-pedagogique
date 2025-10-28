@@ -1,3 +1,4 @@
+
 export type Article = {
   id: string;
   name: string;
@@ -147,6 +148,9 @@ export type Task = {
     description: string;
     status: TaskStatus;
     taskType: TaskType;
+    taskOrder: number;
     prerequisiteTaskId?: number;
     details?: Record<string, any>;
 };
+
+    
