@@ -2,20 +2,32 @@
 
 import { useWms } from "@/context/WmsContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Boxes, Users, FileText, Truck, User, Activity, Clock } from "lucide-react";
+import { Boxes, Users, FileText, Truck, User, Activity, Clock, CheckSquare, ListTodo, Lock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
-import type { User as UserType, Document, Tier } from "@/lib/types";
+import type { User as UserType, Document, Tier, Task } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-function StudentDashboard({ articles, tiers, documents }: { articles: Map<string, any>, tiers: Map<number, any>, documents: Map<number, any> }) {
+function StudentDashboard() {
+  const { state } = useWms();
+  const { articles, tiers, documents, currentUser, activeScenarios, tasks, roles } = state;
   const [isClient, setIsClient] = useState(false);
+  
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  const studentActiveScenario = currentUser ? Array.from(activeScenarios.values()).find(sc => {
+      const studentClassId = currentUser.classId;
+      return sc.classId === studentClassId && sc.status === 'running';
+  }) : undefined;
+  
+  const studentTasks = currentUser && studentActiveScenario 
+    ? Array.from(tasks.values()).filter(t => t.userId === currentUser.username && t.scenarioId === studentActiveScenario.id).sort((a,b) => a.id - b.id)
+    : [];
 
   let welcomeMessageShown = false;
   if (isClient) {
@@ -24,58 +36,81 @@ function StudentDashboard({ articles, tiers, documents }: { articles: Map<string
       sessionStorage.setItem('welcomeMessageShown', 'true');
     }
   }
+  
+  const TaskIcon = ({status}: {status: Task['status']}) => {
+    switch(status) {
+        case 'completed': return <CheckSquare className="h-5 w-5 text-green-500"/>
+        case 'todo': return <ListTodo className="h-5 w-5 text-blue-500"/>
+        case 'blocked': return <Lock className="h-5 w-5 text-muted-foreground"/>
+        default: return null;
+    }
+  }
 
   return (
     <div className="space-y-6">
-      {isClient && !welcomeMessageShown && (
+      {!studentActiveScenario && isClient && !welcomeMessageShown && (
         <Alert className="bg-primary/10 border-primary/20">
           <Boxes className="h-4 w-4" />
           <AlertTitle className="font-bold text-primary">Bienvenue dans le Magasin Pédagogique !</AlertTitle>
           <AlertDescription>
-            J'ai chargé avec succès {articles.size} articles dans la base de données. Que souhaitez-vous faire ?
+            J'ai chargé avec succès {articles.size} articles dans la base de données. Explorez l'application ou attendez que votre enseignant lance un scénario.
           </AlertDescription>
         </Alert>
       )}
 
       <h1 className="text-3xl font-bold tracking-tight">Tableau de Bord</h1>
 
+      {studentActiveScenario && (
+        <Card className="bg-blue-50 border-blue-200 dark:bg-blue-950">
+            <CardHeader>
+                <CardTitle>Scénario en cours : {state.scenarioTemplates.get(studentActiveScenario.templateId)?.title}</CardTitle>
+                <CardDescription>Votre rôle : <span className="font-bold">{roles.get(currentUser?.roleId || '')?.name}</span>. Suivez les étapes ci-dessous.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <ul className="space-y-3">
+                    {studentTasks.map(task => (
+                        <li key={task.id} className={`flex items-start gap-4 p-3 rounded-md ${task.status === 'todo' ? 'bg-background' : 'bg-transparent'}`}>
+                           <TaskIcon status={task.status} />
+                           <div className="flex-1">
+                                <p className={`font-medium ${task.status === 'completed' ? 'line-through text-muted-foreground' : ''} ${task.status === 'blocked' ? 'text-muted-foreground' : ''}`}>{task.description}</p>
+                           </div>
+                        </li>
+                    ))}
+                </ul>
+            </CardContent>
+        </Card>
+      )}
+
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Articles Uniques
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Articles Uniques</CardTitle>
             <Boxes className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{articles.size}</div>
-            <p className="text-xs text-muted-foreground">
-              Nombre total de références articles
-            </p>
+            <p className="text-xs text-muted-foreground">Nombre total de références articles</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tiers Enregistrés</CardTitle>
+            <CardTitle className="text-sm font-medium">Tiers Créés par vous</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{tiers.size}</div>
-            <p className="text-xs text-muted-foreground">
-              Clients, fournisseurs et transporteurs
-            </p>
+            <div className="text-2xl font-bold">{Array.from(tiers.values()).filter(t => t.createdBy === currentUser?.username).length}</div>
+            <p className="text-xs text-muted-foreground">Clients, fournisseurs et transporteurs</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Documents Créés</CardTitle>
+            <CardTitle className="text-sm font-medium">Documents Créés par vous</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{documents.size}</div>
-            <p className="text-xs text-muted-foreground">
-              BC, BL et Lettres de Voiture
-            </p>
+            <div className="text-2xl font-bold">{Array.from(documents.values()).filter(d => d.createdBy === currentUser?.username).length}</div>
+            <p className="text-xs text-muted-foreground">BC, BL et Lettres de Voiture</p>
           </CardContent>
         </Card>
         <Card>
@@ -87,40 +122,11 @@ function StudentDashboard({ articles, tiers, documents }: { articles: Map<string
             <div className="text-2xl font-bold">
               {Array.from(documents.values()).filter(d => d.status === 'En préparation' && d.type === 'Bon de Livraison Client').length}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Bons de livraison en attente
-            </p>
+            <p className="text-xs text-muted-foreground">Bons de livraison en attente</p>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Guide de Démarrage Rapide</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p>
-            Ceci est un outil pédagogique pour simuler les opérations d'un entrepôt. Voici les étapes typiques d'un flux logistique :
-          </p>
-          <ol className="list-decimal list-inside space-y-2">
-            <li>
-              <strong>Gestion des Tiers :</strong> Commencez par ajouter un fournisseur, un client et un transporteur.
-            </li>
-            <li>
-              <strong>Flux Entrant :</strong> Créez un Bon de Commande (BC) pour un fournisseur, puis réceptionnez la marchandise pour augmenter votre stock.
-            </li>
-            <li>
-              <strong>Flux Sortant :</strong> Créez un Bon de Livraison (BL) pour un client, préparez la commande (picking), puis expédiez-la, ce qui générera les documents finaux (BL et Lettre de Voiture).
-            </li>
-            <li>
-              <strong>Gestion des Stocks :</strong> À tout moment, consultez l'état de vos stocks, l'historique des mouvements ou effectuez des ajustements d'inventaire.
-            </li>
-          </ol>
-          <p>
-            Utilisez le menu sur la gauche pour naviguer entre les différents modules.
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 }
@@ -296,7 +302,7 @@ function TeacherDashboard() {
 
 export function DashboardClient() {
   const { state } = useWms();
-  const { articles, tiers, documents, currentUser } = state;
+  const { currentUser } = state;
   
   if (!currentUser) {
     return null; // Or a loading skeleton
@@ -306,7 +312,5 @@ export function DashboardClient() {
     return <TeacherDashboard />;
   }
 
-  return <StudentDashboard articles={articles} tiers={tiers} documents={documents} />;
+  return <StudentDashboard />;
 }
-
-    

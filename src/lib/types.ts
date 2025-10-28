@@ -59,6 +59,7 @@ export type Permissions = {
     canManageClasses: boolean;
     canUseIaTools: boolean;
     canUseMessaging: boolean;
+    canManageScenarios: boolean;
 }
 
 export type Role = {
@@ -80,7 +81,7 @@ export type User = {
 
 export type Class = {
     id: number;
-    name: string;
+    name:string;
     teacherIds?: string[]; // username of the teacher
 }
 
@@ -95,4 +96,57 @@ export type Email = {
   isRead: boolean;
 };
 
-    
+// --- SCENARIO ENGINE TYPES ---
+
+export type TaskType = 
+    | 'CREATE_TIERS_FOURNISSEUR'
+    | 'CREATE_TIERS_CLIENT'
+    | 'CREATE_TIERS_TRANSPORTEUR'
+    | 'CREATE_BC'
+    | 'RECEIVE_BC'
+    | 'CREATE_BL'
+    | 'PREPARE_BL'
+    | 'SHIP_BL'
+    | 'MANUAL_VALIDATION'; // For tasks that require teacher validation
+
+export type ScenarioTaskTemplate = {
+    taskOrder: number;
+    description: string;
+    roleId: string;
+    taskType: TaskType;
+    prerequisite?: number; // Refers to taskOrder
+    details?: Record<string, any>; // e.g., { tierName: 'PneuExpress', articleId: '123', quantity: 20 }
+};
+
+export type ScenarioTemplate = {
+    id: number;
+    title: string;
+    description: string;
+    competences: string[];
+    rolesRequis: string[];
+    tasks: ScenarioTaskTemplate[];
+    createdBy: string;
+};
+
+export type ScenarioStatus = 'preparing' | 'running' | 'completed';
+
+export type ActiveScenario = {
+    id: number;
+    templateId: number;
+    classId: number;
+    status: ScenarioStatus;
+    createdAt: string;
+};
+
+export type TaskStatus = 'blocked' | 'todo' | 'completed';
+
+export type Task = {
+    id: number;
+    scenarioId: number;
+    userId: string;
+    description: string;
+    status: TaskStatus;
+    taskType: TaskType;
+    prerequisiteTaskId?: number;
+    details?: Record<string, any>;
+};

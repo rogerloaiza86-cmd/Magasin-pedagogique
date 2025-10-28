@@ -14,6 +14,7 @@ import {
   FileText,
   BookUser,
   Mail,
+  Swords,
 } from "lucide-react";
 
 import {
@@ -45,11 +46,13 @@ type NavItem = {
     | 'canViewStock'
     | 'canManageClasses'
     | 'canUseIaTools'
-    | 'canUseMessaging';
+    | 'canUseMessaging'
+    | 'canManageScenarios';
 };
 
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: Home, permission: 'canViewDashboard' },
+  { href: "/scenarios", label: "Scénarios", icon: Swords, permission: 'canManageScenarios'},
   { href: "/tiers", label: "Gestion des Tiers", icon: Users, permission: 'canViewTiers' },
   { href: "/flux-entrant", label: "Flux Entrant", icon: ArrowDownToLine, permission: 'canCreateBC' }, // Simplified for grouping
   { href: "/flux-sortant", label: "Flux Sortant", icon: ArrowUpFromLine, permission: 'canCreateBL' }, // Simplified for grouping
@@ -67,7 +70,7 @@ export default function MainLayout({
 }) {
   const pathname = usePathname();
   const { state, dispatch } = useWms();
-  const { currentUser, currentUserPermissions, emails } = state;
+  const { currentUser, currentUserPermissions, emails, roles } = state;
 
   const handleLogout = () => {
     dispatch({ type: "LOGOUT" });
@@ -139,7 +142,7 @@ export default function MainLayout({
                 </Avatar>
                 <div className="flex-1 overflow-hidden">
                     <p className="text-sm font-semibold truncate">{currentUser?.username}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{state.roles.get(currentUser?.roleId || '')?.name || currentUser?.profile}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{roles.get(currentUser?.roleId || '')?.name || currentUser?.profile}</p>
                 </div>
                 <Link href="/login" onClick={handleLogout}>
                     <SidebarMenuButton tooltip="Se déconnecter" className="w-auto">

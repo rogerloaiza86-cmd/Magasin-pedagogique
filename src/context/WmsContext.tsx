@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
-import type { Article, Tier, Document, Movement, User, UserProfile, Class, Email, Role, Permissions } from '@/lib/types';
+import type { Article, Tier, Document, Movement, User, UserProfile, Class, Email, Role, Permissions, ScenarioTemplate, ActiveScenario, Task } from '@/lib/types';
 import { initialArticles } from '@/lib/articles-data';
 
 // --- ROLES & PERMISSIONS DEFINITION ---
@@ -17,7 +17,7 @@ ROLES.set('super_admin', {
         isSuperAdmin: true,
         canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true, canReceiveBC: true,
         canCreateBL: true, canPrepareBL: true, canShipBL: true, canManageStock: true, canViewStock: true,
-        canManageClasses: true, canUseIaTools: true, canUseMessaging: true,
+        canManageClasses: true, canUseIaTools: true, canUseMessaging: true, canManageScenarios: true,
     }
 });
 
@@ -30,6 +30,7 @@ ROLES.set('equipe_reception', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true,
         canReceiveBC: true, canCreateBL: false, canPrepareBL: false, canShipBL: false,
         canManageStock: true, canViewStock: true, canManageClasses: false, canUseIaTools: false, canUseMessaging: true,
+        canManageScenarios: false,
     }
 });
 
@@ -42,6 +43,7 @@ ROLES.set('equipe_preparation', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: false,
         canReceiveBC: false, canCreateBL: true, canPrepareBL: true, canShipBL: true,
         canManageStock: false, canViewStock: true, canManageClasses: false, canUseIaTools: false, canUseMessaging: true,
+        canManageScenarios: false,
     }
 });
 
@@ -54,11 +56,17 @@ interface WmsState {
   classes: Map<number, Class>;
   emails: Map<number, Email>;
   roles: Map<string, Role>;
+  scenarioTemplates: Map<number, ScenarioTemplate>;
+  activeScenarios: Map<number, ActiveScenario>;
+  tasks: Map<number, Task>;
   tierIdCounter: number;
   docIdCounter: number;
   movementIdCounter: number;
   classIdCounter: number;
   emailIdCounter: number;
+  scenarioTemplateIdCounter: number;
+  activeScenarioIdCounter: number;
+  taskIdCounter: number;
   currentUser: User | null;
   currentUserPermissions: Permissions | null;
 }
@@ -78,22 +86,26 @@ const getInitialState = (): WmsState => {
   initialUsers.set('admin', { username: 'admin', password: 'admin', profile: 'Administrateur', createdAt: new Date().toISOString(), roleId: 'super_admin' });
   initialUsers.set('prof', { username: 'prof', password: 'prof', profile: 'professeur', createdAt: new Date().toISOString(), roleId: 'super_admin' });
 
-  const initialClasses = new Map<number, Class>();
-
   return {
     articles: new Map(initialArticles.map(a => [a.id, a])),
     tiers: new Map(),
     documents: new Map(),
     movements: initialMovements,
     users: initialUsers,
-    classes: initialClasses,
+    classes: new Map(),
     emails: new Map(),
     roles: ROLES,
+    scenarioTemplates: new Map(),
+    activeScenarios: new Map(),
+    tasks: new Map(),
     tierIdCounter: 1,
     docIdCounter: 1,
     movementIdCounter: initialMovements.length + 1,
     classIdCounter: 1,
     emailIdCounter: 1,
+    scenarioTemplateIdCounter: 1,
+    activeScenarioIdCounter: 1,
+    taskIdCounter: 1,
     currentUser: null,
     currentUserPermissions: null,
   };
@@ -112,6 +124,9 @@ type WmsAction =
   | { type: 'TOGGLE_TEACHER_CLASS_ASSIGNMENT', payload: { classId: number, teacherId: string } }
   | { type: 'SEND_EMAIL'; payload: Omit<Email, 'id' | 'timestamp' | 'isRead'> }
   | { type: 'MARK_EMAIL_AS_READ'; payload: { emailId: number } }
+  | { type: 'SAVE_SCENARIO_TEMPLATE'; payload: Omit<ScenarioTemplate, 'id' | 'createdBy'> & { id?: number } }
+  | { type: 'DELETE_SCENARIO_TEMPLATE'; payload: { templateId: number } }
+  | { type: 'LAUNCH_SCENARIO', payload: { templateId: number, classId: number } }
   | { type: 'SET_STATE'; payload: WmsState };
 
 
@@ -127,18 +142,11 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       throw new Error("Identifiant ou mot de passe incorrect.");
     }
     case 'LOGOUT':
-      // Reset the entire state but keep users, roles, and initial data
-      const freshState = getInitialState();
+      localStorage.removeItem('wmsLastUser');
       return { 
-        ...freshState, 
-        currentUser: null, 
-        currentUserPermissions: null,
-        users: state.users, 
-        articles: state.articles, 
-        movements: state.movements, 
+        ...getInitialState(), 
+        users: state.users,
         classes: state.classes,
-        roles: state.roles,
-        emails: state.emails 
       };
     case 'REGISTER_USER': {
         const { username, password, profile, classId } = action.payload;
@@ -291,22 +299,13 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       }
       return state;
     }
-    case 'SET_STATE':
-        const newState = action.payload;
-        if(newState.currentUser) {
-            newState.currentUserPermissions = newState.roles.get(newState.currentUser.roleId)?.permissions || null;
-        } else {
-            newState.currentUserPermissions = null;
-        }
-        return newState;
-
     case 'ADD_TIER': {
-      if (!state.currentUserPermissions?.canManageTiers) return state;
+      if (!state.currentUserPermissions?.canManageTiers || !state.currentUser) return state;
       const newTier: Tier = { 
         ...action.payload, 
         id: state.tierIdCounter,
         createdAt: new Date().toISOString(),
-        createdBy: state.currentUser?.username || 'Inconnu'
+        createdBy: state.currentUser.username
       };
       const newTiers = new Map(state.tiers);
       newTiers.set(newTier.id, newTier);
@@ -315,14 +314,14 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
     case 'CREATE_DOCUMENT': {
         const { type } = action.payload;
         const perms = state.currentUserPermissions;
-        if ((type === 'Bon de Commande Fournisseur' && !perms?.canCreateBC) || (type === 'Bon de Livraison Client' && !perms?.canCreateBL)) {
-            return state; // Action non autorisée
+        if (!state.currentUser || (type === 'Bon de Commande Fournisseur' && !perms?.canCreateBC) || (type === 'Bon de Livraison Client' && !perms?.canCreateBL)) {
+            return state;
         }
         const newDoc: Document = { 
             ...action.payload, 
             id: state.docIdCounter, 
             createdAt: new Date().toISOString(),
-            createdBy: state.currentUser?.username || 'Inconnu'
+            createdBy: state.currentUser.username
         };
         const newDocuments = new Map(state.documents);
         newDocuments.set(newDoc.id, newDoc);
@@ -331,6 +330,9 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
     case 'UPDATE_DOCUMENT': {
         const updatedDocuments = new Map(state.documents);
         const docToUpdate = action.payload;
+        const currentUser = state.currentUser;
+
+        if (!currentUser) return state;
 
         const oldDoc = state.documents.get(docToUpdate.id);
         if(!oldDoc) return state;
@@ -353,7 +355,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         type: 'Entrée (Réception BC)',
                         quantity: line.quantity,
                         stockAfter: newStock,
-                        user: state.currentUser?.username || 'Inconnu',
+                        user: currentUser.username,
                     });
                 }
             });
@@ -373,7 +375,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         type: 'Sortie (Expédition BL)',
                         quantity: -line.quantity,
                         stockAfter: newStock,
-                        user: state.currentUser?.username || 'Inconnu',
+                        user: currentUser.username,
                     });
                 }
             });
@@ -384,7 +386,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         return { ...state, documents: updatedDocuments, articles: newArticles, movements: newMovements, movementIdCounter: newMovementIdCounter };
     }
     case 'ADJUST_INVENTORY': {
-      if (!state.currentUserPermissions?.canManageStock) return state;
+      if (!state.currentUserPermissions?.canManageStock || !state.currentUser) return state;
       const { articleId, newStock, oldStock } = action.payload;
       const newArticles = new Map(state.articles);
       const article = newArticles.get(articleId);
@@ -398,7 +400,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
           type: 'Ajustement Inventaire',
           quantity: newStock - oldStock,
           stockAfter: newStock,
-          user: state.currentUser?.username || "Inconnu",
+          user: state.currentUser.username,
         };
         return {
           ...state,
@@ -409,6 +411,122 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       }
       return state;
     }
+    case 'SAVE_SCENARIO_TEMPLATE': {
+        if (!state.currentUserPermissions?.canManageScenarios || !state.currentUser) return state;
+        const newTemplates = new Map(state.scenarioTemplates);
+        if (action.payload.id) { // Update existing
+            const existing = newTemplates.get(action.payload.id);
+            if(existing && existing.createdBy === state.currentUser.username) {
+                newTemplates.set(action.payload.id, {...existing, ...action.payload});
+            }
+        } else { // Create new
+            const newId = state.scenarioTemplateIdCounter;
+            const newTemplate: ScenarioTemplate = {
+                ...action.payload,
+                id: newId,
+                createdBy: state.currentUser.username
+            };
+            newTemplates.set(newId, newTemplate);
+            return {...state, scenarioTemplates: newTemplates, scenarioTemplateIdCounter: newId + 1};
+        }
+        return {...state, scenarioTemplates: newTemplates};
+    }
+    case 'DELETE_SCENARIO_TEMPLATE': {
+        if (!state.currentUserPermissions?.canManageScenarios || !state.currentUser) return state;
+        const newTemplates = new Map(state.scenarioTemplates);
+        const template = newTemplates.get(action.payload.templateId);
+        if (template && (state.currentUserPermissions.isSuperAdmin || template.createdBy === state.currentUser.username)) {
+            newTemplates.delete(action.payload.templateId);
+        }
+        return {...state, scenarioTemplates: newTemplates};
+    }
+    case 'LAUNCH_SCENARIO': {
+        if (!state.currentUserPermissions?.canManageScenarios) return state;
+        const { templateId, classId } = action.payload;
+        const template = state.scenarioTemplates.get(templateId);
+        if (!template) return state;
+
+        // Create active scenario
+        const newActiveScenarioId = state.activeScenarioIdCounter;
+        const newActiveScenario: ActiveScenario = {
+            id: newActiveScenarioId,
+            templateId,
+            classId,
+            status: 'running',
+            createdAt: new Date().toISOString()
+        };
+        const newActiveScenarios = new Map(state.activeScenarios);
+        newActiveScenarios.set(newActiveScenarioId, newActiveScenario);
+
+        // Assign roles and create tasks
+        const studentsInClass = Array.from(state.users.values()).filter(u => u.classId === classId && u.profile === 'élève');
+        const rolesToAssign = template.rolesRequis;
+        const newUsers = new Map(state.users);
+        const newTasks = new Map(state.tasks);
+        let taskIdCounter = state.taskIdCounter;
+
+        studentsInClass.forEach((student, index) => {
+            const roleId = rolesToAssign[index % rolesToAssign.length];
+            const updatedUser = {...student, roleId};
+            newUsers.set(student.username, updatedUser);
+
+            const studentTasks = template.tasks.filter(t => t.roleId === roleId);
+            const taskCreationMap = new Map<number, number>(); // template.taskOrder -> new taskId
+
+            studentTasks.forEach(taskTemplate => {
+                const newTask: Task = {
+                    id: taskIdCounter,
+                    scenarioId: newActiveScenarioId,
+                    userId: student.username,
+                    description: taskTemplate.description,
+                    taskType: taskTemplate.taskType,
+                    status: 'blocked',
+                    details: taskTemplate.details,
+                };
+                newTasks.set(taskIdCounter, newTask);
+                taskCreationMap.set(taskTemplate.taskOrder, taskIdCounter);
+                taskIdCounter++;
+            });
+             // Link prerequisites and set initial tasks to 'todo'
+            newTasks.forEach(task => {
+                if (task.userId === student.username && task.scenarioId === newActiveScenarioId) {
+                    const originalTemplate = template.tasks.find(t => t.description === task.description && t.roleId === roleId);
+                    if (originalTemplate) {
+                       if (originalTemplate.prerequisite) {
+                           task.prerequisiteTaskId = taskCreationMap.get(originalTemplate.prerequisite);
+                       }
+                       if (!task.prerequisiteTaskId) {
+                           task.status = 'todo';
+                       }
+                    }
+                }
+            });
+        });
+
+        // Update current user if they are part of the scenario
+        const updatedCurrentUser = state.currentUser ? newUsers.get(state.currentUser.username) || state.currentUser : null;
+        const updatedPermissions = updatedCurrentUser ? state.roles.get(updatedCurrentUser.roleId)?.permissions || null : null;
+
+
+        return {
+            ...state,
+            activeScenarios: newActiveScenarios,
+            users: newUsers,
+            tasks: newTasks,
+            activeScenarioIdCounter: newActiveScenarioId + 1,
+            taskIdCounter: taskIdCounter,
+            currentUser: updatedCurrentUser,
+            currentUserPermissions: updatedPermissions
+        };
+    }
+    case 'SET_STATE':
+        const newState = action.payload;
+        if(newState.currentUser) {
+            newState.currentUserPermissions = newState.roles.get(newState.currentUser.roleId)?.permissions || null;
+        } else {
+            newState.currentUserPermissions = null;
+        }
+        return newState;
     default:
       return state;
   }
@@ -433,28 +551,28 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
       const savedState = localStorage.getItem('wmsState');
       if (savedState) {
         const parsedState = JSON.parse(savedState);
+        
+        // Deserialize Maps
         parsedState.articles = new Map(parsedState.articles);
         parsedState.tiers = new Map(parsedState.tiers.map((t: Tier) => [t.id, t]));
         parsedState.documents = new Map(parsedState.documents.map((d: Document) => [d.id, d]));
         parsedState.users = new Map(parsedState.users);
         parsedState.classes = parsedState.classes ? new Map(parsedState.classes.map((c: Class) => [c.id, c])) : getInitialState().classes;
         parsedState.emails = parsedState.emails ? new Map(parsedState.emails.map((e: Email) => [e.id, e])) : new Map();
+        parsedState.scenarioTemplates = parsedState.scenarioTemplates ? new Map(parsedState.scenarioTemplates.map((st: ScenarioTemplate) => [st.id, st])) : new Map();
+        parsedState.activeScenarios = parsedState.activeScenarios ? new Map(parsedState.activeScenarios.map((as: ActiveScenario) => [as.id, as])) : new Map();
+        parsedState.tasks = parsedState.tasks ? new Map(parsedState.tasks.map((t: Task) => [t.id, t])) : new Map();
+
         parsedState.roles = ROLES;
         
-        // When loading, auto-login if a user was previously logged in.
+        // Auto-login logic
         const lastUser = localStorage.getItem('wmsLastUser');
         if (lastUser) {
           const user = parsedState.users.get(lastUser);
           if (user) {
             parsedState.currentUser = user;
-            parsedState.currentUserPermissions = ROLES.get(user.roleId)?.permissions || null;
           }
-        } else {
-            parsedState.currentUser = null;
-            parsedState.currentUserPermissions = null;
         }
-
-
         dispatch({ type: 'SET_STATE', payload: parsedState });
       }
     } catch (e) {
@@ -473,19 +591,18 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
           users: Array.from(state.users.entries()),
           classes: Array.from(state.classes.values()),
           emails: Array.from(state.emails.values()),
-          roles: [], // Roles are static, no need to save them
-          currentUser: null, // Don't persist logged in user, handled separately
-          currentUserPermissions: null, // Don't persist permissions
+          scenarioTemplates: Array.from(state.scenarioTemplates.values()),
+          activeScenarios: Array.from(state.activeScenarios.values()),
+          tasks: Array.from(state.tasks.values()),
+          roles: [], // Static, no need to save
+          currentUser: null, 
+          currentUserPermissions: null,
       };
       localStorage.setItem('wmsState', JSON.stringify(stateToSave));
 
-      // Save the current user separately to re-login on refresh
       if (state.currentUser) {
           localStorage.setItem('wmsLastUser', state.currentUser.username);
-      } else {
-          localStorage.removeItem('wmsLastUser');
       }
-
     } catch (e) {
       console.error("Could not save state to localStorage.", e);
     }
