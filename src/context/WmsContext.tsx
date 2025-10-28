@@ -37,10 +37,12 @@ const getInitialState = (): WmsState => {
 
 
   const initialClasses = new Map<number, Class>();
-  initialClasses.set(1, { id: 1, name: '2nde Logistique A' });
-  initialClasses.set(2, { id: 2, name: '2nde Logistique B' });
-  initialClasses.set(3, { id: 3, name: '1ere Logistique' });
-  initialClasses.set(4, { id: 4, name: 'Terminale Logistique' });
+  initialClasses.set(1, { id: 1, name: '2GATL1 A' });
+  initialClasses.set(2, { id: 2, name: '2GATL1 B' });
+  initialClasses.set(3, { id: 3, name: '2GATL2 A' });
+  initialClasses.set(4, { id: 4, name: '2GATL2 B' });
+  initialClasses.set(5, { id: 5, name: '2GATL3 A' });
+  initialClasses.set(6, { id: 6, name: '2GATL3 B' });
 
 
   return {
@@ -54,7 +56,7 @@ const getInitialState = (): WmsState => {
     tierIdCounter: 1,
     docIdCounter: 1,
     movementIdCounter: initialMovements.length + 1,
-    classIdCounter: 5,
+    classIdCounter: 7,
     emailIdCounter: 1,
     currentUser: null,
   };
