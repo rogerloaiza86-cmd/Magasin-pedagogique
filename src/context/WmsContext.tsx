@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
-import type { Article, Tier, Document, Movement, User, UserProfile, Class, Email, Role, Permissions, ScenarioTemplate, ActiveScenario, Task } from '@/lib/types';
+import type { Article, Tier, Document, Movement, User, UserProfile, Class, Email, Role, Permissions, ScenarioTemplate, ActiveScenario, Task, TaskType } from '@/lib/types';
 import { initialArticles } from '@/lib/articles-data';
 
 // --- ROLES & PERMISSIONS DEFINITION ---
@@ -29,7 +29,7 @@ ROLES.set('equipe_reception', {
     permissions: {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true,
         canReceiveBC: true, canCreateBL: false, canPrepareBL: false, canShipBL: false,
-        canManageStock: true, canViewStock: true, canManageClasses: false, canUseIaTools: false, canUseMessaging: true,
+        canManageStock: true, canViewStock: true, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
         canManageScenarios: false,
     }
 });
@@ -42,10 +42,11 @@ ROLES.set('equipe_preparation', {
     permissions: {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: false,
         canReceiveBC: false, canCreateBL: true, canPrepareBL: true, canShipBL: true,
-        canManageStock: false, canViewStock: true, canManageClasses: false, canUseIaTools: false, canUseMessaging: true,
+        canManageStock: false, canViewStock: true, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
         canManageScenarios: false,
     }
 });
+
 
 interface WmsState {
   articles: Map<string, Article>;
@@ -129,25 +130,102 @@ type WmsAction =
   | { type: 'LAUNCH_SCENARIO', payload: { templateId: number, classId: number } }
   | { type: 'SET_STATE'; payload: WmsState };
 
+const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState => {
+    const { currentUser, tasks, activeScenarios } = state;
+    if (!currentUser) return state;
+
+    const userActiveScenario = Array.from(activeScenarios.values()).find(sc => sc.classId === currentUser.classId && sc.status === 'running');
+    if (!userActiveScenario) return state;
+
+    const userTasks = Array.from(tasks.values()).filter(t => t.userId === currentUser.username && t.scenarioId === userActiveScenario.id);
+    const todoTasks = userTasks.filter(t => t.status === 'todo');
+
+    let completedTaskId: number | null = null;
+
+    for (const task of todoTasks) {
+        let taskCompleted = false;
+        switch (task.taskType) {
+            case 'CREATE_TIERS_CLIENT':
+                if (action.type === 'ADD_TIER' && action.payload.type === 'Client') taskCompleted = true;
+                break;
+            case 'CREATE_TIERS_FOURNISSEUR':
+                if (action.type === 'ADD_TIER' && action.payload.type === 'Fournisseur') taskCompleted = true;
+                break;
+            case 'CREATE_TIERS_TRANSPORTEUR':
+                if (action.type === 'ADD_TIER' && action.payload.type === 'Transporteur') taskCompleted = true;
+                break;
+            case 'CREATE_BC':
+                if (action.type === 'CREATE_DOCUMENT' && action.payload.type === 'Bon de Commande Fournisseur') taskCompleted = true;
+                break;
+            case 'RECEIVE_BC':
+                 if (action.type === 'UPDATE_DOCUMENT' && action.payload.type === 'Bon de Commande Fournisseur' && action.payload.status === 'Réceptionné') taskCompleted = true;
+                break;
+            case 'CREATE_BL':
+                 if (action.type === 'CREATE_DOCUMENT' && action.payload.type === 'Bon de Livraison Client') taskCompleted = true;
+                break;
+            case 'PREPARE_BL':
+                // This is a manual action in the UI for now, so we need a dedicated action or a way to track it.
+                // For now, we'll assume it's part of SHIP_BL. Let's adjust if a 'preparation finished' action is added.
+                // A simple way is to consider it done when the shipping happens.
+                if (action.type === 'UPDATE_DOCUMENT' && action.payload.type === 'Bon de Livraison Client' && action.payload.status === 'Expédié') taskCompleted = true;
+                break;
+            case 'SHIP_BL':
+                if (action.type === 'UPDATE_DOCUMENT' && action.payload.type === 'Bon de Livraison Client' && action.payload.status === 'Expédié') taskCompleted = true;
+                break;
+            // MANUAL_VALIDATION is ignored here
+        }
+        if (taskCompleted) {
+            completedTaskId = task.id;
+            break; 
+        }
+    }
+
+    if (completedTaskId) {
+        const newTasks = new Map(tasks);
+        const completedTask = newTasks.get(completedTaskId);
+        if (completedTask) {
+            newTasks.set(completedTaskId, { ...completedTask, status: 'completed' });
+
+            // Unlock next tasks
+            userTasks.forEach(task => {
+                if (task.prerequisiteTaskId === completedTaskId) {
+                    const taskToUnlock = newTasks.get(task.id);
+                    if (taskToUnlock) {
+                        newTasks.set(task.id, { ...taskToUnlock, status: 'todo' });
+                    }
+                }
+            });
+            return { ...state, tasks: newTasks };
+        }
+    }
+    
+    return state;
+};
+
 
 const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
+  let newState: WmsState;
   switch (action.type) {
     case 'LOGIN': {
       const { username, password } = action.payload;
       const user = state.users.get(username);
       if (user && user.password === password) {
         const permissions = state.roles.get(user.roleId)?.permissions || null;
-        return { ...state, currentUser: user, currentUserPermissions: permissions };
+        newState = { ...state, currentUser: user, currentUserPermissions: permissions };
+      } else {
+        throw new Error("Identifiant ou mot de passe incorrect.");
       }
-      throw new Error("Identifiant ou mot de passe incorrect.");
+      break;
     }
     case 'LOGOUT':
       localStorage.removeItem('wmsLastUser');
-      return { 
+      newState = { 
         ...getInitialState(), 
         users: state.users,
         classes: state.classes,
+        scenarioTemplates: state.scenarioTemplates, // Keep templates
       };
+      break;
     case 'REGISTER_USER': {
         const { username, password, profile, classId } = action.payload;
         if (state.users.has(username)) {
@@ -171,7 +249,8 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
             newUser.classId = classId;
         }
         newUsers.set(username, newUser);
-        return { ...state, users: newUsers };
+        newState = { ...state, users: newUsers };
+        break;
     }
     case 'ADD_CLASS': {
         if (!state.currentUserPermissions?.canManageClasses) return state;
@@ -182,7 +261,8 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         };
         const newClasses = new Map(state.classes);
         newClasses.set(newClass.id, newClass);
-        return { ...state, classes: newClasses, classIdCounter: state.classIdCounter + 1 };
+        newState = { ...state, classes: newClasses, classIdCounter: state.classIdCounter + 1 };
+        break;
     }
     case 'DELETE_CLASS': {
         if (!state.currentUserPermissions?.isSuperAdmin) return state;
@@ -199,7 +279,8 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
             }
         });
 
-        return { ...state, classes: newClasses, users: newUsers };
+        newState = { ...state, classes: newClasses, users: newUsers };
+        break;
     }
     case 'TOGGLE_TEACHER_CLASS_ASSIGNMENT': {
         if (!state.currentUserPermissions?.canManageClasses) return state;
@@ -218,9 +299,11 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                 const newTeacherIds = [...teacherIds, teacherId];
                 newClasses.set(classId, { ...classToUpdate, teacherIds: newTeacherIds });
             }
-            return { ...state, classes: newClasses };
+            newState = { ...state, classes: newClasses };
+        } else {
+          newState = state;
         }
-        return state;
+        break;
     }
     case 'SEND_EMAIL': {
       if (!state.currentUser || !state.currentUserPermissions?.canUseMessaging) return state;
@@ -287,7 +370,8 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         }
       }
       
-      return { ...state, emails: newEmails, emailIdCounter };
+      newState = { ...state, emails: newEmails, emailIdCounter };
+      break;
     }
     case 'MARK_EMAIL_AS_READ': {
       if (!state.currentUserPermissions?.canUseMessaging) return state;
@@ -295,9 +379,11 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       const email = newEmails.get(action.payload.emailId);
       if (email) {
         newEmails.set(action.payload.emailId, { ...email, isRead: true });
-        return { ...state, emails: newEmails };
+        newState = { ...state, emails: newEmails };
+      } else {
+        newState = state;
       }
-      return state;
+      break;
     }
     case 'ADD_TIER': {
       if (!state.currentUserPermissions?.canManageTiers || !state.currentUser) return state;
@@ -309,7 +395,8 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       };
       const newTiers = new Map(state.tiers);
       newTiers.set(newTier.id, newTier);
-      return { ...state, tiers: newTiers, tierIdCounter: state.tierIdCounter + 1 };
+      newState = { ...state, tiers: newTiers, tierIdCounter: state.tierIdCounter + 1 };
+      break;
     }
     case 'CREATE_DOCUMENT': {
         const { type } = action.payload;
@@ -325,7 +412,8 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         };
         const newDocuments = new Map(state.documents);
         newDocuments.set(newDoc.id, newDoc);
-        return { ...state, documents: newDocuments, docIdCounter: state.docIdCounter + 1 };
+        newState = { ...state, documents: newDocuments, docIdCounter: state.docIdCounter + 1 };
+        break;
     }
     case 'UPDATE_DOCUMENT': {
         const updatedDocuments = new Map(state.documents);
@@ -383,7 +471,8 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         
         updatedDocuments.set(docToUpdate.id, docToUpdate);
 
-        return { ...state, documents: updatedDocuments, articles: newArticles, movements: newMovements, movementIdCounter: newMovementIdCounter };
+        newState = { ...state, documents: updatedDocuments, articles: newArticles, movements: newMovements, movementIdCounter: newMovementIdCounter };
+        break;
     }
     case 'ADJUST_INVENTORY': {
       if (!state.currentUserPermissions?.canManageStock || !state.currentUser) return state;
@@ -402,21 +491,23 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
           stockAfter: newStock,
           user: state.currentUser.username,
         };
-        return {
+        newState = {
           ...state,
           articles: newArticles,
           movements: [...state.movements, newMovement],
           movementIdCounter: state.movementIdCounter + 1,
         };
+      } else {
+        newState = state;
       }
-      return state;
+      break;
     }
     case 'SAVE_SCENARIO_TEMPLATE': {
         if (!state.currentUserPermissions?.canManageScenarios || !state.currentUser) return state;
         const newTemplates = new Map(state.scenarioTemplates);
         if (action.payload.id) { // Update existing
             const existing = newTemplates.get(action.payload.id);
-            if(existing && existing.createdBy === state.currentUser.username) {
+            if(existing && (existing.createdBy === state.currentUser.username || state.currentUserPermissions.isSuperAdmin)) {
                 newTemplates.set(action.payload.id, {...existing, ...action.payload});
             }
         } else { // Create new
@@ -427,9 +518,11 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                 createdBy: state.currentUser.username
             };
             newTemplates.set(newId, newTemplate);
-            return {...state, scenarioTemplates: newTemplates, scenarioTemplateIdCounter: newId + 1};
+            newState = {...state, scenarioTemplates: newTemplates, scenarioTemplateIdCounter: newId + 1};
+            break;
         }
-        return {...state, scenarioTemplates: newTemplates};
+        newState = {...state, scenarioTemplates: newTemplates};
+        break;
     }
     case 'DELETE_SCENARIO_TEMPLATE': {
         if (!state.currentUserPermissions?.canManageScenarios || !state.currentUser) return state;
@@ -438,7 +531,8 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         if (template && (state.currentUserPermissions.isSuperAdmin || template.createdBy === state.currentUser.username)) {
             newTemplates.delete(action.payload.templateId);
         }
-        return {...state, scenarioTemplates: newTemplates};
+        newState = {...state, scenarioTemplates: newTemplates};
+        break;
     }
     case 'LAUNCH_SCENARIO': {
         if (!state.currentUserPermissions?.canManageScenarios) return state;
@@ -482,6 +576,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                     taskType: taskTemplate.taskType,
                     status: 'blocked',
                     details: taskTemplate.details,
+                    taskOrder: taskTemplate.taskOrder,
                 };
                 newTasks.set(taskIdCounter, newTask);
                 taskCreationMap.set(taskTemplate.taskOrder, taskIdCounter);
@@ -490,7 +585,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
              // Link prerequisites and set initial tasks to 'todo'
             newTasks.forEach(task => {
                 if (task.userId === student.username && task.scenarioId === newActiveScenarioId) {
-                    const originalTemplate = template.tasks.find(t => t.description === task.description && t.roleId === roleId);
+                    const originalTemplate = template.tasks.find(t => t.taskOrder === task.taskOrder && t.roleId === roleId);
                     if (originalTemplate) {
                        if (originalTemplate.prerequisite) {
                            task.prerequisiteTaskId = taskCreationMap.get(originalTemplate.prerequisite);
@@ -508,7 +603,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         const updatedPermissions = updatedCurrentUser ? state.roles.get(updatedCurrentUser.roleId)?.permissions || null : null;
 
 
-        return {
+        newState = {
             ...state,
             activeScenarios: newActiveScenarios,
             users: newUsers,
@@ -518,18 +613,21 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
             currentUser: updatedCurrentUser,
             currentUserPermissions: updatedPermissions
         };
+        break;
     }
     case 'SET_STATE':
-        const newState = action.payload;
-        if(newState.currentUser) {
-            newState.currentUserPermissions = newState.roles.get(newState.currentUser.roleId)?.permissions || null;
+        const loadedState = action.payload;
+        if(loadedState.currentUser) {
+            loadedState.currentUserPermissions = loadedState.roles.get(loadedState.currentUser.roleId)?.permissions || null;
         } else {
-            newState.currentUserPermissions = null;
+            loadedState.currentUserPermissions = null;
         }
-        return newState;
+        newState = loadedState;
+        break;
     default:
       return state;
   }
+  return validateAndUpdateTasks(newState, action);
 };
 
 interface WmsContextType {
