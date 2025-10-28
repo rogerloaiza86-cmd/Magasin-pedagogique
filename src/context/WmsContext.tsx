@@ -215,7 +215,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         return state;
     }
     case 'SEND_EMAIL': {
-      if (!state.currentUser) return state;
+      if (!state.currentUser || !state.currentUserPermissions?.canUseMessaging) return state;
     
       const newEmailData = action.payload;
       const newEmails = new Map(state.emails);
@@ -282,6 +282,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       return { ...state, emails: newEmails, emailIdCounter };
     }
     case 'MARK_EMAIL_AS_READ': {
+      if (!state.currentUserPermissions?.canUseMessaging) return state;
       const newEmails = new Map(state.emails);
       const email = newEmails.get(action.payload.emailId);
       if (email) {
@@ -440,8 +441,19 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
         parsedState.emails = parsedState.emails ? new Map(parsedState.emails.map((e: Email) => [e.id, e])) : new Map();
         parsedState.roles = ROLES;
         
-        parsedState.currentUser = null;
-        parsedState.currentUserPermissions = null;
+        // When loading, auto-login if a user was previously logged in.
+        const lastUser = localStorage.getItem('wmsLastUser');
+        if (lastUser) {
+          const user = parsedState.users.get(lastUser);
+          if (user) {
+            parsedState.currentUser = user;
+            parsedState.currentUserPermissions = ROLES.get(user.roleId)?.permissions || null;
+          }
+        } else {
+            parsedState.currentUser = null;
+            parsedState.currentUserPermissions = null;
+        }
+
 
         dispatch({ type: 'SET_STATE', payload: parsedState });
       }
@@ -462,10 +474,18 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
           classes: Array.from(state.classes.values()),
           emails: Array.from(state.emails.values()),
           roles: [], // Roles are static, no need to save them
-          currentUser: null, // Don't persist logged in user
+          currentUser: null, // Don't persist logged in user, handled separately
           currentUserPermissions: null, // Don't persist permissions
       };
       localStorage.setItem('wmsState', JSON.stringify(stateToSave));
+
+      // Save the current user separately to re-login on refresh
+      if (state.currentUser) {
+          localStorage.setItem('wmsLastUser', state.currentUser.username);
+      } else {
+          localStorage.removeItem('wmsLastUser');
+      }
+
     } catch (e) {
       console.error("Could not save state to localStorage.", e);
     }

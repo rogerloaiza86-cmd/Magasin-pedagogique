@@ -5,18 +5,18 @@ import { useWms } from '@/context/WmsContext';
 import { usePathname, useRouter } from 'next/navigation';
 
 export function AppStateSync() {
-  const { state } = useWms();
+  const { state, dispatch } = useWms();
   const router = useRouter();
   const pathname = usePathname();
 
   const unprotectedRoutes = ['/login', '/signup'];
 
   useEffect(() => {
-    // Redirect to login if not authenticated and not on an unprotected page
+    // This component will now also handle re-login on refresh
+    // via the logic in WmsProvider's useEffect.
     if (!state.currentUser && !unprotectedRoutes.includes(pathname)) {
       router.replace('/login');
     }
-    // Redirect to dashboard if authenticated and on an unprotected page
     else if (state.currentUser && unprotectedRoutes.includes(pathname)) {
       router.replace('/dashboard');
     }
