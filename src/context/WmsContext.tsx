@@ -85,7 +85,7 @@ const getInitialState = (): WmsState => {
 
   const initialUsers = new Map<string, User>();
   initialUsers.set('admin', { username: 'admin', password: 'admin', profile: 'Administrateur', createdAt: new Date().toISOString(), roleId: 'super_admin' });
-  initialUsers.set('prof', { username: 'prof', password: 'prof', profile: 'professeur', createdAt: new Date().toISOString(), roleId: 'super_admin' });
+  initialUsers.set('prof', { username: 'prof', password: 'professeur', createdAt: new Date().toISOString(), roleId: 'super_admin' });
 
   return {
     articles: new Map(initialArticles.map(a => [a.id, a])),
