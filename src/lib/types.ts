@@ -51,7 +51,7 @@ export type User = {
 export type Class = {
     id: number;
     name: string;
-    teacherId?: string; // username of the teacher
+    teacherIds?: string[]; // username of the teacher
 }
 
 export type Email = {

@@ -17,36 +17,35 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { User, Class } from "@/lib/types";
+import { User } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 
 export function ClassesClient() {
   const { state, dispatch } = useWms();
   const { classes, users, currentUser } = state;
   const { toast } = useToast();
-  const [selectedClassId, setSelectedClassId] = useState<string>("");
+  const [openClassId, setOpenClassId] = useState<number | null>(null);
 
-  const handleAssignClass = (classId: string) => {
+  const handleToggleAssignment = (classId: number) => {
     if (currentUser?.profile === "professeur") {
       dispatch({
-        type: "ASSIGN_TEACHER_TO_CLASS",
+        type: "TOGGLE_TEACHER_CLASS_ASSIGNMENT",
         payload: {
-          classId: parseInt(classId, 10),
+          classId: classId,
           teacherId: currentUser.username,
         },
       });
+      
+      const classInfo = classes.get(classId);
+      const isAssigned = classInfo?.teacherIds?.includes(currentUser.username);
+
       toast({
-        title: "Classe assignée",
-        description: `Vous avez été assigné à la classe.`,
+        title: isAssigned ? "Désassignation réussie" : "Assignation réussie",
+        description: `Vous avez ${isAssigned ? 'quitté' : 'rejoint'} la classe ${classInfo?.name}.`,
       });
     }
   };
@@ -57,77 +56,64 @@ export function ClassesClient() {
     );
   };
   
-  const getTeacherClass = (): Class | undefined => {
-    if (currentUser?.profile !== 'professeur') return undefined;
-    return Array.from(classes.values()).find(c => c.teacherId === currentUser.username);
+  const getTeachersForClass = (classId: number): User[] => {
+    const classInfo = classes.get(classId);
+    if (!classInfo || !classInfo.teacherIds) return [];
+    return classInfo.teacherIds.map(teacherId => users.get(teacherId)).filter(Boolean) as User[];
   }
-
-  const teacherClass = getTeacherClass();
 
   return (
     <div className="space-y-6">
-      {currentUser?.profile === "professeur" && !teacherClass && (
-        <Card>
-          <CardHeader>
-            <CardTitle>S'assigner à une classe</CardTitle>
-            <CardDescription>
-              Sélectionnez la classe que vous supervisez pour voir la liste des
-              élèves.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex items-center gap-4">
-            <Select onValueChange={setSelectedClassId} value={selectedClassId}>
-              <SelectTrigger className="w-[280px]">
-                <SelectValue placeholder="Sélectionner une classe..." />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from(classes.values()).map((c) => (
-                  <SelectItem key={c.id} value={c.id.toString()} disabled={!!c.teacherId}>
-                    {c.name} {c.teacherId && `(déjà assignée)`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              onClick={() => handleAssignClass(selectedClassId)}
-              disabled={!selectedClassId}
-            >
-              Confirmer
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {teacherClass && (
-        <Card>
-            <CardHeader>
-                <CardTitle>Votre Classe: {teacherClass.name}</CardTitle>
-                <CardDescription>Liste des élèves inscrits dans votre classe.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <StudentListTable students={getStudentsInClass(teacherClass.id)} />
-            </CardContent>
-        </Card>
-      )}
-
-      {currentUser?.profile === "Administrateur" && (
+      {(currentUser?.profile === "professeur" || currentUser?.profile === "Administrateur") && (
          <Card>
             <CardHeader>
-                <CardTitle>Vue Administrateur</CardTitle>
-                <CardDescription>Liste de toutes les classes et des élèves.</CardDescription>
+                <CardTitle>Gestion des Classes</CardTitle>
+                <CardDescription>
+                  {currentUser.profile === 'professeur' 
+                    ? "Assignez-vous aux classes que vous supervisez et consultez la liste des élèves." 
+                    : "Vue d'ensemble de toutes les classes, des professeurs assignés et des élèves."}
+                </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-8">
-                {Array.from(classes.values()).map(c => (
-                    <div key={c.id}>
-                        <h3 className="font-bold text-lg mb-2">{c.name}</h3>
-                        <div className="border rounded-lg">
-                           <StudentListTable 
-                                students={getStudentsInClass(c.id)} 
-                                teacher={c.teacherId ? state.users.get(c.teacherId) : undefined}
-                           />
+            <CardContent className="space-y-4">
+                {Array.from(classes.values()).map(c => {
+                  const isTeacherAssigned = currentUser?.profile === 'professeur' && c.teacherIds?.includes(currentUser.username);
+                  const teachers = getTeachersForClass(c.id);
+
+                  return (
+                    <Collapsible key={c.id} open={openClassId === c.id} onOpenChange={() => setOpenClassId(prev => prev === c.id ? null : c.id)}>
+                      <div className="border p-4 rounded-lg">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h3 className="font-bold text-lg">{c.name}</h3>
+                            <div className="text-xs text-muted-foreground flex gap-1">
+                              {teachers.map(t => <Badge key={t.username} variant="secondary">{t.username}</Badge>)}
+                              {teachers.length === 0 && <Badge variant="outline">Aucun professeur</Badge>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                             {currentUser?.profile === 'professeur' && (
+                                <Button 
+                                  variant={isTeacherAssigned ? 'destructive' : 'default'} 
+                                  onClick={(e) => { e.stopPropagation(); handleToggleAssignment(c.id); }}
+                                >
+                                  {isTeacherAssigned ? 'Quitter la classe' : 'Gérer cette classe'}
+                                </Button>
+                              )}
+                            <CollapsibleTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                                <span className="sr-only">Toggle</span>
+                              </Button>
+                            </CollapsibleTrigger>
+                          </div>
                         </div>
-                    </div>
-                ))}
+                        <CollapsibleContent className="mt-4">
+                          <StudentListTable students={getStudentsInClass(c.id)} />
+                        </CollapsibleContent>
+                      </div>
+                    </Collapsible>
+                  )
+                })}
             </CardContent>
         </Card>
       )}
@@ -135,7 +121,7 @@ export function ClassesClient() {
   );
 }
 
-function StudentListTable({ students, teacher }: { students: User[], teacher?: User }) {
+function StudentListTable({ students }: { students: User[] }) {
     return (
          <Table>
             <TableHeader>
@@ -145,17 +131,11 @@ function StudentListTable({ students, teacher }: { students: User[], teacher?: U
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {teacher && (
-                    <TableRow className="bg-muted/50">
-                        <TableCell className="font-medium">{teacher.username} <Badge variant="secondary">Professeur</Badge></TableCell>
-                        <TableCell>{teacher.profile}</TableCell>
-                    </TableRow>
-                )}
                 {students.length > 0 ? (
                 students.map((student) => (
                     <TableRow key={student.username}>
                     <TableCell className="font-medium">{student.username}</TableCell>
-                    <TableCell>{student.profile}</TableCell>
+                    <TableCell><Badge variant="outline">{student.profile}</Badge></TableCell>
                     </TableRow>
                 ))
                 ) : (

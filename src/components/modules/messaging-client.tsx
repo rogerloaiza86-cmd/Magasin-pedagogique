@@ -49,13 +49,30 @@ function ComposeEmail() {
     if (currentUser.profile === 'élève') {
         const userClassId = currentUser.classId;
         if (!userClassId) return [];
-        return Array.from(users.values()).filter(u => u.profile === 'élève' && u.classId === userClassId && u.username !== currentUser.username);
+        const studentClass = classes.get(userClassId);
+        const recipients = Array.from(users.values()).filter(u => 
+            (u.profile === 'élève' && u.classId === userClassId && u.username !== currentUser.username)
+        );
+        if (studentClass && studentClass.teacherIds) {
+           studentClass.teacherIds.forEach(teacherId => {
+                const teacher = users.get(teacherId);
+                if (teacher) recipients.push(teacher);
+           });
+        }
+        return recipients;
     }
     
     if (currentUser.profile === 'professeur') {
-        const teacherClass = Array.from(classes.values()).find(c => c.teacherId === currentUser.username);
-        if (!teacherClass) return [];
-        return Array.from(users.values()).filter(u => u.classId === teacherClass.id);
+        const teacherClasses = Array.from(classes.values()).filter(c => c.teacherIds?.includes(currentUser.username));
+        const studentUsernames = new Set<string>();
+        teacherClasses.forEach(c => {
+             Array.from(users.values()).forEach(u => {
+                if (u.profile === 'élève' && u.classId === c.id) {
+                    studentUsernames.add(u.username);
+                }
+             })
+        });
+        return Array.from(studentUsernames).map(username => users.get(username)).filter(Boolean) as any[];
     }
 
     // Admin can message anyone
@@ -75,25 +92,11 @@ function ComposeEmail() {
   const onSubmit = (data: EmailFormData) => {
     if (!currentUser) return;
     
-    let cc: string[] = [];
-
-    // If student sends to student, CC the teacher
-    const sender = currentUser;
-    const recipientUser = users.get(data.recipient);
-    if (sender.profile === 'élève' && recipientUser?.profile === 'élève' && sender.classId) {
-        const studentClass = classes.get(sender.classId);
-        if (studentClass?.teacherId) {
-            cc.push(studentClass.teacherId);
-        }
-    }
-
-
     dispatch({
         type: "SEND_EMAIL",
         payload: {
             sender: currentUser.username,
             recipient: data.recipient,
-            cc: cc,
             subject: data.subject,
             body: data.body,
         }

@@ -37,12 +37,12 @@ const getInitialState = (): WmsState => {
 
 
   const initialClasses = new Map<number, Class>();
-  initialClasses.set(1, { id: 1, name: '2GATL1 A' });
-  initialClasses.set(2, { id: 2, name: '2GATL1 B' });
-  initialClasses.set(3, { id: 3, name: '2GATL2 A' });
-  initialClasses.set(4, { id: 4, name: '2GATL2 B' });
-  initialClasses.set(5, { id: 5, name: '2GATL3 A' });
-  initialClasses.set(6, { id: 6, name: '2GATL3 B' });
+  initialClasses.set(1, { id: 1, name: '2GATL1 A', teacherIds: [] });
+  initialClasses.set(2, { id: 2, name: '2GATL1 B', teacherIds: [] });
+  initialClasses.set(3, { id: 3, name: '2GATL2 A', teacherIds: [] });
+  initialClasses.set(4, { id: 4, name: '2GATL2 B', teacherIds: [] });
+  initialClasses.set(5, { id: 5, name: '2GATL3 A', teacherIds: [] });
+  initialClasses.set(6, { id: 6, name: '2GATL3 B', teacherIds: [] });
 
 
   return {
@@ -70,7 +70,7 @@ type WmsAction =
   | { type: 'LOGIN'; payload: { username: string, password: string} }
   | { type: 'LOGOUT' }
   | { type: 'REGISTER_USER', payload: Omit<User, 'password'> & { password?: string, classId?: number } }
-  | { type: 'ASSIGN_TEACHER_TO_CLASS', payload: { classId: number, teacherId: string } }
+  | { type: 'TOGGLE_TEACHER_CLASS_ASSIGNMENT', payload: { classId: number, teacherId: string } }
   | { type: 'SEND_EMAIL'; payload: Omit<Email, 'id' | 'timestamp' | 'isRead'> }
   | { type: 'MARK_EMAIL_AS_READ'; payload: { emailId: number } }
   | { type: 'SET_STATE'; payload: WmsState };
@@ -106,19 +106,24 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         newUsers.set(username, newUser);
         return { ...state, users: newUsers };
     }
-    case 'ASSIGN_TEACHER_TO_CLASS': {
+    case 'TOGGLE_TEACHER_CLASS_ASSIGNMENT': {
         const { classId, teacherId } = action.payload;
         const newClasses = new Map(state.classes);
         const classToUpdate = newClasses.get(classId);
+
         if (classToUpdate) {
-            // Remove teacher from old class if any
-            state.classes.forEach(c => {
-                if (c.teacherId === teacherId) {
-                    const oldClass = newClasses.get(c.id);
-                    if(oldClass) newClasses.set(c.id, {...oldClass, teacherId: undefined});
-                }
-            })
-            newClasses.set(classId, { ...classToUpdate, teacherId });
+            const teacherIds = classToUpdate.teacherIds || [];
+            const isAssigned = teacherIds.includes(teacherId);
+
+            if (isAssigned) {
+                // Unassign
+                const newTeacherIds = teacherIds.filter(id => id !== teacherId);
+                newClasses.set(classId, { ...classToUpdate, teacherIds: newTeacherIds });
+            } else {
+                // Assign
+                const newTeacherIds = [...teacherIds, teacherId];
+                newClasses.set(classId, { ...classToUpdate, teacherIds: newTeacherIds });
+            }
             return { ...state, classes: newClasses };
         }
         return state;
@@ -137,19 +142,25 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       };
       newEmails.set(mainEmail.id, mainEmail);
 
-      // CC to teacher if applicable
-      if (newEmailData.cc && newEmailData.cc.length > 0) {
-        newEmailData.cc.forEach(ccRecipient => {
-          const ccEmail: Email = {
-            ...newEmailData,
-            id: emailIdCounter++,
-            recipient: ccRecipient, // The recipient is the teacher
-            subject: `[Copie] ${newEmailData.subject}`,
-            timestamp: new Date().toISOString(),
-            isRead: false,
-          };
-          newEmails.set(ccEmail.id, ccEmail);
-        });
+      // CC to teachers if applicable
+      const recipientUser = state.users.get(newEmailData.recipient);
+      if (state.currentUser?.profile === 'élève' && recipientUser?.profile === 'élève') {
+        const studentClass = state.classes.get(state.currentUser.classId!);
+        if (studentClass?.teacherIds && studentClass.teacherIds.length > 0) {
+            studentClass.teacherIds.forEach(teacherId => {
+                 if (newEmailData.recipient !== teacherId && newEmailData.sender !== teacherId) {
+                    const ccEmail: Email = {
+                        ...newEmailData,
+                        id: emailIdCounter++,
+                        recipient: teacherId, // The recipient is the teacher
+                        subject: `[Copie de ${newEmailData.sender}] ${newEmailData.subject}`,
+                        timestamp: new Date().toISOString(),
+                        isRead: false,
+                    };
+                    newEmails.set(ccEmail.id, ccEmail);
+                 }
+            });
+        }
       }
       
       return { ...state, emails: newEmails, emailIdCounter };
