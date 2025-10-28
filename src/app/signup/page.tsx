@@ -55,7 +55,7 @@ export default function SignUpPage() {
 
   const password = watch("password");
   const profile = watch("profile");
-  const classes = Array.from(state.classes.values()).sort((a,b) => a.name.localeCompare(b.name));
+  const classes = Array.from(state.classes.values()).filter(Boolean).sort((a,b) => a.name.localeCompare(b.name));
 
   const onSubmit = (data: SignUpFormData) => {
     try {
