@@ -65,7 +65,6 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: Home, permission: 'canViewDashboard', envType: 'ALL' },
-  { href: "/environments", label: "Environnements", icon: Globe, isSuperAdminOnly: true, envType: 'ALL' },
   { href: "/scenarios", label: "Scénarios", icon: Swords, permission: 'canManageScenarios', envType: 'ALL'},
   { href: "/tiers", label: "Gestion des Tiers", icon: Users, permission: 'canViewTiers', envType: 'ALL' },
   { href: "/flotte", label: "Flotte", icon: Truck, permission: 'canManageFleet', envType: 'TMS' },
