@@ -7,6 +7,8 @@ export type Environment = {
     description: string;
 }
 
+export type ArticleStatus = 'Actif' | 'Bloqué' | 'En contrôle qualité' | 'Obsolète' | 'En attente de rangement';
+
 export type Article = {
   id: string;
   name: string;
@@ -15,6 +17,12 @@ export type Article = {
   price: number;
   packaging: string;
   environnementId: string;
+  // New fields
+  status: ArticleStatus;
+  ean?: string;
+  weight?: number; // in kg
+  dimensions?: { length: number; width: number; height: number }; // in cm
+  supplierIds?: number[];
 };
 
 export type TierType = 'Client' | 'Fournisseur' | 'Transporteur' | 'Vehicule';

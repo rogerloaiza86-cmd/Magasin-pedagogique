@@ -19,7 +19,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Article } from "@/lib/types";
+import { Article, ArticleStatus } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Eye } from "lucide-react";
 
 export function ArticlesClient() {
   const { state } = useWms();
@@ -42,6 +45,18 @@ export function ArticlesClient() {
     );
   }, [articlesInEnv, searchTerm]);
 
+  const getStatusVariant = (status: ArticleStatus): "default" | "secondary" | "destructive" | "outline" => {
+    switch (status) {
+        case 'Actif': return 'default';
+        case 'Bloqué': return 'destructive';
+        case 'Obsolète': return 'destructive';
+        case 'En contrôle qualité':
+        case 'En attente de rangement':
+            return 'secondary';
+        default: return 'outline';
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -59,38 +74,46 @@ export function ArticlesClient() {
             className="max-w-sm"
           />
         </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Référence</TableHead>
-              <TableHead>Désignation</TableHead>
-              <TableHead>Adressage</TableHead>
-              <TableHead>Stock Final</TableHead>
-              <TableHead>Conditionnement</TableHead>
-              <TableHead>Prix unitaire HT</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredArticles.length > 0 ? (
-              filteredArticles.map((article: Article) => (
-                <TableRow key={article.id}>
-                  <TableCell className="font-mono">{article.id}</TableCell>
-                  <TableCell className="font-medium">{article.name}</TableCell>
-                  <TableCell className="font-mono">{article.location}</TableCell>
-                  <TableCell>{article.stock}</TableCell>
-                  <TableCell>{article.packaging}</TableCell>
-                  <TableCell>{article.price.toFixed(2)} €</TableCell>
+        <div className="overflow-x-auto">
+            <Table>
+            <TableHeader>
+                <TableRow>
+                <TableHead>Référence</TableHead>
+                <TableHead>Désignation</TableHead>
+                <TableHead>Statut</TableHead>
+                <TableHead>Stock</TableHead>
+                <TableHead>Emplacement</TableHead>
+                <TableHead>Prix U. HT</TableHead>
+                <TableHead className="text-right">Détails</TableHead>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
-                  {articlesInEnv.length === 0 ? "Aucun article dans cet environnement." : "Aucun article ne correspond à votre recherche."}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+                {filteredArticles.length > 0 ? (
+                filteredArticles.map((article: Article) => (
+                    <TableRow key={article.id}>
+                    <TableCell className="font-mono">{article.id}</TableCell>
+                    <TableCell className="font-medium">{article.name}</TableCell>
+                    <TableCell><Badge variant={getStatusVariant(article.status)}>{article.status}</Badge></TableCell>
+                    <TableCell>{article.stock}</TableCell>
+                    <TableCell className="font-mono">{article.location}</TableCell>
+                    <TableCell>{article.price.toFixed(2)} €</TableCell>
+                    <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" disabled>
+                           <Eye className="h-4 w-4"/>
+                        </Button>
+                    </TableCell>
+                    </TableRow>
+                ))
+                ) : (
+                <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center">
+                    {articlesInEnv.length === 0 ? "Aucun article dans cet environnement." : "Aucun article ne correspond à votre recherche."}
+                    </TableCell>
+                </TableRow>
+                )}
+            </TableBody>
+            </Table>
+        </div>
       </CardContent>
     </Card>
   );
