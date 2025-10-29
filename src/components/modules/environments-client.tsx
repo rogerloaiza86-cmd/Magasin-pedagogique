@@ -15,26 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import { Loader2, PlusCircle, Trash2, Wand2 } from "lucide-react";
+import { Loader2, Wand2 } from "lucide-react";
 import type { Environment } from "@/lib/types";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 
 function DataGenerator({ environment }: { environment: Environment }) {
     const { dispatch } = useWms();
@@ -103,11 +85,9 @@ function DataGenerator({ environment }: { environment: Environment }) {
     )
 }
 
-
 export function EnvironmentsClient() {
-    const { state, dispatch } = useWms();
+    const { state } = useWms();
     const { currentUserPermissions, environments } = state;
-    const { toast } = useToast();
 
     if (!currentUserPermissions?.isSuperAdmin) {
         return (
