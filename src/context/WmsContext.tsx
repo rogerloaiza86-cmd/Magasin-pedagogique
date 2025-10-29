@@ -177,6 +177,7 @@ type WmsAction =
   | { type: 'UPDATE_DOCUMENT'; payload: Document }
   | { type: 'ADJUST_INVENTORY'; payload: { articleId: string; newStock: number; oldStock: number } }
   | { type: 'LOGIN'; payload: { username: string, password: string} }
+  | { type: 'REAUTHENTICATE_USER'; payload: { username: string } }
   | { type: 'LOGOUT' }
   | { type: 'REGISTER_USER', payload: Omit<User, 'password' | 'createdAt' | 'roleId'> & { password?: string, classId?: number } }
   | { type: 'ADD_CLASS', payload: { name: string } }
@@ -271,6 +272,18 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         newState = { ...state, currentUser: user, currentUserPermissions: permissions };
       } else {
         throw new Error("Identifiant ou mot de passe incorrect.");
+      }
+      break;
+    }
+     case 'REAUTHENTICATE_USER': {
+      const { username } = action.payload;
+      const user = state.users.get(username);
+      if (user) {
+        const permissions = state.roles.get(user.roleId)?.permissions || null;
+        newState = { ...state, currentUser: user, currentUserPermissions: permissions };
+      } else {
+        // User from localStorage not found, just return current state
+        newState = state;
       }
       break;
     }
@@ -867,10 +880,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
         
         const lastUser = localStorage.getItem('wmsLastUser');
         if (lastUser) {
-          const user = parsedState.users.get(lastUser);
-          if (user) {
-            parsedState.currentUser = user;
-          }
+           dispatch({ type: 'REAUTHENTICATE_USER', payload: { username: lastUser } });
         }
         
         const lastEnv = localStorage.getItem('wmsLastEnv');
@@ -884,7 +894,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (e) {
       console.error("Could not load state from localStorage. Using initial state.", e);
-      dispatch({ type: 'SET_STATE', payload: getInitialState() });
+      // Do not dispatch here, let it use the initial state from useReducer
     }
   }, []);
 
