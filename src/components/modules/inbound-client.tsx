@@ -2,7 +2,7 @@
 "use client";
 
 import { useWms } from "@/context/WmsContext";
-import { Article, Document, DocumentLine, Tier } from "@/lib/types";
+import { Article, Document, DocumentLine, Tier, ReturnReason, ReturnDecision } from "@/lib/types";
 import { useState } from "react";
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import {
@@ -33,7 +33,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, PlusCircle } from "lucide-react";
+import { Trash2, PlusCircle, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -53,6 +53,7 @@ import {
   DialogTitle,
   DialogFooter,
   DialogClose,
+  DialogDescription,
 } from "@/components/ui/dialog";
 
 type PurchaseOrderFormData = {
@@ -71,6 +72,25 @@ type ReceptionFormData = {
         ordered: number;
         received: number;
         nonConforming: number;
+    }[];
+}
+
+type ReturnFormData = {
+    clientId: string;
+    lines: {
+        articleId: string;
+        quantity: number;
+        returnReason: ReturnReason;
+    }[];
+}
+
+type ProcessReturnFormData = {
+    docId: number;
+    lines: {
+        articleId: string;
+        quantity: number;
+        returnReason: ReturnReason;
+        returnDecision: ReturnDecision;
     }[];
 }
 
@@ -400,13 +420,190 @@ function ReceivePurchaseOrder() {
   );
 }
 
+function CustomerReturns() {
+    const { state, dispatch, getArticle, getTier } = useWms();
+    const { toast } = useToast();
+    const { currentUser, currentEnvironmentId, documents } = state;
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const [isProcessDialogOpen, setIsProcessDialogOpen] = useState<Document | null>(null);
+    const returnReasons: ReturnReason[] = ["Erreur de commande", "Article défectueux", "Endommagé au transport", "Autre"];
+    const returnDecisions: ReturnDecision[] = ["Réintégrer en stock", "Mettre au rebut"];
+
+    const { control: createControl, handleSubmit: handleCreateSubmit, reset: resetCreate, formState: { errors: createErrors } } = useForm<ReturnFormData>({
+        defaultValues: { clientId: "", lines: [{ articleId: "", quantity: 1, returnReason: "Autre" }] }
+    });
+    const { fields: createFields, append: createAppend, remove: createRemove } = useFieldArray({ control: createControl, name: "lines" });
+
+    const { control: processControl, handleSubmit: handleProcessSubmit, reset: resetProcess, watch: watchProcess } = useForm<ProcessReturnFormData>();
+
+    const clients = Array.from(state.tiers.values()).filter(t => t.type === 'Client' && t.environnementId === currentEnvironmentId);
+    const articles = Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId);
+    const pendingReturns = Array.from(documents.values()).filter(d => d.type === 'Retour Client' && d.status === 'En attente de traitement' && d.environnementId === currentEnvironmentId);
+
+    const onCreateSubmit = (data: ReturnFormData) => {
+        dispatch({
+            type: "CREATE_DOCUMENT",
+            payload: {
+                type: 'Retour Client',
+                tierId: parseInt(data.clientId),
+                status: 'En attente de traitement',
+                lines: data.lines.map(l => ({ ...l, quantity: Number(l.quantity) })),
+            }
+        });
+        toast({ title: "Retour enregistré", description: "Le retour client a été créé et est en attente de traitement." });
+        resetCreate();
+        setIsCreateDialogOpen(false);
+    };
+    
+    const onProcessSubmit = (data: ProcessReturnFormData) => {
+        const docToUpdate = documents.get(data.docId);
+        if (!docToUpdate) return;
+        
+        dispatch({
+            type: 'UPDATE_DOCUMENT',
+            payload: {
+                ...docToUpdate,
+                status: 'Traité',
+                lines: data.lines,
+            }
+        });
+
+        toast({ title: "Retour traité", description: "Le stock a été mis à jour en fonction de vos décisions."});
+        setIsProcessDialogOpen(null);
+    };
+
+    const openProcessDialog = (doc: Document) => {
+        setIsProcessDialogOpen(doc);
+        resetProcess({
+            docId: doc.id,
+            lines: doc.lines.map(l => ({
+                articleId: l.articleId,
+                quantity: l.quantity,
+                returnReason: l.returnReason || "Autre",
+                returnDecision: "Réintégrer en stock"
+            }))
+        });
+    }
+
+    return (
+        <>
+            <Card>
+                <CardHeader className="flex-row justify-between items-center">
+                    <div>
+                        <CardTitle>Gestion des Retours Clients</CardTitle>
+                        <CardDescription>Enregistrez et traitez les retours de marchandises.</CardDescription>
+                    </div>
+                    <Button onClick={() => setIsCreateDialogOpen(true)}><RotateCcw className="mr-2 h-4 w-4"/>Enregistrer un retour</Button>
+                </CardHeader>
+                <CardContent>
+                     <Table>
+                        <TableHeader><TableRow><TableHead>Retour #</TableHead><TableHead>Client</TableHead><TableHead>Date</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                            {pendingReturns.length > 0 ? (
+                                pendingReturns.map(doc => (
+                                    <TableRow key={doc.id}>
+                                        <TableCell>{doc.id}</TableCell>
+                                        <TableCell>{getTier(doc.tierId)?.name || 'N/A'}</TableCell>
+                                        <TableCell>{new Date(doc.createdAt).toLocaleDateString()}</TableCell>
+                                        <TableCell>{doc.status}</TableCell>
+                                        <TableCell className="text-right"><Button size="sm" onClick={() => openProcessDialog(doc)}>Traiter</Button></TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow><TableCell colSpan={5} className="h-24 text-center">Aucun retour en attente de traitement.</TableCell></TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+
+            {/* Create Return Dialog */}
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <DialogContent className="max-w-3xl">
+                    <form onSubmit={handleCreateSubmit(onCreateSubmit)}>
+                        <DialogHeader><DialogTitle>Enregistrer un Retour Client</DialogTitle></DialogHeader>
+                        <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto px-1">
+                             <div>
+                                <Label>Client</Label>
+                                <Controller name="clientId" control={createControl} rules={{ required: true }} render={({ field }) => (
+                                    <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue placeholder="Choisir un client..." /></SelectTrigger><SelectContent>{clients.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent></Select>
+                                )}/>
+                            </div>
+                            <Label>Articles Retournés</Label>
+                             {createFields.map((field, index) => (
+                                <div key={field.id} className="grid grid-cols-3 items-end gap-2 p-2 border rounded-lg">
+                                    <div className="col-span-3 sm:col-span-2">
+                                        <Label>Article</Label>
+                                        <Controller name={`lines.${index}.articleId`} control={createControl} rules={{ required: true }} render={({ field }) => (
+                                             <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue placeholder="Choisir..."/></SelectTrigger><SelectContent>{articles.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent></Select>
+                                        )}/>
+                                    </div>
+                                    <div className="col-span-2 sm:col-span-1">
+                                        <Label>Quantité</Label>
+                                        <Controller name={`lines.${index}.quantity`} control={createControl} rules={{ required: true, min: 1 }} render={({ field }) => <Input type="number" {...field} />} />
+                                    </div>
+                                    <div className="col-span-3 sm:col-span-2">
+                                        <Label>Raison</Label>
+                                        <Controller name={`lines.${index}.returnReason`} control={createControl} rules={{ required: true }} render={({ field }) => (
+                                            <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue placeholder="Choisir..."/></SelectTrigger><SelectContent>{returnReasons.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent></Select>
+                                        )}/>
+                                    </div>
+                                     <div className="col-span-1 flex justify-end">
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => createRemove(index)}><Trash2 className="h-4 w-4" /></Button>
+                                    </div>
+                                </div>
+                             ))}
+                              <Button type="button" variant="outline" size="sm" onClick={() => createAppend({ articleId: "", quantity: 1, returnReason: "Autre" })}>
+                                <PlusCircle className="h-4 w-4 mr-2"/> Ajouter une ligne
+                            </Button>
+                        </div>
+                        <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Annuler</Button></DialogClose><Button type="submit">Enregistrer le Retour</Button></DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+            
+            {/* Process Return Dialog */}
+            <Dialog open={!!isProcessDialogOpen} onOpenChange={() => setIsProcessDialogOpen(null)}>
+                 <DialogContent className="max-w-3xl">
+                     <form onSubmit={handleProcessSubmit(onProcessSubmit)}>
+                        <DialogHeader><DialogTitle>Traiter le Retour #{isProcessDialogOpen?.id}</DialogTitle></DialogHeader>
+                        <div className="py-4 max-h-[60vh] overflow-y-auto px-1">
+                             <Table>
+                                <TableHeader><TableRow><TableHead>Article</TableHead><TableHead>Qté</TableHead><TableHead>Raison</TableHead><TableHead>Décision</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    {watchProcess('lines')?.map((line, index) => (
+                                        <TableRow key={index}>
+                                            <TableCell>{getArticle(line.articleId)?.name}</TableCell>
+                                            <TableCell>{line.quantity}</TableCell>
+                                            <TableCell>{line.returnReason}</TableCell>
+                                            <TableCell>
+                                                 <Controller name={`lines.${index}.returnDecision`} control={processControl} rules={{ required: true }} render={({ field }) => (
+                                                    <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{returnDecisions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select>
+                                                 )}/>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                         <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Annuler</Button></DialogClose><Button type="submit">Valider le Traitement</Button></DialogFooter>
+                     </form>
+                </DialogContent>
+            </Dialog>
+        </>
+    );
+}
+
 export function InboundClient() {
   const { state } = useWms();
   const perms = state.currentUserPermissions;
   
   const tabs = [];
   if (perms?.canCreateBC) tabs.push({ value: "create", label: "1. Créer un BC" });
-  if (perms?.canReceiveBC) tabs.push({ value: "receive", label: "2. Réceptionner un BC" });
+  if (perms?.canReceiveBC) {
+    tabs.push({ value: "receive", label: "2. Réceptionner un BC" });
+    tabs.push({ value: "returns", label: "3. Gérer un Retour Client" });
+  }
   
   if (tabs.length === 0) {
     return (
@@ -428,6 +625,7 @@ export function InboundClient() {
       </TabsList>
       {perms?.canCreateBC && <TabsContent value="create"><CreatePurchaseOrder /></TabsContent>}
       {perms?.canReceiveBC && <TabsContent value="receive"><ReceivePurchaseOrder /></TabsContent>}
+      {perms?.canReceiveBC && <TabsContent value="returns"><CustomerReturns /></TabsContent>}
     </Tabs>
   );
 }

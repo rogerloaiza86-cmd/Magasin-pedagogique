@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
-import type { Article, Tier, Document, Movement, User, Class, Email, Role, Permissions, ScenarioTemplate, ActiveScenario, Task, Environment, Maintenance } from '@/lib/types';
+import type { Article, Tier, Document, Movement, User, Class, Email, Role, Permissions, ScenarioTemplate, ActiveScenario, Task, Environment, Maintenance, DocumentLine } from '@/lib/types';
 import { initialArticles } from '@/lib/articles-data';
 import { faker } from '@faker-js/faker/locale/fr';
 
@@ -481,7 +481,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
     case 'CREATE_DOCUMENT': {
         const { type } = action.payload;
         const perms = state.currentUserPermissions;
-        if (!state.currentUser || (type === 'Bon de Commande Fournisseur' && !perms?.canCreateBC) || (type === 'Bon de Livraison Client' && !perms?.canCreateBL) || (type === 'Lettre de Voiture' && !perms?.canShipBL) ) {
+        if (!state.currentUser || (type === 'Bon de Commande Fournisseur' && !perms?.canCreateBC) || (type === 'Bon de Livraison Client' && !perms?.canCreateBL) || (type === 'Lettre de Voiture' && !perms?.canShipBL) || (type === 'Retour Client' && !perms?.canReceiveBC) ) {
             return state;
         }
         const newDoc: Document = { 
@@ -509,6 +509,45 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         const newArticles = new Map(state.articles);
         const newMovements = [...state.movements];
         let newMovementIdCounter = state.movementIdCounter;
+        
+        // --- LOGIC FOR CUSTOMER RETURNS ---
+        if (oldDoc.type === 'Retour Client' && oldDoc.status !== 'Traité' && docToUpdate.status === 'Traité') {
+            if (!state.currentUserPermissions?.canReceiveBC) return state;
+
+            docToUpdate.lines.forEach((line: DocumentLine) => {
+                const article = newArticles.get(line.articleId);
+                if (!article) return;
+
+                if (line.returnDecision === 'Réintégrer en stock') {
+                    const newStock = article.stock + line.quantity;
+                    newArticles.set(line.articleId, { ...article, stock: newStock, status: 'Actif' });
+                    newMovements.push({
+                        id: newMovementIdCounter++,
+                        timestamp: new Date().toISOString(),
+                        articleId: line.articleId,
+                        type: 'Retour Client',
+                        quantity: line.quantity,
+                        stockAfter: newStock,
+                        user: currentUser.username,
+                        environnementId: state.currentEnvironmentId,
+                    });
+                } else if (line.returnDecision === 'Mettre au rebut') {
+                    newArticles.set(line.articleId, { ...article, status: 'Au rebut' });
+                    // No stock change, but we log the movement for traceability
+                    newMovements.push({
+                        id: newMovementIdCounter++,
+                        timestamp: new Date().toISOString(),
+                        articleId: line.articleId,
+                        type: 'Retour Client',
+                        quantity: 0, // No change in quantity, just status
+                        stockAfter: article.stock,
+                        user: currentUser.username,
+                        environnementId: state.currentEnvironmentId,
+                    });
+                }
+            });
+        }
+
 
         if (oldDoc.type === 'Bon de Commande Fournisseur' && docToUpdate.status.startsWith('Réceptionné') && !oldDoc.status.startsWith('Réceptionné')) {
             if (!state.currentUserPermissions?.canReceiveBC) return state;

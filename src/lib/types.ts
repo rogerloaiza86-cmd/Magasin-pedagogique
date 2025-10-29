@@ -7,7 +7,7 @@ export type Environment = {
     description: string;
 }
 
-export type ArticleStatus = 'Actif' | 'Bloqué' | 'En contrôle qualité' | 'Obsolète' | 'En attente de rangement';
+export type ArticleStatus = 'Actif' | 'Bloqué' | 'En contrôle qualité' | 'Obsolète' | 'En attente de rangement' | 'Au rebut';
 
 export type Article = {
   id: string;
@@ -64,31 +64,37 @@ export type Maintenance = {
     notes?: string;
 }
 
+export type ReturnReason = "Erreur de commande" | "Article défectueux" | "Endommagé au transport" | "Autre";
+export type ReturnDecision = "Réintégrer en stock" | "Mettre au rebut";
+
 export type DocumentLine = {
   articleId: string;
-  quantity: number; // Quantité commandée
+  quantity: number; // Quantité commandée/livrée/retournée
   quantityReceived?: number;
   quantityNonConforming?: number;
+  returnReason?: ReturnReason;
+  returnDecision?: ReturnDecision;
 };
 
 export type Document = {
   id: number;
-  type: 'Bon de Commande Fournisseur' | 'Bon de Livraison Client' | 'Lettre de Voiture';
+  type: 'Bon de Commande Fournisseur' | 'Bon de Livraison Client' | 'Lettre de Voiture' | 'Retour Client';
   tierId: number;
-  status: 'En préparation' | 'Validé' | 'Expédié' | 'Réceptionné' | 'Réceptionné avec anomalies';
+  status: 'En préparation' | 'Validé' | 'Expédié' | 'Réceptionné' | 'Réceptionné avec anomalies' | 'En attente de traitement' | 'Traité';
   lines: DocumentLine[];
   createdAt: string;
   createdBy: string;
   transporterId?: number; // For CMR
   environnementId: string;
   receptionNotes?: string; // Réserves à la réception
+  originalDocumentId?: number; // For returns
 };
 
 export type Movement = {
   id: number;
   timestamp: string;
   articleId: string;
-  type: 'Entrée (Réception BC)' | 'Sortie (Expédition BL)' | 'Ajustement Inventaire' | 'Initial' | 'Génération' | 'Mise en non-conforme';
+  type: 'Entrée (Réception BC)' | 'Sortie (Expédition BL)' | 'Ajustement Inventaire' | 'Initial' | 'Génération' | 'Mise en non-conforme' | 'Retour Client';
   quantity: number;
   stockAfter: number;
   user: string;
