@@ -118,25 +118,27 @@ export function EnvironmentsClient() {
         );
     }
     
-    const wmsEnvironments = Array.from(environments.values()).filter(env => env.type === 'WMS');
+    const allEnvironments = Array.from(environments.values());
 
     return (
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>Environnements WMS Fictifs</CardTitle>
-                    <CardDescription>Gérez les entrepôts de simulation et peuplez-les avec des données.</CardDescription>
+                    <CardTitle>Gestion des Environnements</CardTitle>
+                    <CardDescription>Gérez les entrepôts de simulation et les agences de transport.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {wmsEnvironments.map(env => (
+                    {allEnvironments.map(env => (
                         <Card key={env.id} className="mb-4">
                             <CardHeader>
                                 <CardTitle>{env.name}</CardTitle>
                                 <CardDescription>{env.description}</CardDescription>
                             </CardHeader>
-                            <CardContent>
-                                <DataGenerator environment={env} />
-                            </CardContent>
+                            {env.type === 'WMS' && (
+                                <CardContent>
+                                    <DataGenerator environment={env} />
+                                </CardContent>
+                            )}
                         </Card>
                     ))}
                 </CardContent>
