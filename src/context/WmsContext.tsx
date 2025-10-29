@@ -127,8 +127,10 @@ interface WmsState {
 
 const getInitialState = (): WmsState => {
   const defaultEnvId = 'magasin_pedago';
-  const articlesMap = new Map(initialArticles.map(a => [a.id, {...a, environnementId: defaultEnvId}]));
-  const initialMovements: Movement[] = initialArticles.map((article, index) => ({
+  const articlesWithEnv = initialArticles.map(a => [a.id, {...a, environnementId: defaultEnvId}]) as [string, Article][];
+  const articlesMap = new Map(articlesWithEnv);
+  
+  const initialMovements: Movement[] = Array.from(articlesMap.values()).filter(a => a.environnementId === defaultEnvId).map((article, index) => ({
     id: index + 1,
     timestamp: new Date().toISOString(),
     articleId: article.id,
@@ -469,7 +471,6 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       };
        if (newTier.type === 'Vehicule') {
           newTier.status = 'Disponible';
-          // Ensure name is set for Vehicle (from immatriculation) for table display
           newTier.name = action.payload.name || newTier.immatriculation || '';
       }
       const newTiers = new Map(state.tiers);
@@ -480,7 +481,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
     case 'CREATE_DOCUMENT': {
         const { type } = action.payload;
         const perms = state.currentUserPermissions;
-        if (!state.currentUser || (type === 'Bon de Commande Fournisseur' && !perms?.canCreateBC) || (type === 'Bon de Livraison Client' && !perms?.canCreateBL)) {
+        if (!state.currentUser || (type === 'Bon de Commande Fournisseur' && !perms?.canCreateBC) || (type === 'Bon de Livraison Client' && !perms?.canCreateBL) || (type === 'Lettre de Voiture' && !perms?.canShipBL) ) {
             return state;
         }
         const newDoc: Document = { 
@@ -509,23 +510,46 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         const newMovements = [...state.movements];
         let newMovementIdCounter = state.movementIdCounter;
 
-        if (oldDoc.type === 'Bon de Commande Fournisseur' && oldDoc.status !== 'Réceptionné' && docToUpdate.status === 'Réceptionné') {
+        if (oldDoc.type === 'Bon de Commande Fournisseur' && docToUpdate.status.startsWith('Réceptionné') && !oldDoc.status.startsWith('Réceptionné')) {
             if (!state.currentUserPermissions?.canReceiveBC) return state;
+            
             docToUpdate.lines.forEach(line => {
                 const article = newArticles.get(line.articleId);
+                const quantityConforming = line.quantityReceived || 0;
+                const quantityNonConforming = line.quantityNonConforming || 0;
+
                 if (article) {
-                    const newStock = article.stock + line.quantity;
+                    // Update stock with conforming quantity
+                    const newStock = article.stock + quantityConforming;
                     newArticles.set(line.articleId, { ...article, stock: newStock });
                     newMovements.push({
                         id: newMovementIdCounter++,
                         timestamp: new Date().toISOString(),
                         articleId: line.articleId,
                         type: 'Entrée (Réception BC)',
-                        quantity: line.quantity,
+                        quantity: quantityConforming,
                         stockAfter: newStock,
                         user: currentUser.username,
                         environnementId: state.currentEnvironmentId,
                     });
+
+                    // Handle non-conforming items
+                    if (quantityNonConforming > 0) {
+                        const updatedArticle = newArticles.get(line.articleId);
+                        if (updatedArticle) {
+                            newArticles.set(line.articleId, { ...updatedArticle, status: 'En contrôle qualité' });
+                             newMovements.push({
+                                id: newMovementIdCounter++,
+                                timestamp: new Date().toISOString(),
+                                articleId: line.articleId,
+                                type: 'Mise en non-conforme',
+                                quantity: quantityNonConforming,
+                                stockAfter: updatedArticle.stock, // Stock isn't changing here, just status
+                                user: currentUser.username,
+                                environnementId: state.currentEnvironmentId,
+                            });
+                        }
+                    }
                 }
             });
         }
@@ -718,6 +742,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                 price: parseFloat(faker.commerce.price()),
                 stock: faker.number.int({ min: 50, max: 1000 }),
                 environnementId,
+                status: 'Actif',
             };
             newArticles.set(newArticle.id, newArticle);
             newMovements.push({
@@ -862,15 +887,28 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     try {
       const savedState = localStorage.getItem('wmsState');
+      const initialState = getInitialState();
+      let combinedState;
+
       if (savedState) {
         const parsedState = JSON.parse(savedState);
-        const initialState = getInitialState();
         
-        // Combine initial data with saved data, giving precedence to saved data for mutable items
-        const combinedState = {
+        const articlesFromStorage = parsedState.articles ? new Map(parsedState.articles) : new Map();
+        const articlesFromInitial = initialState.articles;
+        
+        // Merge articles, giving precedence to initial for the default env
+        const mergedArticles = new Map(articlesFromInitial);
+        articlesFromStorage.forEach((value, key) => {
+            // Overwrite if it's not the default env's initial data
+            if(value.environnementId !== 'magasin_pedago' || !initialArticles.some(a => a.id === key)) {
+                 mergedArticles.set(key, value);
+            }
+        });
+
+        combinedState = {
             ...initialState,
             ...parsedState,
-            articles: parsedState.articles ? new Map(parsedState.articles) : initialState.articles,
+            articles: mergedArticles,
             tiers: parsedState.tiers ? new Map(parsedState.tiers.map((t: Tier) => [t.id, t])) : initialState.tiers,
             documents: parsedState.documents ? new Map(parsedState.documents.map((d: Document) => [d.id, d])) : initialState.documents,
             movements: parsedState.movements || initialState.movements,
@@ -882,28 +920,33 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
             activeScenarios: parsedState.activeScenarios ? new Map(parsedState.activeScenarios.map((as: ActiveScenario) => [as.id, as])) : initialState.activeScenarios,
             tasks: parsedState.tasks ? new Map(parsedState.tasks.map((t: Task) => [t.id, t])) : initialState.tasks,
 
-            // Ensure static data is always fresh
             roles: ROLES,
             environments: ENVIRONMENTS,
         };
-
-        const lastUser = localStorage.getItem('wmsLastUser');
-        if (lastUser) {
-           dispatch({ type: 'REAUTHENTICATE_USER', payload: { username: lastUser } });
-        }
-        
-        const lastEnv = localStorage.getItem('wmsLastEnv');
-        if(lastEnv && combinedState.environments.has(lastEnv)) {
-            combinedState.currentEnvironmentId = lastEnv;
-        } else {
-            combinedState.currentEnvironmentId = getInitialState().currentEnvironmentId;
-        }
-
-        dispatch({ type: 'SET_STATE', payload: combinedState });
+      } else {
+        combinedState = initialState;
       }
+      
+      const lastUser = localStorage.getItem('wmsLastUser');
+      if (lastUser && combinedState.users.has(lastUser)) {
+         const user = combinedState.users.get(lastUser);
+         if (user) {
+            combinedState.currentUser = user;
+            combinedState.currentUserPermissions = combinedState.roles.get(user.roleId)?.permissions || null;
+         }
+      }
+      
+      const lastEnv = localStorage.getItem('wmsLastEnv');
+      if(lastEnv && combinedState.environments.has(lastEnv)) {
+          combinedState.currentEnvironmentId = lastEnv;
+      } else {
+          combinedState.currentEnvironmentId = getInitialState().currentEnvironmentId;
+      }
+
+      dispatch({ type: 'SET_STATE', payload: combinedState });
+
     } catch (e) {
       console.error("Could not load state from localStorage. Using initial state.", e);
-      // Let it use the initial state from useReducer
     }
   }, []);
 
@@ -963,7 +1006,3 @@ export const useWms = () => {
   }
   return context;
 };
-
-    
-
-    

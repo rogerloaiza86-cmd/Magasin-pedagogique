@@ -11,7 +11,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
 import {
   Table,
@@ -32,7 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Trash2, PlusCircle, Loader2, FileText, Wand2 } from "lucide-react";
+import { Trash2, PlusCircle, Loader2, Wand2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -193,7 +192,7 @@ function CreateDeliveryNote() {
 }
 
 function PrepareOrder() {
-  const { state, dispatch, getTier, getArticle } = useWms();
+  const { state, getTier, getArticle } = useWms();
   const { toast } = useToast();
   const {currentUser, currentEnvironmentId} = state;
   const pendingDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "En préparation" && d.environnementId === currentEnvironmentId).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
@@ -241,15 +240,12 @@ function PrepareOrder() {
 
   const handlePreparationFinished = () => {
     if (currentDoc) {
-        // Here we would trigger the shipment flow
         setPickingList(null);
         setCurrentDoc(null);
         toast({
             title: "Préparation terminée",
             description: `La commande #${currentDoc.id} est prête à être expédiée.`,
         });
-        // The next logical step is shipping, so let's leave it in this state.
-        // The user should now go to the "Expédier" tab.
     }
   }
 
@@ -329,7 +325,6 @@ function ShipOrder() {
     const { toast } = useToast();
     const {currentUser, currentEnvironmentId} = state;
     const transporters = Array.from(state.tiers.values()).filter(t => t.type === 'Transporteur' && t.environnementId === currentEnvironmentId).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
-    // For shipping, we consider orders that are "En préparation" as ready, assuming picking is a sub-step.
     const shippableDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "En préparation" && d.environnementId === currentEnvironmentId).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
 
     const [selectedTransporter, setSelectedTransporter] = useState<string>("");
@@ -343,21 +338,37 @@ function ShipOrder() {
 
         const transporterId = parseInt(selectedTransporter, 10);
         
-        // Update BL status to 'Expédié'
+        // This will trigger stock deduction and status update in the reducer
         dispatch({ type: 'UPDATE_DOCUMENT', payload: {...doc, status: 'Expédié'} });
 
+        const newDocIdBeforeCreation = state.docIdCounter;
+
         // Create CMR document
-        const cmr: Omit<WmsDocument, 'id' | 'createdAt'> = {
+        dispatch({
+            type: 'CREATE_DOCUMENT', 
+            payload: {
+                type: 'Lettre de Voiture',
+                tierId: doc.tierId,
+                status: 'Validé',
+                lines: doc.lines,
+                transporterId: transporterId,
+            }
+        });
+        
+        const cmrPreview: WmsDocument = {
+            id: newDocIdBeforeCreation,
             type: 'Lettre de Voiture',
             tierId: doc.tierId,
             status: 'Validé',
             lines: doc.lines,
             transporterId: transporterId,
+            createdBy: currentUser?.username || 'unknown',
+            createdAt: new Date().toISOString(),
+            environnementId: currentEnvironmentId
         };
-        dispatch({type: 'CREATE_DOCUMENT', payload: cmr});
-
-        const newDocId = state.docIdCounter;
-        setFinalDoc({ bl: {...doc, status: 'Expédié'}, cmr: {...cmr, id: newDocId, createdAt: new Date().toISOString()}});
+        
+        setFinalDoc({ bl: {...doc, status: 'Expédié'}, cmr: cmrPreview});
+        setSelectedTransporter("");
 
         toast({ title: "Commande Expédiée", description: `Le BL #${doc.id} a été expédié et la Lettre de Voiture a été générée.`});
     };
