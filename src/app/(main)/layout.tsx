@@ -39,7 +39,7 @@ type NavItem = {
   href: string;
   label: string;
   icon: React.ElementType;
-  permission: 
+  permission?: 
     | 'canViewDashboard' 
     | 'canViewTiers' 
     | 'canCreateBC' 
@@ -52,15 +52,15 @@ type NavItem = {
     | 'canUseIaTools'
     | 'canUseMessaging'
     | 'canManageScenarios';
-  envType?: Environment['type'] | 'ALL'; // Can be specific to WMS, TMS, or ALL
+  envType: Environment['type'] | 'ALL';
   isSuperAdminOnly?: boolean;
 };
 
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: Home, permission: 'canViewDashboard', envType: 'ALL' },
-  { href: "/environments", label: "Environnements", icon: Globe, permission: 'canManageScenarios', isSuperAdminOnly: true, envType: 'ALL' },
+  { href: "/environments", label: "Environnements", icon: Globe, isSuperAdminOnly: true, envType: 'ALL' },
   { href: "/scenarios", label: "Scénarios", icon: Swords, permission: 'canManageScenarios', envType: 'ALL'},
-  { href: "/tiers", label: "Gestion des Tiers", icon: Users, permission: 'canViewTiers', envType: 'WMS' },
+  { href: "/tiers", label: "Gestion des Tiers", icon: Users, permission: 'canViewTiers', envType: 'ALL' },
   { href: "/flux-entrant", label: "Flux Entrant", icon: ArrowDownToLine, permission: 'canCreateBC', envType: 'WMS' },
   { href: "/flux-sortant", label: "Flux Sortant", icon: ArrowUpFromLine, permission: 'canCreateBL', envType: 'WMS' },
   { href: "/stock", label: "Gestion des Stocks", icon: Warehouse, permission: 'canViewStock', envType: 'WMS' },
@@ -91,10 +91,13 @@ export default function MainLayout({
   const userInitials = currentUser?.username.substring(0, 2).toUpperCase() || '??';
 
   const visibleNavItems = navItems.filter(item => {
-    if (!currentUserPermissions) return false;
-    
     // Hide for non-super-admin if required
-    if (item.isSuperAdminOnly && !currentUserPermissions.isSuperAdmin) {
+    if (item.isSuperAdminOnly && !currentUserPermissions?.isSuperAdmin) {
+        return false;
+    }
+    
+    // Check for general permission if it exists
+    if (item.permission && !currentUserPermissions?.[item.permission]) {
         return false;
     }
 
@@ -111,7 +114,7 @@ export default function MainLayout({
       return currentUserPermissions.canCreateBL || currentUserPermissions.canPrepareBL || currentUserPermissions.canShipBL;
     }
 
-    return currentUserPermissions[item.permission];
+    return true;
   });
 
   const unreadMessages = Array.from(emails.values()).filter(email => email.recipient === currentUser?.username && !email.isRead).length;
