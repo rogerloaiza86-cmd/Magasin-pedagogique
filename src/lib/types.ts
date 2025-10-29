@@ -149,7 +149,7 @@ export type Class = {
 export type Email = {
   id: number;
   sender: string; // username
-  recipient: string; // username
+  recipient: string; // username or tier-id
   cc?: string[]; // for the teacher copy
   subject: string;
   body: string;
