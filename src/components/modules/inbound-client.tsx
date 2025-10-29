@@ -197,8 +197,8 @@ function ReceivePurchaseOrder() {
   const { currentUser, currentEnvironmentId } = state;
   const pendingPOs = Array.from(state.documents.values()).filter(
     (d) =>
-      d.type === "Bon de Commande Fournisseur" && d.status === "En préparation" && d.createdBy === currentUser?.username && d.environnementId === currentEnvironmentId
-  );
+      d.type === "Bon de Commande Fournisseur" && d.status === "En préparation" && d.environnementId === currentEnvironmentId
+  ).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
   
   const handleReceive = (docId: number) => {
     const doc = state.documents.get(docId);

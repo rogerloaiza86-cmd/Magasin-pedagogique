@@ -91,7 +91,7 @@ export function ClassesClient() {
   const { toast } = useToast();
   const [openClassId, setOpenClassId] = useState<number | null>(null);
 
-  if (!currentUserPermissions?.canManageClasses) {
+  if (!currentUserPermissions?.isSuperAdmin) {
     return (
         <Card>
             <CardHeader>

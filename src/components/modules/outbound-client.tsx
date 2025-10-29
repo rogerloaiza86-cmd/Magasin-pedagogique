@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useWms } from "@/context/WmsContext";
@@ -55,8 +56,9 @@ type DeliveryNoteFormData = {
 function CreateDeliveryNote() {
   const { state, dispatch, getArticle } = useWms();
   const { toast } = useToast();
-  const clients = Array.from(state.tiers.values()).filter((t) => t.type === "Client" && t.createdBy === state.currentUser?.username);
-  const articles = Array.from(state.articles.values());
+  const { currentUser, currentEnvironmentId } = state;
+  const clients = Array.from(state.tiers.values()).filter((t) => t.type === "Client" && t.createdBy === currentUser?.username && t.environnementId === currentEnvironmentId);
+  const articles = Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId);
 
   const { control, handleSubmit, reset, watch, setError, clearErrors, formState: { errors } } =
     useForm<DeliveryNoteFormData>({
@@ -193,7 +195,8 @@ function CreateDeliveryNote() {
 function PrepareOrder() {
   const { state, dispatch, getTier, getArticle } = useWms();
   const { toast } = useToast();
-  const pendingDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "En préparation" && d.createdBy === state.currentUser?.username);
+  const {currentUser, currentEnvironmentId} = state;
+  const pendingDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "En préparation" && d.environnementId === currentEnvironmentId).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
   
   const [isLoading, setIsLoading] = useState(false);
   const [pickingList, setPickingList] = useState<Article[] | null>(null);
@@ -324,9 +327,10 @@ function PrepareOrder() {
 function ShipOrder() {
     const { state, dispatch, getTier, getArticle } = useWms();
     const { toast } = useToast();
-    const transporters = Array.from(state.tiers.values()).filter(t => t.type === 'Transporteur' && t.createdBy === state.currentUser?.username);
+    const {currentUser, currentEnvironmentId} = state;
+    const transporters = Array.from(state.tiers.values()).filter(t => t.type === 'Transporteur' && t.environnementId === currentEnvironmentId).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
     // For shipping, we consider orders that are "En préparation" as ready, assuming picking is a sub-step.
-    const shippableDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "En préparation" && d.createdBy === state.currentUser?.username);
+    const shippableDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "En préparation" && d.environnementId === currentEnvironmentId).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
 
     const [selectedTransporter, setSelectedTransporter] = useState<string>("");
     const [finalDoc, setFinalDoc] = useState<{bl: WmsDocument, cmr: WmsDocument} | null>(null);

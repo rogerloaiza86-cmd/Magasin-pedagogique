@@ -1,3 +1,4 @@
+
 import { ScenariosClient } from "@/components/modules/scenarios-client";
 
 export default function ScenariosPage() {

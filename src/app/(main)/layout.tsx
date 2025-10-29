@@ -52,20 +52,22 @@ type NavItem = {
     | 'canUseIaTools'
     | 'canUseMessaging'
     | 'canManageScenarios';
-  envType?: Environment['type'];
+  envType?: Environment['type'] | 'ALL'; // Can be specific to WMS, TMS, or ALL
+  isSuperAdminOnly?: boolean;
 };
 
 const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: Home, permission: 'canViewDashboard' },
-  { href: "/scenarios", label: "Scénarios", icon: Swords, permission: 'canManageScenarios'},
+  { href: "/dashboard", label: "Dashboard", icon: Home, permission: 'canViewDashboard', envType: 'ALL' },
+  { href: "/environments", label: "Environnements", icon: Globe, permission: 'canManageScenarios', isSuperAdminOnly: true, envType: 'ALL' },
+  { href: "/scenarios", label: "Scénarios", icon: Swords, permission: 'canManageScenarios', envType: 'ALL'},
   { href: "/tiers", label: "Gestion des Tiers", icon: Users, permission: 'canViewTiers', envType: 'WMS' },
-  { href: "/flux-entrant", label: "Flux Entrant", icon: ArrowDownToLine, permission: 'canCreateBC', envType: 'WMS' }, // Simplified for grouping
-  { href: "/flux-sortant", label: "Flux Sortant", icon: ArrowUpFromLine, permission: 'canCreateBL', envType: 'WMS' }, // Simplified for grouping
+  { href: "/flux-entrant", label: "Flux Entrant", icon: ArrowDownToLine, permission: 'canCreateBC', envType: 'WMS' },
+  { href: "/flux-sortant", label: "Flux Sortant", icon: ArrowUpFromLine, permission: 'canCreateBL', envType: 'WMS' },
   { href: "/stock", label: "Gestion des Stocks", icon: Warehouse, permission: 'canViewStock', envType: 'WMS' },
-  { href: "/documents", label: "Documents", icon: FileText, permission: 'canViewDashboard' },
-  { href: "/messaging", label: "Messagerie", icon: Mail, permission: 'canUseMessaging' },
-  { href: "/classes", label: "Gestion des Classes", icon: BookUser, permission: 'canManageClasses' },
-  { href: "/ia-tools", label: "Outils d'IA", icon: BrainCircuit, permission: 'canUseIaTools' },
+  { href: "/documents", label: "Documents", icon: FileText, permission: 'canViewDashboard', envType: 'ALL' },
+  { href: "/messaging", label: "Messagerie", icon: Mail, permission: 'canUseMessaging', envType: 'ALL' },
+  { href: "/classes", label: "Gestion des Classes", icon: BookUser, permission: 'canManageClasses', isSuperAdminOnly: true, envType: 'ALL' },
+  { href: "/ia-tools", label: "Outils d'IA", icon: BrainCircuit, permission: 'canUseIaTools', envType: 'ALL' },
 ];
 
 export default function MainLayout({
@@ -90,9 +92,14 @@ export default function MainLayout({
 
   const visibleNavItems = navItems.filter(item => {
     if (!currentUserPermissions) return false;
+    
+    // Hide for non-super-admin if required
+    if (item.isSuperAdminOnly && !currentUserPermissions.isSuperAdmin) {
+        return false;
+    }
 
     // Filter by environment type
-    if (item.envType && item.envType !== currentEnv?.type) {
+    if (item.envType && item.envType !== 'ALL' && item.envType !== currentEnv?.type) {
         return false;
     }
 

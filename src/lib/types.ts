@@ -48,7 +48,7 @@ export type Movement = {
   id: number;
   timestamp: string;
   articleId: string;
-  type: 'Entrée (Réception BC)' | 'Sortie (Expédition BL)' | 'Ajustement Inventaire' | 'Initial';
+  type: 'Entrée (Réception BC)' | 'Sortie (Expédition BL)' | 'Ajustement Inventaire' | 'Initial' | 'Génération';
   quantity: number;
   stockAfter: number;
   user: string;
@@ -167,5 +167,3 @@ export type Task = {
     details?: Record<string, any>;
     environnementId: string;
 };
-
-    

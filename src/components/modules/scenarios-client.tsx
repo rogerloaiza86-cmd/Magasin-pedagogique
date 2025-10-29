@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useWms } from "@/context/WmsContext";
@@ -316,5 +315,3 @@ export function ScenariosClient() {
     </div>
   );
 }
-
-    

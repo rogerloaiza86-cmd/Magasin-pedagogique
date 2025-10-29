@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect, useState } from 'react';
 import type { Article, Tier, Document, Movement, User, UserProfile, Class, Email, Role, Permissions, ScenarioTemplate, ActiveScenario, Task, TaskType, Environment } from '@/lib/types';
 import { initialArticles } from '@/lib/articles-data';
+import { faker } from '@faker-js/faker/locale/fr';
 
 // --- ROLES & PERMISSIONS DEFINITION ---
 const ROLES: Map<string, Role> = new Map();
@@ -109,7 +110,7 @@ const getInitialState = (): WmsState => {
 
   const initialUsers = new Map<string, User>();
   initialUsers.set('admin', { username: 'admin', password: 'admin', profile: 'Administrateur', createdAt: new Date().toISOString(), roleId: 'super_admin' });
-  initialUsers.set('prof', { username: 'prof', password: 'professeur', createdAt: new Date().toISOString(), roleId: 'super_admin' });
+  initialUsers.set('prof', { username: 'prof', password: 'prof', profile: 'professeur', createdAt: new Date().toISOString(), roleId: 'super_admin' });
 
   return {
     articles: new Map(initialArticles.map(a => [a.id, {...a, environnementId: defaultEnvId}])),
@@ -154,6 +155,7 @@ type WmsAction =
   | { type: 'SAVE_SCENARIO_TEMPLATE'; payload: Omit<ScenarioTemplate, 'id' | 'createdBy' | 'environnementId'> & { id?: number } }
   | { type: 'DELETE_SCENARIO_TEMPLATE'; payload: { templateId: number } }
   | { type: 'LAUNCH_SCENARIO', payload: { templateId: number, classId: number } }
+  | { type: 'GENERATE_DATA'; payload: { environnementId: string, articles: number, clients: number, suppliers: number } }
   | { type: 'SET_STATE'; payload: WmsState }
   | { type: 'SET_ENVIRONMENT'; payload: { environmentId: string } };
 
@@ -646,10 +648,78 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         };
         break;
     }
+    case 'GENERATE_DATA': {
+        if (!state.currentUserPermissions?.isSuperAdmin || !state.currentUser) return state;
+        const { environnementId, articles, clients, suppliers } = action.payload;
+        const newArticles = new Map(state.articles);
+        const newTiers = new Map(state.tiers);
+        const newMovements = [...state.movements];
+        let movementIdCounter = state.movementIdCounter;
+        let tierIdCounter = state.tierIdCounter;
+
+        for (let i = 0; i < articles; i++) {
+            const newArticle: Article = {
+                id: `SKU-${environnementId.substring(0,4).toUpperCase()}-${faker.string.alphanumeric(6).toUpperCase()}`,
+                name: faker.commerce.productName(),
+                location: `${faker.string.alpha(1).toUpperCase()}.${faker.number.int({min:1, max:3})}.${faker.number.int({min:1, max:6})}.${faker.string.alpha(1).toUpperCase()}`,
+                packaging: 'PIEC',
+                price: parseFloat(faker.commerce.price()),
+                stock: faker.number.int({ min: 50, max: 1000 }),
+                environnementId,
+            };
+            newArticles.set(newArticle.id, newArticle);
+            newMovements.push({
+                id: movementIdCounter++,
+                articleId: newArticle.id,
+                quantity: newArticle.stock,
+                stockAfter: newArticle.stock,
+                timestamp: new Date().toISOString(),
+                type: 'Génération',
+                user: 'Système',
+                environnementId,
+            })
+        }
+        
+        for (let i = 0; i < clients; i++) {
+             const newClient: Tier = {
+                id: tierIdCounter++,
+                name: faker.company.name(),
+                address: `${faker.location.streetAddress()}, ${faker.location.zipCode()} ${faker.location.city()}`,
+                type: 'Client',
+                createdBy: state.currentUser.username,
+                createdAt: new Date().toISOString(),
+                environnementId,
+             };
+             newTiers.set(newClient.id, newClient);
+        }
+        
+        for (let i = 0; i < suppliers; i++) {
+             const newSupplier: Tier = {
+                id: tierIdCounter++,
+                name: faker.company.name(),
+                address: `${faker.location.streetAddress()}, ${faker.location.zipCode()} ${faker.location.city()}`,
+                type: 'Fournisseur',
+                createdBy: state.currentUser.username,
+                createdAt: new Date().toISOString(),
+                environnementId,
+             };
+             newTiers.set(newSupplier.id, newSupplier);
+        }
+
+        newState = { 
+            ...state, 
+            articles: newArticles, 
+            tiers: newTiers, 
+            movements: newMovements,
+            movementIdCounter,
+            tierIdCounter,
+        };
+        break;
+    }
     case 'SET_STATE': {
         const loadedState = action.payload;
         if(loadedState.currentUser) {
-            loadedState.currentUserPermissions = loadedState.roles.get(loadedState.currentUser.roleId)?.permissions || null;
+            loadedState.currentUserPermissions = loadedState.roles.get(loadedState.currentUser.roleId) ?.permissions || null;
         } else {
             loadedState.currentUserPermissions = null;
         }
@@ -682,7 +752,7 @@ interface WmsContextType {
 const WmsContext = createContext<WmsContextType | undefined>(undefined);
 
 export const WmsProvider = ({ children }: { children: ReactNode }) => {
-  const [state, dispatch] = React.useReducer(wmsReducer, getInitialState());
+  const [state, dispatch] = useReducer(wmsReducer, getInitialState());
 
   useEffect(() => {
     try {
@@ -781,5 +851,3 @@ export const useWms = () => {
   }
   return context;
 };
-
-    
