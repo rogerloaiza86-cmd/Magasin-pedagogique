@@ -127,6 +127,7 @@ interface WmsState {
 
 const getInitialState = (): WmsState => {
   const defaultEnvId = 'magasin_pedago';
+  const articlesMap = new Map(initialArticles.map(a => [a.id, {...a, environnementId: defaultEnvId}]));
   const initialMovements: Movement[] = initialArticles.map((article, index) => ({
     id: index + 1,
     timestamp: new Date().toISOString(),
@@ -143,7 +144,7 @@ const getInitialState = (): WmsState => {
   initialUsers.set('prof', { username: 'prof', password: 'prof', profile: 'professeur', createdAt: new Date().toISOString(), roleId: 'super_admin' });
 
   return {
-    articles: new Map(initialArticles.map(a => [a.id, {...a, environnementId: defaultEnvId}])),
+    articles: articlesMap,
     tiers: new Map(),
     documents: new Map(),
     movements: initialMovements,
@@ -856,45 +857,53 @@ interface WmsContextType {
 const WmsContext = createContext<WmsContextType | undefined>(undefined);
 
 export const WmsProvider = ({ children }: { children: ReactNode }) => {
-  const [state, dispatch] = useReducer(wmsReducer, getInitialState());
+  const [state, dispatch] = useReducer(wmsReducer, undefined, getInitialState);
 
   useEffect(() => {
     try {
       const savedState = localStorage.getItem('wmsState');
       if (savedState) {
         const parsedState = JSON.parse(savedState);
+        const initialState = getInitialState();
         
-        parsedState.articles = new Map(parsedState.articles);
-        parsedState.tiers = new Map(parsedState.tiers.map((t: Tier) => [t.id, t]));
-        parsedState.documents = new Map(parsedState.documents.map((d: Document) => [d.id, d]));
-        parsedState.users = new Map(parsedState.users);
-        parsedState.classes = parsedState.classes ? new Map(parsedState.classes.map((c: Class) => [c.id, c])) : getInitialState().classes;
-        parsedState.emails = parsedState.emails ? new Map(parsedState.emails.map((e: Email) => [e.id, e])) : new Map();
-        parsedState.scenarioTemplates = parsedState.scenarioTemplates ? new Map(parsedState.scenarioTemplates.map((st: ScenarioTemplate) => [st.id, st])) : new Map();
-        parsedState.activeScenarios = parsedState.activeScenarios ? new Map(parsedState.activeScenarios.map((as: ActiveScenario) => [as.id, as])) : new Map();
-        parsedState.tasks = parsedState.tasks ? new Map(parsedState.tasks.map((t: Task) => [t.id, t])) : new Map();
-        parsedState.maintenances = parsedState.maintenances ? new Map(parsedState.maintenances.map((m: Maintenance) => [m.id, m])) : new Map();
+        // Combine initial data with saved data, giving precedence to saved data for mutable items
+        const combinedState = {
+            ...initialState,
+            ...parsedState,
+            articles: parsedState.articles ? new Map(parsedState.articles) : initialState.articles,
+            tiers: parsedState.tiers ? new Map(parsedState.tiers.map((t: Tier) => [t.id, t])) : initialState.tiers,
+            documents: parsedState.documents ? new Map(parsedState.documents.map((d: Document) => [d.id, d])) : initialState.documents,
+            movements: parsedState.movements || initialState.movements,
+            users: parsedState.users ? new Map(parsedState.users) : initialState.users,
+            classes: parsedState.classes ? new Map(parsedState.classes.map((c: Class) => [c.id, c])) : initialState.classes,
+            emails: parsedState.emails ? new Map(parsedState.emails.map((e: Email) => [e.id, e])) : initialState.emails,
+            maintenances: parsedState.maintenances ? new Map(parsedState.maintenances.map((m: Maintenance) => [m.id, m])) : initialState.maintenances,
+            scenarioTemplates: parsedState.scenarioTemplates ? new Map(parsedState.scenarioTemplates.map((st: ScenarioTemplate) => [st.id, st])) : initialState.scenarioTemplates,
+            activeScenarios: parsedState.activeScenarios ? new Map(parsedState.activeScenarios.map((as: ActiveScenario) => [as.id, as])) : initialState.activeScenarios,
+            tasks: parsedState.tasks ? new Map(parsedState.tasks.map((t: Task) => [t.id, t])) : initialState.tasks,
 
-        parsedState.roles = ROLES;
-        parsedState.environments = ENVIRONMENTS;
-        
+            // Ensure static data is always fresh
+            roles: ROLES,
+            environments: ENVIRONMENTS,
+        };
+
         const lastUser = localStorage.getItem('wmsLastUser');
         if (lastUser) {
            dispatch({ type: 'REAUTHENTICATE_USER', payload: { username: lastUser } });
         }
         
         const lastEnv = localStorage.getItem('wmsLastEnv');
-        if(lastEnv && parsedState.environments.has(lastEnv)) {
-            parsedState.currentEnvironmentId = lastEnv;
+        if(lastEnv && combinedState.environments.has(lastEnv)) {
+            combinedState.currentEnvironmentId = lastEnv;
         } else {
-            parsedState.currentEnvironmentId = getInitialState().currentEnvironmentId;
+            combinedState.currentEnvironmentId = getInitialState().currentEnvironmentId;
         }
 
-        dispatch({ type: 'SET_STATE', payload: parsedState });
+        dispatch({ type: 'SET_STATE', payload: combinedState });
       }
     } catch (e) {
       console.error("Could not load state from localStorage. Using initial state.", e);
-      // Do not dispatch here, let it use the initial state from useReducer
+      // Let it use the initial state from useReducer
     }
   }, []);
 
@@ -954,5 +963,7 @@ export const useWms = () => {
   }
   return context;
 };
+
+    
 
     
