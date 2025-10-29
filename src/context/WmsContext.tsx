@@ -225,7 +225,7 @@ const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState =>
                 if (action.type === 'CREATE_DOCUMENT' && action.payload.type === 'Bon de Commande Fournisseur') taskCompleted = true;
                 break;
             case 'RECEIVE_BC':
-                 if (action.type === 'UPDATE_DOCUMENT' && action.payload.type === 'Bon de Commande Fournisseur' && action.payload.status === 'Réceptionné') taskCompleted = true;
+                 if (action.type === 'UPDATE_DOCUMENT' && action.payload.type === 'Bon de Commande Fournisseur' && action.payload.status.startsWith('Réceptionné')) taskCompleted = true;
                 break;
             case 'CREATE_BL':
                  if (action.type === 'CREATE_DOCUMENT' && action.payload.type === 'Bon de Livraison Client') taskCompleted = true;
@@ -532,14 +532,13 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         environnementId: state.currentEnvironmentId,
                     });
                 } else if (line.returnDecision === 'Mettre au rebut') {
-                    newArticles.set(line.articleId, { ...article, status: 'Au rebut' });
-                    // No stock change, but we log the movement for traceability
+                    // Stock doesn't change, just log the event. Real-world might move to a different stock type.
                     newMovements.push({
                         id: newMovementIdCounter++,
                         timestamp: new Date().toISOString(),
                         articleId: line.articleId,
                         type: 'Retour Client',
-                        quantity: 0, // No change in quantity, just status
+                        quantity: 0, // No change in quantity
                         stockAfter: article.stock,
                         user: currentUser.username,
                         environnementId: state.currentEnvironmentId,
@@ -933,13 +932,11 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
         const parsedState = JSON.parse(savedState);
         
         const articlesFromStorage = parsedState.articles ? new Map(parsedState.articles) : new Map();
-        const articlesFromInitial = initialState.articles;
         
-        // Merge articles, giving precedence to initial for the default env
-        const mergedArticles = new Map(articlesFromInitial);
-        articlesFromStorage.forEach((value, key) => {
-            // Overwrite if it's not the default env's initial data
-            if(value.environnementId !== 'magasin_pedago' || !initialArticles.some(a => a.id === key)) {
+        // Use initial articles for the default environment, and stored articles for others.
+        const mergedArticles = new Map(initialState.articles);
+        articlesFromStorage.forEach((value: Article, key: string) => {
+            if(value.environnementId !== initialState.currentEnvironmentId) {
                  mergedArticles.set(key, value);
             }
         });
@@ -1045,3 +1042,5 @@ export const useWms = () => {
   }
   return context;
 };
+
+    

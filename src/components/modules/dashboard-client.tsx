@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Boxes, Users, FileText, Truck, User, Activity, Clock, CheckSquare, ListTodo, Lock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
-import type { User as UserType, Document, Tier, Task } from "@/lib/types";
+import type { User as UserType, Document, Tier, Movement as MovementType } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow, parseISO } from 'date-fns';
@@ -165,7 +165,7 @@ type StudentProgress = {
     lastActivityRelative: string;
 };
 
-const getStudentProgress = (student: UserType, allDocs: Document[], allTiers: Tier[], allMovements: any[], envId: string): StudentProgress => {
+const getStudentProgress = (student: UserType, allDocs: Document[], allTiers: Tier[], allMovements: MovementType[], envId: string): StudentProgress => {
     const userDocs = allDocs.filter(doc => doc.createdBy === student.username && doc.environnementId === envId);
     const userTiers = allTiers.filter(tier => tier.createdBy === student.username && tier.environnementId === envId);
     const userMovements = allMovements.filter(mov => mov.user === student.username && mov.environnementId === envId);
@@ -223,7 +223,7 @@ function TeacherDashboard() {
     
     const bcThisWeek = docsThisWeek.filter(d => d.type === 'Bon de Commande Fournisseur').length;
     const blThisWeek = docsThisWeek.filter(d => d.type === 'Bon de Livraison Client').length;
-    const receptionsThisWeek = docsThisWeek.filter(d => d.type === 'Bon de Commande Fournisseur' && d.status === 'Réceptionné').length;
+    const receptionsThisWeek = docsThisWeek.filter(d => d.type === 'Bon de Commande Fournisseur' && d.status.startsWith('Réceptionné')).length;
     const shipmentsThisWeek = docsThisWeek.filter(d => d.type === 'Bon de Livraison Client' && d.status === 'Expédié').length;
     const currentEnv = state.environments.get(currentEnvironmentId);
 
@@ -354,3 +354,5 @@ export function DashboardClient() {
 
   return <StudentDashboard />;
 }
+
+    
