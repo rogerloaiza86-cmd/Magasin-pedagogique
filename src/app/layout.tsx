@@ -19,6 +19,7 @@ import {
   Swords,
   Globe,
   Truck,
+  Archive,
 } from "lucide-react";
 
 import {
@@ -66,6 +67,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: Home, permission: 'canViewDashboard', envType: 'ALL' },
   { href: "/scenarios", label: "Scénarios", icon: Swords, permission: 'canManageScenarios', envType: 'ALL'},
+  { href: "/articles", label: "Fichier Articles", icon: Archive, permission: 'canViewStock', envType: 'WMS'},
   { href: "/tiers", label: "Gestion des Tiers", icon: Users, permission: 'canViewTiers', envType: 'ALL' },
   { href: "/flotte", label: "Flotte", icon: Truck, permission: 'canManageFleet', envType: 'TMS' },
   { href: "/flux-entrant", label: "Flux Entrant", icon: ArrowDownToLine, permission: 'canCreateBC', envType: 'WMS' },
