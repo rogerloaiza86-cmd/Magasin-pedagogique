@@ -17,6 +17,7 @@ import {
   Mail,
   Swords,
   Globe,
+  Truck,
 } from "lucide-react";
 
 import {
@@ -51,7 +52,8 @@ type NavItem = {
     | 'canManageClasses'
     | 'canUseIaTools'
     | 'canUseMessaging'
-    | 'canManageScenarios';
+    | 'canManageScenarios'
+    | 'canManageFleet';
   envType: Environment['type'] | 'ALL';
   isSuperAdminOnly?: boolean;
 };
@@ -61,6 +63,7 @@ const navItems: NavItem[] = [
   { href: "/environments", label: "Environnements", icon: Globe, isSuperAdminOnly: true, envType: 'ALL' },
   { href: "/scenarios", label: "Scénarios", icon: Swords, permission: 'canManageScenarios', envType: 'ALL'},
   { href: "/tiers", label: "Gestion des Tiers", icon: Users, permission: 'canViewTiers', envType: 'ALL' },
+  { href: "/flotte", label: "Flotte", icon: Truck, permission: 'canManageFleet', envType: 'TMS' },
   { href: "/flux-entrant", label: "Flux Entrant", icon: ArrowDownToLine, permission: 'canCreateBC', envType: 'WMS' },
   { href: "/flux-sortant", label: "Flux Sortant", icon: ArrowUpFromLine, permission: 'canCreateBL', envType: 'WMS' },
   { href: "/stock", label: "Gestion des Stocks", icon: Warehouse, permission: 'canViewStock', envType: 'WMS' },

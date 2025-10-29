@@ -17,15 +17,44 @@ export type Article = {
   environnementId: string;
 };
 
+export type TierType = 'Client' | 'Fournisseur' | 'Transporteur' | 'Vehicule';
+
+export type VehicleStatus = "Disponible" | "En Tournée" | "En Maintenance" | "Hors Service";
+
 export type Tier = {
   id: number;
-  type: 'Client' | 'Fournisseur' | 'Transporteur';
-  name: string;
-  address: string;
+  type: TierType;
+  name: string; // For Client/Fournisseur/Transporteur
+  address: string; // For Client/Fournisseur/Transporteur
   createdAt: string;
   createdBy: string;
   environnementId: string;
+  
+  // -- VEHICLE SPECIFIC FIELDS --
+  immatriculation?: string; // For Vehicule
+  capacitePalette?: number; // For Vehicule
+  status?: VehicleStatus;
+  chauffeurActuelId?: string | null;
+  tourneeActuelleId?: string | null;
+  echeanceControleTechnique?: string;
+  echeanceAssurance?: string;
+  kilometrage?: number;
+  coutKm?: number;
 };
+
+export type Maintenance = {
+    id: number;
+    environnementId: string;
+    vehiculeId: number;
+    vehiculeImmat: string;
+    typeMaintenance: string;
+    dateEcheance: string;
+    status: "Planifiée" | "En cours" | "Terminée" | "Annulée";
+    dateRealisation?: string | null;
+    kilometrageRealisation?: number | null;
+    cout?: number | null;
+    notes?: string;
+}
 
 export type DocumentLine = {
   articleId: string;
@@ -73,6 +102,8 @@ export type Permissions = {
     canUseIaTools: boolean;
     canUseMessaging: boolean;
     canManageScenarios: boolean;
+    // TMS Permissions to be added
+    canManageFleet: boolean;
 }
 
 export type Role = {

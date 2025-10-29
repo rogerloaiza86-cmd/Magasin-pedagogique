@@ -1,8 +1,8 @@
 
 "use client";
 
-import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect, useState } from 'react';
-import type { Article, Tier, Document, Movement, User, UserProfile, Class, Email, Role, Permissions, ScenarioTemplate, ActiveScenario, Task, TaskType, Environment } from '@/lib/types';
+import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
+import type { Article, Tier, Document, Movement, User, Class, Email, Role, Permissions, ScenarioTemplate, ActiveScenario, Task, Environment, Maintenance } from '@/lib/types';
 import { initialArticles } from '@/lib/articles-data';
 import { faker } from '@faker-js/faker/locale/fr';
 
@@ -19,6 +19,7 @@ ROLES.set('super_admin', {
         canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true, canReceiveBC: true,
         canCreateBL: true, canPrepareBL: true, canShipBL: true, canManageStock: true, canViewStock: true,
         canManageClasses: true, canUseIaTools: true, canUseMessaging: true, canManageScenarios: true,
+        canManageFleet: true,
     }
 });
 
@@ -31,7 +32,7 @@ ROLES.set('equipe_reception', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true,
         canReceiveBC: true, canCreateBL: false, canPrepareBL: false, canShipBL: false,
         canManageStock: true, canViewStock: true, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false,
+        canManageScenarios: false, canManageFleet: false,
     }
 });
 
@@ -44,9 +45,36 @@ ROLES.set('equipe_preparation', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: false,
         canReceiveBC: false, canCreateBL: true, canPrepareBL: true, canShipBL: true,
         canManageStock: false, canViewStock: true, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false,
+        canManageScenarios: false, canManageFleet: false,
     }
 });
+
+ROLES.set('tms_affreteur', {
+    id: 'tms_affreteur',
+    name: "Affréteur (TMS)",
+    description: "Gère la création des devis de transport.",
+    isStudentRole: true,
+    permissions: {
+        isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: false,
+        canReceiveBC: false, canCreateBL: false, canPrepareBL: false, canShipBL: false,
+        canManageStock: false, canViewStock: false, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
+        canManageScenarios: false, canManageFleet: false,
+    }
+});
+
+ROLES.set('tms_exploitation', {
+    id: 'tms_exploitation',
+    name: "Agent d'exploitation (TMS)",
+    description: "Gère la planification et le suivi des tournées.",
+    isStudentRole: true,
+permissions: {
+        isSuperAdmin: false, canViewDashboard: true, canManageTiers: false, canViewTiers: true, canCreateBC: false,
+        canReceiveBC: false, canCreateBL: false, canPrepareBL: false, canShipBL: false,
+        canManageStock: false, canViewStock: false, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
+        canManageScenarios: false, canManageFleet: true,
+    }
+});
+
 
 const ENVIRONMENTS: Map<string, Environment> = new Map();
 ENVIRONMENTS.set('magasin_pedago', {
@@ -79,6 +107,7 @@ interface WmsState {
   emails: Map<number, Email>;
   roles: Map<string, Role>;
   environments: Map<string, Environment>;
+  maintenances: Map<number, Maintenance>;
   scenarioTemplates: Map<number, ScenarioTemplate>;
   activeScenarios: Map<number, ActiveScenario>;
   tasks: Map<number, Task>;
@@ -87,6 +116,7 @@ interface WmsState {
   movementIdCounter: number;
   classIdCounter: number;
   emailIdCounter: number;
+  maintenanceIdCounter: number;
   scenarioTemplateIdCounter: number;
   activeScenarioIdCounter: number;
   taskIdCounter: number;
@@ -122,6 +152,7 @@ const getInitialState = (): WmsState => {
     emails: new Map(),
     roles: ROLES,
     environments: ENVIRONMENTS,
+    maintenances: new Map(),
     scenarioTemplates: new Map(),
     activeScenarios: new Map(),
     tasks: new Map(),
@@ -130,6 +161,7 @@ const getInitialState = (): WmsState => {
     movementIdCounter: initialMovements.length + 1,
     classIdCounter: 1,
     emailIdCounter: 1,
+    maintenanceIdCounter: 1,
     scenarioTemplateIdCounter: 1,
     activeScenarioIdCounter: 1,
     taskIdCounter: 1,
@@ -170,7 +202,6 @@ const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState =>
     const todoTasks = userTasks.filter(t => t.status === 'todo');
 
     let completedTaskId: number | null = null;
-    let taskCompletedAction: WmsAction | null = null;
 
     for (const task of todoTasks) {
         let taskCompleted = false;
@@ -193,16 +224,13 @@ const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState =>
             case 'CREATE_BL':
                  if (action.type === 'CREATE_DOCUMENT' && action.payload.type === 'Bon de Livraison Client') taskCompleted = true;
                 break;
-            case 'PREPARE_BL':
-                if (action.type === 'UPDATE_DOCUMENT' && action.payload.type === 'Bon de Livraison Client' && action.payload.status === 'Expédié') taskCompleted = true;
-                break;
+            case 'PREPARE_BL': // This is a virtual step for now, linked to SHIP_BL
             case 'SHIP_BL':
                 if (action.type === 'UPDATE_DOCUMENT' && action.payload.type === 'Bon de Livraison Client' && action.payload.status === 'Expédié') taskCompleted = true;
                 break;
         }
         if (taskCompleted) {
             completedTaskId = task.id;
-            taskCompletedAction = action;
             break; 
         }
     }
@@ -213,6 +241,7 @@ const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState =>
         if (completedTask) {
             newTasks.set(completedTaskId, { ...completedTask, status: 'completed' });
 
+            // Unlock next tasks
             newTasks.forEach(task => {
                 if (task.prerequisiteTaskId === completedTaskId) {
                     const taskToUnlock = newTasks.get(task.id);
@@ -420,7 +449,11 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         createdAt: new Date().toISOString(),
         createdBy: state.currentUser.username,
         environnementId: state.currentEnvironmentId,
+        name: action.payload.type === 'Vehicule' ? action.payload.immatriculation || '' : action.payload.name,
       };
+      if (newTier.type === 'Vehicule') {
+          newTier.status = 'Disponible';
+      }
       const newTiers = new Map(state.tiers);
       newTiers.set(newTier.id, newTier);
       newState = { ...state, tiers: newTiers, tierIdCounter: state.tierIdCounter + 1 };
@@ -622,7 +655,8 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                     const originalTemplate = template.tasks.find(t => t.taskOrder === task.taskOrder && t.roleId === roleId);
                     if (originalTemplate) {
                        if (originalTemplate.prerequisite) {
-                           task.prerequisiteTaskId = taskCreationMap.get(originalTemplate.prerequisite);
+                           const prereqNewId = taskCreationMap.get(originalTemplate.prerequisite);
+                           task.prerequisiteTaskId = prereqNewId;
                        }
                        if (!task.prerequisiteTaskId) {
                            task.status = 'todo';
@@ -769,6 +803,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
         parsedState.scenarioTemplates = parsedState.scenarioTemplates ? new Map(parsedState.scenarioTemplates.map((st: ScenarioTemplate) => [st.id, st])) : new Map();
         parsedState.activeScenarios = parsedState.activeScenarios ? new Map(parsedState.activeScenarios.map((as: ActiveScenario) => [as.id, as])) : new Map();
         parsedState.tasks = parsedState.tasks ? new Map(parsedState.tasks.map((t: Task) => [t.id, t])) : new Map();
+        parsedState.maintenances = parsedState.maintenances ? new Map(parsedState.maintenances.map((m: Maintenance) => [m.id, m])) : new Map();
 
         parsedState.roles = ROLES;
         parsedState.environments = ENVIRONMENTS;
@@ -806,6 +841,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
           users: Array.from(state.users.entries()),
           classes: Array.from(state.classes.values()),
           emails: Array.from(state.emails.values()),
+          maintenances: Array.from(state.maintenances.values()),
           scenarioTemplates: Array.from(state.scenarioTemplates.values()),
           activeScenarios: Array.from(state.activeScenarios.values()),
           tasks: Array.from(state.tasks.values()),
