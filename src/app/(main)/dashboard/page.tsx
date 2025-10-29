@@ -1,6 +1,1 @@
-
-import { DashboardClient } from "@/components/modules/dashboard-client";
-
-export default function DashboardPage() {
-  return <DashboardClient />;
-}
+export { default } from "@/app/dashboard/page";
