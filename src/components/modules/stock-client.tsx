@@ -49,6 +49,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { Badge } from "../ui/badge";
 
 function ArticleCombobox({ articles, value, onSelect, placeholder }: { articles: Article[], value: string, onSelect: (value: string) => void, placeholder?: string }) {
     const [open, setOpen] = useState(false);
@@ -211,36 +212,49 @@ function AdjustInventory() {
     const { toast } = useToast();
     const { currentEnvironmentId } = state;
     const articlesInEnv = Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId);
-    const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<{articleId: string, physicalStock: number}>({
-        defaultValues: { articleId: "", physicalStock: 0 }
+    const { control, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm<{articleId: string, physicalStock: number | string}>({
+        defaultValues: { articleId: "", physicalStock: "" }
     });
     const selectedArticleId = watch("articleId");
+    const physicalStock = watch("physicalStock");
     const article = selectedArticleId ? getArticle(selectedArticleId) : null;
     
-    const onSubmit = (data: {articleId: string, physicalStock: number}) => {
+    const onSubmit = (data: {articleId: string, physicalStock: number | string}) => {
         const articleToAdjust = getArticle(data.articleId);
         if (articleToAdjust) {
-            const physicalStock = Number(data.physicalStock);
+            const countedStock = Number(data.physicalStock);
+            if (isNaN(countedStock)) {
+                toast({
+                    variant: "destructive",
+                    title: "Erreur de saisie",
+                    description: "La quantité physique doit être un nombre."
+                });
+                return;
+            }
+
             dispatch({
                 type: 'ADJUST_INVENTORY',
                 payload: {
                     articleId: data.articleId,
-                    newStock: physicalStock,
+                    newStock: countedStock,
                     oldStock: articleToAdjust.stock
                 }
             });
             toast({
                 title: "Inventaire ajusté",
-                description: `Le stock de ${articleToAdjust.name} est passé à ${physicalStock}.`
+                description: `Le stock de ${articleToAdjust.name} est passé de ${articleToAdjust.stock} à ${countedStock}.`
             })
+            reset();
         }
     }
+    
+    const stockDifference = article ? Number(physicalStock) - article.stock : 0;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Effectuer un ajustement d'inventaire</CardTitle>
-        <CardDescription>Corrigez le stock d'un article après un comptage physique.</CardDescription>
+        <CardTitle>Effectuer un inventaire tournant</CardTitle>
+        <CardDescription>Corrigez le stock d'un article après un comptage physique et visualisez l'écart.</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
       <CardContent className="space-y-4">
@@ -249,33 +263,46 @@ function AdjustInventory() {
             <Controller
                 name="articleId"
                 control={control}
-                rules={{ required: "Article requis" }}
+                rules={{ required: "Veuillez sélectionner un article." }}
                 render={({ field }) => (
                      <ArticleCombobox
                         articles={articlesInEnv}
                         value={field.value}
-                        onSelect={field.onChange}
+                        onSelect={(value) => {
+                            field.onChange(value);
+                            setValue('physicalStock', '');
+                        }}
                     />
                 )}
             />
+            {errors.articleId && <p className="text-sm text-destructive mt-1">{errors.articleId.message}</p>}
         </div>
         {article && (
-            <div className="space-y-4">
-                <p>Stock théorique (actuel): <span className="font-bold text-lg">{article.stock}</span></p>
-                <div>
-                    <Label htmlFor="physicalStock">Stock physique réel compté</Label>
+            <div className="grid md:grid-cols-3 gap-4 items-end">
+                <div className="p-4 border rounded-md">
+                    <Label>Stock théorique</Label>
+                    <p className="font-bold text-2xl">{article.stock}</p>
+                </div>
+                <div className="p-4 border rounded-md">
+                    <Label htmlFor="physicalStock">Stock physique compté</Label>
                     <Controller
                         name="physicalStock"
                         control={control}
-                        rules={{ required: true, min: 0 }}
-                        render={({ field }) => <Input type="number" {...field} />}
+                        rules={{ required: "Quantité requise", min: { value: 0, message: "Ne peut être négatif" } }}
+                        render={({ field }) => <Input type="number" id="physicalStock" className="text-2xl h-auto p-0 border-0 focus-visible:ring-0" {...field} />}
                     />
-                    {errors.physicalStock && <p className="text-sm text-destructive mt-1">Veuillez entrer une valeur valide.</p>}
+                    {errors.physicalStock && <p className="text-sm text-destructive mt-1">{errors.physicalStock.message}</p>}
+                </div>
+                 <div className="p-4 border rounded-md">
+                    <Label>Écart d'inventaire</Label>
+                    <p className={`font-bold text-2xl ${stockDifference === 0 ? '' : stockDifference > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {physicalStock === '' ? '-' : (stockDifference > 0 ? `+${stockDifference}` : stockDifference)}
+                    </p>
                 </div>
             </div>
         )}
       </CardContent>
-      {article && <CardFooter><Button type="submit">Ajuster le stock</Button></CardFooter>}
+      {article && <CardFooter><Button type="submit" disabled={physicalStock === ''}>Valider et Ajuster le stock</Button></CardFooter>}
       </form>
     </Card>
   );
@@ -297,7 +324,7 @@ export function StockClient() {
   const tabs = [];
   tabs.push({ value: "view", label: "Consulter le Stock" });
   tabs.push({ value: "movements", label: "Consulter les Mouvements" });
-  if(perms.canManageStock) tabs.push({ value: "adjust", label: "Ajustement d'Inventaire" });
+  if(perms.canManageStock) tabs.push({ value: "adjust", label: "Inventaire / Ajustement" });
 
   return (
     <Tabs defaultValue="view" className="w-full">
@@ -314,3 +341,5 @@ export function StockClient() {
     </Tabs>
   );
 }
+
+    
