@@ -47,6 +47,9 @@ function StudentDashboard() {
         default: return null;
     }
   }
+  
+  const studentRole = currentUser ? roles.get(currentUser.roleId) : null;
+
 
   return (
     <div className="space-y-6">
@@ -66,19 +69,23 @@ function StudentDashboard() {
         <Card className="bg-blue-50 border-blue-200 dark:bg-blue-950">
             <CardHeader>
                 <CardTitle>Scénario en cours : {state.scenarioTemplates.get(studentActiveScenario.templateId)?.title}</CardTitle>
-                <CardDescription>Votre rôle : <span className="font-bold">{roles.get(currentUser?.roleId || '')?.name}</span>. Suivez les étapes ci-dessous.</CardDescription>
+                <CardDescription>Votre rôle : <span className="font-bold">{studentRole?.name || 'Chargement...'}</span>. Suivez les étapes ci-dessous.</CardDescription>
             </CardHeader>
             <CardContent>
-                <ul className="space-y-3">
-                    {studentTasks.map(task => (
-                        <li key={task.id} className={`flex items-start gap-4 p-3 rounded-md ${task.status === 'todo' ? 'bg-background shadow-sm' : 'bg-transparent'}`}>
-                           <TaskIcon status={task.status} />
-                           <div className="flex-1">
-                                <p className={`font-medium ${task.status === 'completed' ? 'line-through text-muted-foreground' : ''} ${task.status === 'blocked' ? 'text-muted-foreground' : ''}`}>{task.description}</p>
-                           </div>
-                        </li>
-                    ))}
-                </ul>
+                 {studentTasks.length > 0 ? (
+                    <ul className="space-y-3">
+                        {studentTasks.map(task => (
+                            <li key={task.id} className={`flex items-start gap-4 p-3 rounded-md ${task.status === 'todo' ? 'bg-background shadow-sm' : 'bg-transparent'}`}>
+                            <TaskIcon status={task.status} />
+                            <div className="flex-1">
+                                    <p className={`font-medium ${task.status === 'completed' ? 'line-through text-muted-foreground' : ''} ${task.status === 'blocked' ? 'text-muted-foreground' : ''}`}>{task.description}</p>
+                            </div>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="text-muted-foreground">Les tâches pour votre rôle sont en cours d'assignation...</p>
+                )}
             </CardContent>
         </Card>
       )}
