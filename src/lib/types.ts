@@ -66,26 +66,29 @@ export type Maintenance = {
 
 export type DocumentLine = {
   articleId: string;
-  quantity: number;
+  quantity: number; // Quantité commandée
+  quantityReceived?: number;
+  quantityNonConforming?: number;
 };
 
 export type Document = {
   id: number;
   type: 'Bon de Commande Fournisseur' | 'Bon de Livraison Client' | 'Lettre de Voiture';
   tierId: number;
-  status: 'En préparation' | 'Validé' | 'Expédié' | 'Réceptionné';
+  status: 'En préparation' | 'Validé' | 'Expédié' | 'Réceptionné' | 'Réceptionné avec anomalies';
   lines: DocumentLine[];
   createdAt: string;
   createdBy: string;
   transporterId?: number; // For CMR
   environnementId: string;
+  receptionNotes?: string; // Réserves à la réception
 };
 
 export type Movement = {
   id: number;
   timestamp: string;
   articleId: string;
-  type: 'Entrée (Réception BC)' | 'Sortie (Expédition BL)' | 'Ajustement Inventaire' | 'Initial' | 'Génération';
+  type: 'Entrée (Réception BC)' | 'Sortie (Expédition BL)' | 'Ajustement Inventaire' | 'Initial' | 'Génération' | 'Mise en non-conforme';
   quantity: number;
   stockAfter: number;
   user: string;
@@ -206,5 +209,3 @@ export type Task = {
     details?: Record<string, any>;
     environnementId: string;
 };
-
-    

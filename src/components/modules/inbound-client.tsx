@@ -2,7 +2,7 @@
 "use client";
 
 import { useWms } from "@/context/WmsContext";
-import { Article, DocumentLine, Tier } from "@/lib/types";
+import { Article, Document, DocumentLine, Tier } from "@/lib/types";
 import { useState } from "react";
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import {
@@ -11,6 +11,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import {
   Table,
@@ -31,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Trash2, PlusCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -44,6 +46,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 type PurchaseOrderFormData = {
   supplierId: string;
@@ -52,6 +62,17 @@ type PurchaseOrderFormData = {
     quantity: number;
   }[];
 };
+
+type ReceptionFormData = {
+    docId: number;
+    receptionNotes: string;
+    lines: {
+        articleId: string;
+        ordered: number;
+        received: number;
+        nonConforming: number;
+    }[];
+}
 
 function CreatePurchaseOrder() {
   const { state, dispatch, getArticle } = useWms();
@@ -195,29 +216,82 @@ function ReceivePurchaseOrder() {
   const { state, dispatch, getTier, getArticle } = useWms();
   const { toast } = useToast();
   const { currentUser, currentEnvironmentId } = state;
+  const [selectedPO, setSelectedPO] = useState<Document | null>(null);
+
+  const { control, handleSubmit, reset, watch, formState: { errors } } = useForm<ReceptionFormData>();
+
   const pendingPOs = Array.from(state.documents.values()).filter(
     (d) =>
       d.type === "Bon de Commande Fournisseur" && d.status === "En préparation" && d.environnementId === currentEnvironmentId
   ).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
   
-  const handleReceive = (docId: number) => {
-    const doc = state.documents.get(docId);
-    if (doc) {
-        // In a real scenario, we'd ask for quantities. Here we assume they match.
-        dispatch({ type: 'UPDATE_DOCUMENT', payload: {...doc, status: 'Réceptionné'} });
-        toast({
-            title: "BC Réceptionné",
-            description: `La marchandise du BC #${docId} a été ajoutée au stock.`
-        })
-    }
+  const handleOpenDialog = (doc: Document) => {
+    setSelectedPO(doc);
+    reset({
+        docId: doc.id,
+        receptionNotes: "",
+        lines: doc.lines.map(line => ({
+            articleId: line.articleId,
+            ordered: line.quantity,
+            received: line.quantity,
+            nonConforming: 0,
+        }))
+    });
   }
 
+  const handleCloseDialog = () => {
+    setSelectedPO(null);
+    reset();
+  }
+
+  const onSubmitReception = (data: ReceptionFormData) => {
+    const originalDoc = state.documents.get(data.docId);
+    if (!originalDoc) return;
+    
+    let hasAnomalies = false;
+    const updatedLines: DocumentLine[] = originalDoc.lines.map((line, index) => {
+        const receivedData = data.lines[index];
+        const received = Number(receivedData.received);
+        const nonConforming = Number(receivedData.nonConforming);
+        
+        if (received !== line.quantity || nonConforming > 0) {
+            hasAnomalies = true;
+        }
+
+        return {
+            ...line,
+            quantityReceived: received,
+            quantityNonConforming: nonConforming
+        }
+    });
+
+    const newStatus = hasAnomalies ? 'Réceptionné avec anomalies' : 'Réceptionné';
+
+    dispatch({
+        type: 'UPDATE_DOCUMENT',
+        payload: {
+            ...originalDoc,
+            lines: updatedLines,
+            status: newStatus,
+            receptionNotes: data.receptionNotes
+        }
+    });
+    
+    toast({
+        title: "BC Réceptionné",
+        description: `La marchandise du BC #${data.docId} a été traitée. Le stock a été mis à jour.`
+    });
+    
+    handleCloseDialog();
+  };
+
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle>Réceptionner un Bon de Commande</CardTitle>
         <CardDescription>
-          Validez la réception des marchandises pour mettre à jour les stocks.
+          Validez la réception des marchandises, déclarez les non-conformités et mettez à jour les stocks.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -246,23 +320,7 @@ function ReceivePurchaseOrder() {
                     </ul>
                   </TableCell>
                   <TableCell className="text-right">
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button>Réceptionner</Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Confirmer la réception ?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Cette action mettra à jour les niveaux de stock pour tous les articles de ce bon de commande. Pour ce scénario simplifié, nous supposons que les quantités reçues sont conformes. L'action est irréversible.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Annuler</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleReceive(po.id)}>Confirmer</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <Button onClick={() => handleOpenDialog(po)}>Réceptionner</Button>
                   </TableCell>
                 </TableRow>
               ))
@@ -277,6 +335,68 @@ function ReceivePurchaseOrder() {
         </Table>
       </CardContent>
     </Card>
+
+    <Dialog open={!!selectedPO} onOpenChange={handleCloseDialog}>
+        <DialogContent className="max-w-4xl">
+            <form onSubmit={handleSubmit(onSubmitReception)}>
+                <DialogHeader>
+                    <DialogTitle>Réception du BC #{selectedPO?.id}</DialogTitle>
+                    <DialogDescription>
+                        Saisissez les quantités réellement reçues et les non-conformités.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="my-4 max-h-[50vh] overflow-y-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Article</TableHead>
+                                <TableHead className="w-24">Qté Commandée</TableHead>
+                                <TableHead className="w-32">Qté Reçue</TableHead>
+                                <TableHead className="w-32">Qté Non-Conforme</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {watch('lines')?.map((line, index) => (
+                                <TableRow key={index}>
+                                    <TableCell>{getArticle(line.articleId)?.name}</TableCell>
+                                    <TableCell className="text-center">{line.ordered}</TableCell>
+                                    <TableCell>
+                                         <Controller
+                                            name={`lines.${index}.received`}
+                                            control={control}
+                                            rules={{ required: true, min: 0, max: line.ordered }}
+                                            render={({ field }) => <Input type="number" {...field} />}
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                         <Controller
+                                            name={`lines.${index}.nonConforming`}
+                                            control={control}
+                                            rules={{ required: true, min: 0, max: watch(`lines.${index}.received`) }}
+                                            render={({ field }) => <Input type="number" {...field} />}
+                                        />
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="receptionNotes">Réserves / Notes sur le bon de livraison</Label>
+                    <Controller
+                        name="receptionNotes"
+                        control={control}
+                        render={({ field }) => <Textarea id="receptionNotes" {...field} placeholder="Ex: Palette filmée endommagée, colis ouvert..."/>}
+                    />
+                </div>
+                <DialogFooter className="mt-4">
+                    <DialogClose asChild><Button type="button" variant="ghost">Annuler</Button></DialogClose>
+                    <Button type="submit">Valider la Réception</Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
