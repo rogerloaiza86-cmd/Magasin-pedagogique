@@ -188,6 +188,8 @@ type WmsAction =
   | { type: 'DELETE_SCENARIO_TEMPLATE'; payload: { templateId: number } }
   | { type: 'LAUNCH_SCENARIO', payload: { templateId: number, classId: number } }
   | { type: 'GENERATE_DATA'; payload: { environnementId: string, articles: number, clients: number, suppliers: number } }
+  | { type: 'START_MAINTENANCE'; payload: { vehiculeId: number, notes: string } }
+  | { type: 'FINISH_MAINTENANCE'; payload: { maintenanceId: number } }
   | { type: 'SET_STATE'; payload: WmsState }
   | { type: 'SET_ENVIRONMENT'; payload: { environmentId: string } };
 
@@ -449,10 +451,12 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         createdAt: new Date().toISOString(),
         createdBy: state.currentUser.username,
         environnementId: state.currentEnvironmentId,
-        name: action.payload.type === 'Vehicule' ? action.payload.immatriculation || '' : action.payload.name,
+        name: action.payload.type === 'Vehicule' ? action.payload.name : action.payload.name,
       };
-      if (newTier.type === 'Vehicule') {
+       if (newTier.type === 'Vehicule') {
           newTier.status = 'Disponible';
+          // Ensure name is set for Vehicle (from immatriculation) for table display
+          newTier.name = action.payload.name || newTier.immatriculation || '';
       }
       const newTiers = new Map(state.tiers);
       newTiers.set(newTier.id, newTier);
@@ -750,6 +754,59 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         };
         break;
     }
+    case 'START_MAINTENANCE': {
+        if (!state.currentUserPermissions?.canManageFleet) return state;
+        const { vehiculeId, notes } = action.payload;
+        const newTiers = new Map(state.tiers);
+        const vehicle = newTiers.get(vehiculeId);
+        if (!vehicle || vehicle.type !== 'Vehicule') return state;
+
+        vehicle.status = 'En Maintenance';
+        newTiers.set(vehiculeId, vehicle);
+
+        const newMaintenances = new Map(state.maintenances);
+        const newMaintenanceId = state.maintenanceIdCounter;
+        const newMaintenance: Maintenance = {
+            id: newMaintenanceId,
+            environnementId: state.currentEnvironmentId,
+            vehiculeId,
+            vehiculeImmat: vehicle.immatriculation || '',
+            typeMaintenance: 'Réparation',
+            dateEcheance: new Date().toISOString(),
+            status: 'En cours',
+            notes,
+        };
+        newMaintenances.set(newMaintenanceId, newMaintenance);
+
+        newState = {
+            ...state,
+            tiers: newTiers,
+            maintenances: newMaintenances,
+            maintenanceIdCounter: newMaintenanceId + 1,
+        };
+        break;
+    }
+     case 'FINISH_MAINTENANCE': {
+        if (!state.currentUserPermissions?.canManageFleet) return state;
+        const { maintenanceId } = action.payload;
+        const newMaintenances = new Map(state.maintenances);
+        const maintenance = newMaintenances.get(maintenanceId);
+        if (!maintenance || maintenance.status !== 'En cours') return state;
+
+        maintenance.status = 'Terminée';
+        maintenance.dateRealisation = new Date().toISOString();
+        newMaintenances.set(maintenanceId, maintenance);
+
+        const newTiers = new Map(state.tiers);
+        const vehicle = newTiers.get(maintenance.vehiculeId);
+        if (vehicle && vehicle.type === 'Vehicule') {
+            vehicle.status = 'Disponible';
+            newTiers.set(maintenance.vehiculeId, vehicle);
+        }
+        
+        newState = { ...state, tiers: newTiers, maintenances: newMaintenances };
+        break;
+    }
     case 'SET_STATE': {
         const loadedState = action.payload;
         if(loadedState.currentUser) {
@@ -887,3 +944,5 @@ export const useWms = () => {
   }
   return context;
 };
+
+    

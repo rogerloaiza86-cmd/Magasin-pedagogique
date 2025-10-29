@@ -8,6 +8,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import {
   Table,
@@ -30,21 +31,25 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useForm, Controller } from "react-hook-form";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Tier, TierType } from "@/lib/types";
+import type { Tier, TierType, Maintenance } from "@/lib/types";
 import { Badge } from "../ui/badge";
-import { PlusCircle } from "lucide-react";
-
+import { PlusCircle, Wrench, Check } from "lucide-react";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Textarea } from "../ui/textarea";
 
 type VehicleFormData = Omit<Tier, 'id' | 'createdAt' | 'createdBy' | 'environnementId' | 'name' | 'address'> & {
     type: 'Vehicule',
@@ -53,6 +58,11 @@ type VehicleFormData = Omit<Tier, 'id' | 'createdAt' | 'createdBy' | 'environnem
     capacitePalette: number;
     echeanceControleTechnique?: string;
     echeanceAssurance?: string;
+};
+
+type MaintenanceFormData = Omit<Maintenance, 'id' | 'environnementId' | 'vehiculeImmat' | 'status' | 'dateRealisation' | 'kilometrageRealisation' | 'cout' | 'notes'> & {
+    typeMaintenance: string;
+    dateEcheance: string;
 };
 
 function VehicleForm({ onSave, onCancel }: { onSave: (data: VehicleFormData) => void, onCancel: () => void }) {
@@ -109,9 +119,12 @@ function VehicleForm({ onSave, onCancel }: { onSave: (data: VehicleFormData) => 
 
 export function FlotteClient() {
   const { state, dispatch } = useWms();
-  const { currentUserPermissions, currentEnvironmentId } = state;
+  const { currentUserPermissions, currentEnvironmentId, maintenances } = state;
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [maintenanceToStart, setMaintenanceToStart] = useState<Tier | null>(null);
+
+  const { control: maintenanceControl, handleSubmit: handleMaintenanceSubmit, reset: resetMaintenanceForm } = useForm<{ notes: string }>();
 
   if (!currentUserPermissions?.canManageFleet) {
     return (
@@ -125,6 +138,8 @@ export function FlotteClient() {
   const vehicles = Array.from(state.tiers.values()).filter(
     (tier) => tier.type === 'Vehicule' && tier.environnementId === currentEnvironmentId
   );
+  
+  const maintenanceList = Array.from(maintenances.values()).filter(m => m.environnementId === currentEnvironmentId);
 
   const onSaveVehicle = (data: VehicleFormData) => {
     dispatch({ type: "ADD_TIER", payload: data });
@@ -135,7 +150,46 @@ export function FlotteClient() {
     setIsFormOpen(false);
   };
   
+  const onStartMaintenance = (data: { notes: string }) => {
+    if (!maintenanceToStart) return;
+    
+    dispatch({
+        type: 'START_MAINTENANCE',
+        payload: {
+            vehiculeId: maintenanceToStart.id,
+            notes: data.notes
+        }
+    });
+
+    toast({
+        title: "Maintenance Démarrée",
+        description: `Le véhicule ${maintenanceToStart.immatriculation} est maintenant en maintenance.`
+    });
+    
+    setMaintenanceToStart(null);
+    resetMaintenanceForm();
+  };
+
+  const onFinishMaintenance = (maintenanceId: number) => {
+     dispatch({ type: 'FINISH_MAINTENANCE', payload: { maintenanceId } });
+      toast({
+        title: "Maintenance Terminée",
+        description: `L'opération a été clôturée et le véhicule est de nouveau disponible.`
+    });
+  }
+  
+  const getStatusVariant = (status: Tier['status']) => {
+    switch (status) {
+        case 'Disponible': return 'default';
+        case 'En Maintenance': return 'destructive';
+        case 'En Tournée': return 'secondary';
+        case 'Hors Service': return 'outline';
+        default: return 'secondary';
+    }
+  }
+
   return (
+    <>
     <Tabs defaultValue="parc">
       <TabsList className="grid w-full grid-cols-2">
         <TabsTrigger value="parc">Vue du Parc</TabsTrigger>
@@ -168,7 +222,7 @@ export function FlotteClient() {
                         <TableHead>Capacité</TableHead>
                         <TableHead>Statut</TableHead>
                         <TableHead>Prochain CT</TableHead>
-                        <TableHead>Action</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -178,10 +232,12 @@ export function FlotteClient() {
                                 <TableCell className="font-medium">{v.immatriculation}</TableCell>
                                 <TableCell>{v.name}</TableCell>
                                 <TableCell>{v.capacitePalette} palettes</TableCell>
-                                <TableCell><Badge variant={v.status === 'Disponible' ? 'default' : 'secondary'}>{v.status}</Badge></TableCell>
+                                <TableCell><Badge variant={getStatusVariant(v.status)}>{v.status}</Badge></TableCell>
                                 <TableCell>{v.echeanceControleTechnique ? new Date(v.echeanceControleTechnique).toLocaleDateString() : 'N/A'}</TableCell>
-                                <TableCell>
-                                    <Button variant="outline" size="sm" disabled={v.status !== 'Disponible'}>Mettre en maintenance</Button>
+                                <TableCell className="text-right">
+                                    <Button variant="outline" size="sm" disabled={v.status !== 'Disponible'} onClick={() => setMaintenanceToStart(v)}>
+                                        <Wrench className="mr-2 h-4 w-4" /> Mettre en maintenance
+                                    </Button>
                                 </TableCell>
                             </TableRow>
                         ))
@@ -204,10 +260,86 @@ export function FlotteClient() {
                 <CardDescription>Planifiez et suivez les maintenances de vos véhicules.</CardDescription>
             </CardHeader>
             <CardContent>
-                <p className="text-muted-foreground text-center py-8">Le module de maintenance est en cours de développement.</p>
+                 <Table>
+                    <TableHeader>
+                        <TableRow>
+                        <TableHead>Véhicule</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Notes</TableHead>
+                        <TableHead>Statut</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {maintenanceList.length > 0 ? (
+                        maintenanceList.map((m) => (
+                            <TableRow key={m.id}>
+                                <TableCell className="font-medium">{m.vehiculeImmat}</TableCell>
+                                <TableCell>{m.typeMaintenance}</TableCell>
+                                <TableCell className="text-sm text-muted-foreground">{m.notes}</TableCell>
+                                <TableCell><Badge variant={m.status === 'En cours' ? 'destructive' : 'default'}>{m.status}</Badge></TableCell>
+                                <TableCell className="text-right">
+                                    {m.status === 'En cours' && (
+                                         <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button size="sm"><Check className="mr-2 h-4 w-4"/>Clôturer</Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Clôturer la maintenance ?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        Le véhicule redeviendra "Disponible". Cette action est irréversible.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => onFinishMaintenance(m.id)}>Confirmer</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    )}
+                                </TableCell>
+                            </TableRow>
+                        ))
+                        ) : (
+                        <TableRow>
+                            <TableCell colSpan={5} className="h-24 text-center">
+                            Aucune opération de maintenance enregistrée.
+                            </TableCell>
+                        </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
             </CardContent>
         </Card>
       </TabsContent>
     </Tabs>
+
+     {/* Maintenance Start Dialog */}
+      <Dialog open={!!maintenanceToStart} onOpenChange={() => setMaintenanceToStart(null)}>
+        <DialogContent>
+            <form onSubmit={handleMaintenanceSubmit(onStartMaintenance)}>
+                <DialogHeader>
+                    <DialogTitle>Mettre le véhicule {maintenanceToStart?.immatriculation} en maintenance</DialogTitle>
+                    <DialogDescription>
+                        Le statut du véhicule passera à "En Maintenance". Ajoutez une note pour décrire l'intervention.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                     <Label htmlFor="notes">Notes / Raison de la maintenance</Label>
+                    <Controller name="notes" control={maintenanceControl} rules={{ required: "Une note est requise."}}
+                        render={({field}) => <Textarea id="notes" {...field} />}
+                     />
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="ghost" type="button" onClick={() => setMaintenanceToStart(null)}>Annuler</Button></DialogClose>
+                    <Button type="submit">Confirmer et Démarrer</Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
+
+    

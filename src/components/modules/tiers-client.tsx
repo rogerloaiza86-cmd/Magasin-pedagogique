@@ -117,7 +117,7 @@ export function TiersClient() {
     watch,
     formState: { errors },
   } = useForm<TierFormData>({
-    defaultValues: { name: "", address: "", type: "Client", immatriculation: "", capacitePalette: 0 },
+    defaultValues: { name: "", address: "", type: "Client", immatriculation: "", capacitePalette: 0, echeanceControleTechnique: new Date().toISOString().split('T')[0], echeanceAssurance: new Date().toISOString().split('T')[0] },
   });
   
   const selectedType = watch("type");
@@ -203,6 +203,14 @@ export function TiersClient() {
                                 <Label htmlFor="capacitePalette" className="text-right">Capacité</Label>
                                 <Controller name="capacitePalette" control={control} rules={{ required: "Capacité requise", valueAsNumber: true }} render={({ field }) => <Input id="capacitePalette" type="number" {...field} className="col-span-3" />} />
                             </div>
+                             <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="echeanceControleTechnique" className="text-right">Échéance CT</Label>
+                                <Controller name="echeanceControleTechnique" control={control} render={({ field }) => <Input id="echeanceControleTechnique" type="date" {...field} className="col-span-3" />} />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="echeanceAssurance" className="text-right">Échéance Assurance</Label>
+                                <Controller name="echeanceAssurance" control={control} render={({ field }) => <Input id="echeanceAssurance" type="date" {...field} className="col-span-3" />} />
+                            </div>
                         </>
                      ) : (
                         <>
@@ -249,3 +257,5 @@ export function TiersClient() {
     </Card>
   );
 }
+
+    

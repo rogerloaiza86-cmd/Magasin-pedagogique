@@ -24,7 +24,7 @@ export type VehicleStatus = "Disponible" | "En Tournée" | "En Maintenance" | "H
 export type Tier = {
   id: number;
   type: TierType;
-  name: string; // For Client/Fournisseur/Transporteur
+  name: string; // For Client/Fournisseur/Transporteur/VehicleType
   address: string; // For Client/Fournisseur/Transporteur
   createdAt: string;
   createdBy: string;
@@ -47,7 +47,7 @@ export type Maintenance = {
     environnementId: string;
     vehiculeId: number;
     vehiculeImmat: string;
-    typeMaintenance: string;
+    typeMaintenance: string; // "Réparation", "Contrôle Technique", "Vidange", ...
     dateEcheance: string;
     status: "Planifiée" | "En cours" | "Terminée" | "Annulée";
     dateRealisation?: string | null;
@@ -198,3 +198,5 @@ export type Task = {
     details?: Record<string, any>;
     environnementId: string;
 };
+
+    
