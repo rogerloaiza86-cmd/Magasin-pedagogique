@@ -218,7 +218,7 @@ export default function RootLayout({
 
   return (
     <html lang="fr">
-      <body className={`font-body antialiased`}>
+      <body className={'font-body antialiased'}>
         <WmsProvider>
           <AppStateSync />
             {isAuthPage ? (
