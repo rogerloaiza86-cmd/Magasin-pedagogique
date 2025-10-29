@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useWms } from "@/context/WmsContext";
@@ -24,8 +25,9 @@ import { Document } from "@/lib/types";
 
 export function DocumentsClient() {
   const { state, getTier } = useWms();
+  const { currentUser, currentEnvironmentId } = state;
   const documents = Array.from(state.documents.values())
-    .filter(doc => doc.createdBy === state.currentUser?.username)
+    .filter(doc => doc.createdBy === currentUser?.username && doc.environnementId === currentEnvironmentId)
     .sort((a,b) => b.id - a.id);
 
   const getStatusVariant = (status: Document['status']): "default" | "secondary" | "destructive" | "outline" => {
@@ -44,7 +46,7 @@ export function DocumentsClient() {
       <CardHeader>
         <CardTitle>Vos documents</CardTitle>
         <CardDescription>
-          Consultez tous les bons de commande, bons de livraison et lettres de voiture que vous avez créés.
+          Consultez tous les bons de commande, bons de livraison et lettres de voiture que vous avez créés dans cet environnement.
         </CardDescription>
       </CardHeader>
       <CardContent>

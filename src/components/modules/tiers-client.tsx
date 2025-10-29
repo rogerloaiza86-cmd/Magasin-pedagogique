@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useWms } from "@/context/WmsContext";
@@ -82,12 +83,12 @@ function TiersTable({ tiers, type }: { tiers: Tier[], type: string }) {
 
 export function TiersClient() {
   const { state, dispatch } = useWms();
-  const { currentUser, currentUserPermissions } = state;
+  const { currentUser, currentUserPermissions, currentEnvironmentId } = state;
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
   const currentUserTiers = Array.from(state.tiers.values()).filter(
-    (tier) => tier.createdBy === currentUser?.username
+    (tier) => tier.createdBy === currentUser?.username && tier.environnementId === currentEnvironmentId
   );
 
   const clients = currentUserTiers.filter(t => t.type === 'Client');
@@ -133,7 +134,7 @@ export function TiersClient() {
                     <DialogHeader>
                     <DialogTitle>Ajouter un nouveau Tiers</DialogTitle>
                     <DialogDescription>
-                        Remplissez les informations ci-dessous. Le nouveau tiers ne sera visible que par vous.
+                        Remplissez les informations ci-dessous. Le nouveau tiers ne sera visible que par vous dans cet environnement.
                     </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">

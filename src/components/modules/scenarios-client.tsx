@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useWms } from "@/context/WmsContext";
@@ -52,7 +53,7 @@ const taskTypeLabels: Record<TaskType, string> = {
 
 function ScenarioTemplateForm({ template, onSave, onCancel }: { template?: ScenarioTemplate, onSave: (data: any) => void, onCancel: () => void }) {
   const { state } = useWms();
-  const { control, handleSubmit, register, formState: { errors } } = useForm<Omit<ScenarioTemplate, 'id' | 'createdBy'>>({
+  const { control, handleSubmit, register, formState: { errors } } = useForm<Omit<ScenarioTemplate, 'id' | 'createdBy' | 'environnementId'>>({
     defaultValues: template ? {
         title: template.title,
         description: template.description,
@@ -182,7 +183,7 @@ function ScenarioTemplateForm({ template, onSave, onCancel }: { template?: Scena
 
 export function ScenariosClient() {
   const { state, dispatch } = useWms();
-  const { currentUserPermissions, scenarioTemplates, classes } = state;
+  const { currentUserPermissions, scenarioTemplates, classes, currentEnvironmentId } = state;
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<ScenarioTemplate | undefined>(undefined);
@@ -204,7 +205,7 @@ export function ScenariosClient() {
     );
   }
   
-  const handleSaveTemplate = (data: Omit<ScenarioTemplate, 'id' | 'createdBy'>) => {
+  const handleSaveTemplate = (data: Omit<ScenarioTemplate, 'id' | 'createdBy' | 'environnementId'>) => {
     dispatch({ type: 'SAVE_SCENARIO_TEMPLATE', payload: { ...data, id: editingTemplate?.id }});
     toast({ title: "Scénario enregistré", description: `Le modèle "${data.title}" a été sauvegardé.`});
     setIsFormOpen(false);
@@ -227,7 +228,7 @@ export function ScenariosClient() {
     toast({ variant: 'destructive', title: "Modèle supprimé" });
   }
 
-  const templates = Array.from(scenarioTemplates.values());
+  const templates = Array.from(scenarioTemplates.values()).filter(t => t.environnementId === currentEnvironmentId);
 
   return (
     <div className="space-y-6">
@@ -236,7 +237,7 @@ export function ScenariosClient() {
           <div>
             <CardTitle>Bibliothèque de Scénarios</CardTitle>
             <CardDescription>
-              Créez, modifiez et lancez des scénarios pour vos classes.
+              Créez, modifiez et lancez des scénarios pour vos classes dans cet environnement.
             </CardDescription>
           </div>
           <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>

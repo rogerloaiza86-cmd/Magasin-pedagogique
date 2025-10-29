@@ -1,8 +1,8 @@
 
 "use client";
 
-import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
-import type { Article, Tier, Document, Movement, User, UserProfile, Class, Email, Role, Permissions, ScenarioTemplate, ActiveScenario, Task, TaskType } from '@/lib/types';
+import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect, useState } from 'react';
+import type { Article, Tier, Document, Movement, User, UserProfile, Class, Email, Role, Permissions, ScenarioTemplate, ActiveScenario, Task, TaskType, Environment } from '@/lib/types';
 import { initialArticles } from '@/lib/articles-data';
 
 // --- ROLES & PERMISSIONS DEFINITION ---
@@ -47,6 +47,26 @@ ROLES.set('equipe_preparation', {
     }
 });
 
+const ENVIRONMENTS: Map<string, Environment> = new Map();
+ENVIRONMENTS.set('magasin_pedago', {
+    id: 'magasin_pedago',
+    name: 'Magasin Pédagogique (Réel)',
+    type: 'WMS',
+    description: 'Stock physique du lycée. Lié au réel.'
+});
+ENVIRONMENTS.set('entrepot_fictif_ecommerce', {
+    id: 'entrepot_fictif_ecommerce',
+    name: 'Entrepôt E-Commerce (Fictif)',
+    type: 'WMS',
+    description: 'Simulation à grande échelle.'
+});
+ENVIRONMENTS.set('agence_transport', {
+    id: 'agence_transport',
+    name: 'Agence de Transport (TMS)',
+    type: 'TMS',
+    description: 'Gestion des devis et des tournées.'
+});
+
 
 interface WmsState {
   articles: Map<string, Article>;
@@ -57,6 +77,7 @@ interface WmsState {
   classes: Map<number, Class>;
   emails: Map<number, Email>;
   roles: Map<string, Role>;
+  environments: Map<string, Environment>;
   scenarioTemplates: Map<number, ScenarioTemplate>;
   activeScenarios: Map<number, ActiveScenario>;
   tasks: Map<number, Task>;
@@ -70,9 +91,11 @@ interface WmsState {
   taskIdCounter: number;
   currentUser: User | null;
   currentUserPermissions: Permissions | null;
+  currentEnvironmentId: string;
 }
 
 const getInitialState = (): WmsState => {
+  const defaultEnvId = 'magasin_pedago';
   const initialMovements: Movement[] = initialArticles.map((article, index) => ({
     id: index + 1,
     timestamp: new Date().toISOString(),
@@ -81,6 +104,7 @@ const getInitialState = (): WmsState => {
     quantity: article.stock,
     stockAfter: article.stock,
     user: 'Système',
+    environnementId: defaultEnvId,
   }));
 
   const initialUsers = new Map<string, User>();
@@ -88,7 +112,7 @@ const getInitialState = (): WmsState => {
   initialUsers.set('prof', { username: 'prof', password: 'professeur', createdAt: new Date().toISOString(), roleId: 'super_admin' });
 
   return {
-    articles: new Map(initialArticles.map(a => [a.id, a])),
+    articles: new Map(initialArticles.map(a => [a.id, {...a, environnementId: defaultEnvId}])),
     tiers: new Map(),
     documents: new Map(),
     movements: initialMovements,
@@ -96,6 +120,7 @@ const getInitialState = (): WmsState => {
     classes: new Map(),
     emails: new Map(),
     roles: ROLES,
+    environments: ENVIRONMENTS,
     scenarioTemplates: new Map(),
     activeScenarios: new Map(),
     tasks: new Map(),
@@ -109,12 +134,13 @@ const getInitialState = (): WmsState => {
     taskIdCounter: 1,
     currentUser: null,
     currentUserPermissions: null,
+    currentEnvironmentId: defaultEnvId,
   };
 };
 
 type WmsAction =
-  | { type: 'ADD_TIER'; payload: Omit<Tier, 'id' | 'createdAt' | 'createdBy'> }
-  | { type: 'CREATE_DOCUMENT'; payload: Omit<Document, 'id' | 'createdAt' | 'createdBy'> }
+  | { type: 'ADD_TIER'; payload: Omit<Tier, 'id' | 'createdAt' | 'createdBy' | 'environnementId'> }
+  | { type: 'CREATE_DOCUMENT'; payload: Omit<Document, 'id' | 'createdAt' | 'createdBy' | 'environnementId'> }
   | { type: 'UPDATE_DOCUMENT'; payload: Document }
   | { type: 'ADJUST_INVENTORY'; payload: { articleId: string; newStock: number; oldStock: number } }
   | { type: 'LOGIN'; payload: { username: string, password: string} }
@@ -125,16 +151,17 @@ type WmsAction =
   | { type: 'TOGGLE_TEACHER_CLASS_ASSIGNMENT', payload: { classId: number, teacherId: string } }
   | { type: 'SEND_EMAIL'; payload: Omit<Email, 'id' | 'timestamp' | 'isRead'> }
   | { type: 'MARK_EMAIL_AS_READ'; payload: { emailId: number } }
-  | { type: 'SAVE_SCENARIO_TEMPLATE'; payload: Omit<ScenarioTemplate, 'id' | 'createdBy'> & { id?: number } }
+  | { type: 'SAVE_SCENARIO_TEMPLATE'; payload: Omit<ScenarioTemplate, 'id' | 'createdBy' | 'environnementId'> & { id?: number } }
   | { type: 'DELETE_SCENARIO_TEMPLATE'; payload: { templateId: number } }
   | { type: 'LAUNCH_SCENARIO', payload: { templateId: number, classId: number } }
-  | { type: 'SET_STATE'; payload: WmsState };
+  | { type: 'SET_STATE'; payload: WmsState }
+  | { type: 'SET_ENVIRONMENT'; payload: { environmentId: string } };
 
 const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState => {
     const { currentUser, tasks, activeScenarios } = state;
     if (!currentUser) return state;
 
-    const userActiveScenario = Array.from(activeScenarios.values()).find(sc => sc.classId === currentUser.classId && sc.status === 'running');
+    const userActiveScenario = Array.from(activeScenarios.values()).find(sc => sc.classId === currentUser.classId && sc.status === 'running' && sc.environnementId === state.currentEnvironmentId);
     if (!userActiveScenario) return state;
 
     const userTasks = Array.from(tasks.values()).filter(t => t.userId === currentUser.username && t.scenarioId === userActiveScenario.id);
@@ -216,6 +243,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
     }
     case 'LOGOUT':
       localStorage.removeItem('wmsLastUser');
+      localStorage.removeItem('wmsLastEnv');
       newState = { 
         ...getInitialState(), 
         users: state.users,
@@ -388,7 +416,8 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         ...action.payload, 
         id: state.tierIdCounter,
         createdAt: new Date().toISOString(),
-        createdBy: state.currentUser.username
+        createdBy: state.currentUser.username,
+        environnementId: state.currentEnvironmentId,
       };
       const newTiers = new Map(state.tiers);
       newTiers.set(newTier.id, newTier);
@@ -405,7 +434,8 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
             ...action.payload, 
             id: state.docIdCounter, 
             createdAt: new Date().toISOString(),
-            createdBy: state.currentUser.username
+            createdBy: state.currentUser.username,
+            environnementId: state.currentEnvironmentId,
         };
         const newDocuments = new Map(state.documents);
         newDocuments.set(newDoc.id, newDoc);
@@ -441,6 +471,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         quantity: line.quantity,
                         stockAfter: newStock,
                         user: currentUser.username,
+                        environnementId: state.currentEnvironmentId,
                     });
                 }
             });
@@ -461,6 +492,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         quantity: -line.quantity,
                         stockAfter: newStock,
                         user: currentUser.username,
+                        environnementId: state.currentEnvironmentId,
                     });
                 }
             });
@@ -487,6 +519,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
           quantity: newStock - oldStock,
           stockAfter: newStock,
           user: state.currentUser.username,
+          environnementId: state.currentEnvironmentId,
         };
         newState = {
           ...state,
@@ -505,14 +538,15 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         if (action.payload.id) { // Update existing
             const existing = newTemplates.get(action.payload.id);
             if(existing && (existing.createdBy === state.currentUser.username || state.currentUserPermissions.isSuperAdmin)) {
-                newTemplates.set(action.payload.id, {...existing, ...action.payload});
+                newTemplates.set(action.payload.id, {...existing, ...action.payload, environnementId: state.currentEnvironmentId});
             }
         } else { // Create new
             const newId = state.scenarioTemplateIdCounter;
             const newTemplate: ScenarioTemplate = {
                 ...action.payload,
                 id: newId,
-                createdBy: state.currentUser.username
+                createdBy: state.currentUser.username,
+                environnementId: state.currentEnvironmentId,
             };
             newTemplates.set(newId, newTemplate);
             newState = {...state, scenarioTemplates: newTemplates, scenarioTemplateIdCounter: newId + 1};
@@ -543,7 +577,8 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
             templateId,
             classId,
             status: 'running',
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            environnementId: state.currentEnvironmentId,
         };
         const newActiveScenarios = new Map(state.activeScenarios);
         newActiveScenarios.set(newActiveScenarioId, newActiveScenario);
@@ -573,6 +608,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                     details: taskTemplate.details,
                     taskOrder: taskTemplate.taskOrder,
                     prerequisiteTaskId: undefined,
+                    environnementId: state.currentEnvironmentId,
                 };
                 newTasks.set(taskIdCounter, newTask);
                 taskCreationMap.set(taskTemplate.taskOrder, taskIdCounter);
@@ -610,7 +646,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         };
         break;
     }
-    case 'SET_STATE':
+    case 'SET_STATE': {
         const loadedState = action.payload;
         if(loadedState.currentUser) {
             loadedState.currentUserPermissions = loadedState.roles.get(loadedState.currentUser.roleId)?.permissions || null;
@@ -619,6 +655,15 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         }
         newState = loadedState;
         break;
+    }
+    case 'SET_ENVIRONMENT': {
+        if (state.environments.has(action.payload.environmentId)) {
+            newState = { ...state, currentEnvironmentId: action.payload.environmentId };
+        } else {
+            newState = state;
+        }
+        break;
+    }
     default:
       return state;
   }
@@ -637,7 +682,7 @@ interface WmsContextType {
 const WmsContext = createContext<WmsContextType | undefined>(undefined);
 
 export const WmsProvider = ({ children }: { children: ReactNode }) => {
-  const [state, dispatch] = useReducer(wmsReducer, getInitialState());
+  const [state, dispatch] = React.useReducer(wmsReducer, getInitialState());
 
   useEffect(() => {
     try {
@@ -656,6 +701,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
         parsedState.tasks = parsedState.tasks ? new Map(parsedState.tasks.map((t: Task) => [t.id, t])) : new Map();
 
         parsedState.roles = ROLES;
+        parsedState.environments = ENVIRONMENTS;
         
         const lastUser = localStorage.getItem('wmsLastUser');
         if (lastUser) {
@@ -664,6 +710,14 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
             parsedState.currentUser = user;
           }
         }
+        
+        const lastEnv = localStorage.getItem('wmsLastEnv');
+        if(lastEnv && parsedState.environments.has(lastEnv)) {
+            parsedState.currentEnvironmentId = lastEnv;
+        } else {
+            parsedState.currentEnvironmentId = getInitialState().currentEnvironmentId;
+        }
+
         dispatch({ type: 'SET_STATE', payload: parsedState });
       }
     } catch (e) {
@@ -686,6 +740,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
           activeScenarios: Array.from(state.activeScenarios.values()),
           tasks: Array.from(state.tasks.values()),
           roles: [], // Static, no need to save
+          environments: [], // Static
           currentUser: null, 
           currentUserPermissions: null,
       };
@@ -696,6 +751,11 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
       } else {
           localStorage.removeItem('wmsLastUser');
       }
+
+      if (state.currentEnvironmentId) {
+        localStorage.setItem('wmsLastEnv', state.currentEnvironmentId);
+      }
+
     } catch (e) {
       console.error("Could not save state to localStorage.", e);
     }

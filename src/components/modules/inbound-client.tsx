@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useWms } from "@/context/WmsContext";
@@ -55,10 +56,12 @@ type PurchaseOrderFormData = {
 function CreatePurchaseOrder() {
   const { state, dispatch, getArticle } = useWms();
   const { toast } = useToast();
+  const { currentUser, currentEnvironmentId } = state;
+
   const suppliers = Array.from(state.tiers.values()).filter(
-    (t) => t.type === "Fournisseur" && t.createdBy === state.currentUser?.username
+    (t) => t.type === "Fournisseur" && t.createdBy === currentUser?.username && t.environnementId === currentEnvironmentId
   );
-  const articles = Array.from(state.articles.values());
+  const articles = Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId);
 
   const {
     control,
@@ -99,7 +102,7 @@ function CreatePurchaseOrder() {
       <CardHeader>
         <CardTitle>Créer un Bon de Commande (BC)</CardTitle>
         <CardDescription>
-          Passez une commande auprès d'un fournisseur que vous avez créé.
+          Passez une commande auprès d'un fournisseur que vous avez créé dans cet environnement.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -191,9 +194,10 @@ function CreatePurchaseOrder() {
 function ReceivePurchaseOrder() {
   const { state, dispatch, getTier, getArticle } = useWms();
   const { toast } = useToast();
+  const { currentUser, currentEnvironmentId } = state;
   const pendingPOs = Array.from(state.documents.values()).filter(
     (d) =>
-      d.type === "Bon de Commande Fournisseur" && d.status === "En préparation" && d.createdBy === state.currentUser?.username
+      d.type === "Bon de Commande Fournisseur" && d.status === "En préparation" && d.createdBy === currentUser?.username && d.environnementId === currentEnvironmentId
   );
   
   const handleReceive = (docId: number) => {

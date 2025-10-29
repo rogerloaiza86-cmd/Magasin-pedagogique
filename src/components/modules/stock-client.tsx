@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useWms } from "@/context/WmsContext";
@@ -35,6 +36,8 @@ import type { Article, Movement } from "@/lib/types";
 
 function ViewStock() {
   const { state, getArticle } = useWms();
+  const { currentEnvironmentId } = state;
+  const articlesInEnv = Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId);
   const [selectedArticleId, setSelectedArticleId] = useState<string>("");
   const selectedArticle = selectedArticleId ? getArticle(selectedArticleId) : null;
 
@@ -52,7 +55,7 @@ function ViewStock() {
                     <SelectValue placeholder="Sélectionner un article..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from(state.articles.values()).map((a) => (
+                    {articlesInEnv.map((a) => (
                       <SelectItem key={a.id} value={a.id}>
                         {a.name} ({a.id})
                       </SelectItem>
@@ -85,8 +88,10 @@ function ViewStock() {
 
 function ViewMovements() {
   const { state } = useWms();
+  const { currentEnvironmentId } = state;
+  const articlesInEnv = Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId);
   const [selectedArticleId, setSelectedArticleId] = useState<string>("");
-  const movements = state.movements.filter(m => m.articleId === selectedArticleId).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  const movements = state.movements.filter(m => m.articleId === selectedArticleId && m.environnementId === currentEnvironmentId).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   return (
     <Card>
@@ -102,7 +107,7 @@ function ViewMovements() {
                     <SelectValue placeholder="Sélectionner un article..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from(state.articles.values()).map((a) => (
+                    {articlesInEnv.map((a) => (
                       <SelectItem key={a.id} value={a.id}>
                         {a.name} ({a.id})
                       </SelectItem>
@@ -148,6 +153,8 @@ function ViewMovements() {
 function AdjustInventory() {
     const { state, dispatch, getArticle } = useWms();
     const { toast } = useToast();
+    const { currentEnvironmentId } = state;
+    const articlesInEnv = Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId);
     const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<{articleId: string, physicalStock: number}>({
         defaultValues: { articleId: "", physicalStock: 0 }
     });
@@ -190,7 +197,7 @@ function AdjustInventory() {
                 render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value}>
                         <SelectTrigger><SelectValue placeholder="Sélectionner un article..." /></SelectTrigger>
-                        <SelectContent>{Array.from(state.articles.values()).map((a) => (<SelectItem key={a.id} value={a.id}>{a.name} ({a.id})</SelectItem>))}</SelectContent>
+                        <SelectContent>{articlesInEnv.map((a) => (<SelectItem key={a.id} value={a.id}>{a.name} ({a.id})</SelectItem>))}</SelectContent>
                     </Select>
                 )}
             />

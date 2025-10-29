@@ -1,4 +1,12 @@
 
+
+export type Environment = {
+    id: string;
+    name: string;
+    type: 'WMS' | 'TMS';
+    description: string;
+}
+
 export type Article = {
   id: string;
   name: string;
@@ -6,6 +14,7 @@ export type Article = {
   stock: number;
   price: number;
   packaging: string;
+  environnementId: string;
 };
 
 export type Tier = {
@@ -15,6 +24,7 @@ export type Tier = {
   address: string;
   createdAt: string;
   createdBy: string;
+  environnementId: string;
 };
 
 export type DocumentLine = {
@@ -31,6 +41,7 @@ export type Document = {
   createdAt: string;
   createdBy: string;
   transporterId?: number; // For CMR
+  environnementId: string;
 };
 
 export type Movement = {
@@ -41,6 +52,7 @@ export type Movement = {
   quantity: number;
   stockAfter: number;
   user: string;
+  environnementId: string;
 };
 
 export type UserProfile = 'élève' | 'professeur' | 'Administrateur';
@@ -127,6 +139,7 @@ export type ScenarioTemplate = {
     rolesRequis: string[];
     tasks: ScenarioTaskTemplate[];
     createdBy: string;
+    environnementId: string;
 };
 
 export type ScenarioStatus = 'preparing' | 'running' | 'completed';
@@ -137,6 +150,7 @@ export type ActiveScenario = {
     classId: number;
     status: ScenarioStatus;
     createdAt: string;
+    environnementId: string;
 };
 
 export type TaskStatus = 'blocked' | 'todo' | 'completed';
@@ -151,6 +165,7 @@ export type Task = {
     taskOrder: number;
     prerequisiteTaskId?: number;
     details?: Record<string, any>;
+    environnementId: string;
 };
 
     

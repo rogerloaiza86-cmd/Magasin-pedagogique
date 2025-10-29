@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -15,6 +16,7 @@ import {
   BookUser,
   Mail,
   Swords,
+  Globe,
 } from "lucide-react";
 
 import {
@@ -30,6 +32,8 @@ import {
 } from "@/components/ui/sidebar";
 import { useWms } from "@/context/WmsContext";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { Environment } from "@/lib/types";
 
 type NavItem = {
   href: string;
@@ -48,16 +52,17 @@ type NavItem = {
     | 'canUseIaTools'
     | 'canUseMessaging'
     | 'canManageScenarios';
+  envType?: Environment['type'];
 };
 
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: Home, permission: 'canViewDashboard' },
   { href: "/scenarios", label: "Scénarios", icon: Swords, permission: 'canManageScenarios'},
-  { href: "/tiers", label: "Gestion des Tiers", icon: Users, permission: 'canViewTiers' },
-  { href: "/flux-entrant", label: "Flux Entrant", icon: ArrowDownToLine, permission: 'canCreateBC' }, // Simplified for grouping
-  { href: "/flux-sortant", label: "Flux Sortant", icon: ArrowUpFromLine, permission: 'canCreateBL' }, // Simplified for grouping
-  { href: "/stock", label: "Gestion des Stocks", icon: Warehouse, permission: 'canViewStock' },
-  { href: "/documents", label: "Documents", icon: FileText, permission: 'canViewDashboard' }, // Everyone can see their docs
+  { href: "/tiers", label: "Gestion des Tiers", icon: Users, permission: 'canViewTiers', envType: 'WMS' },
+  { href: "/flux-entrant", label: "Flux Entrant", icon: ArrowDownToLine, permission: 'canCreateBC', envType: 'WMS' }, // Simplified for grouping
+  { href: "/flux-sortant", label: "Flux Sortant", icon: ArrowUpFromLine, permission: 'canCreateBL', envType: 'WMS' }, // Simplified for grouping
+  { href: "/stock", label: "Gestion des Stocks", icon: Warehouse, permission: 'canViewStock', envType: 'WMS' },
+  { href: "/documents", label: "Documents", icon: FileText, permission: 'canViewDashboard' },
   { href: "/messaging", label: "Messagerie", icon: Mail, permission: 'canUseMessaging' },
   { href: "/classes", label: "Gestion des Classes", icon: BookUser, permission: 'canManageClasses' },
   { href: "/ia-tools", label: "Outils d'IA", icon: BrainCircuit, permission: 'canUseIaTools' },
@@ -70,16 +75,26 @@ export default function MainLayout({
 }) {
   const pathname = usePathname();
   const { state, dispatch } = useWms();
-  const { currentUser, currentUserPermissions, emails, roles } = state;
+  const { currentUser, currentUserPermissions, emails, roles, environments, currentEnvironmentId } = state;
+  const currentEnv = environments.get(currentEnvironmentId);
 
   const handleLogout = () => {
     dispatch({ type: "LOGOUT" });
   };
   
+  const handleEnvironmentChange = (envId: string) => {
+    dispatch({ type: 'SET_ENVIRONMENT', payload: { environmentId: envId }});
+  }
+
   const userInitials = currentUser?.username.substring(0, 2).toUpperCase() || '??';
 
   const visibleNavItems = navItems.filter(item => {
     if (!currentUserPermissions) return false;
+
+    // Filter by environment type
+    if (item.envType && item.envType !== currentEnv?.type) {
+        return false;
+    }
 
     // Special logic for grouped menus
     if (item.href === "/flux-entrant") {
@@ -103,9 +118,24 @@ export default function MainLayout({
             <div className="flex items-center gap-2 p-2">
               <Boxes className="h-8 w-8 text-primary" />
               <div>
-                <h1 className="text-lg font-bold">Magasin Pédagogique</h1>
+                <h1 className="text-lg font-bold">LogiSim Hub</h1>
                 <p className="text-xs text-muted-foreground">Lycée Gaspard Monge</p>
               </div>
+            </div>
+            <div className="p-2">
+                <Select value={currentEnvironmentId} onValueChange={handleEnvironmentChange}>
+                    <SelectTrigger className="w-full">
+                        <div className="flex items-center gap-2">
+                           <Globe className="h-4 w-4" />
+                           <SelectValue placeholder="Changer d'environnement..." />
+                        </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                        {Array.from(environments.values()).map(env => (
+                            <SelectItem key={env.id} value={env.id}>{env.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
             </div>
           </SidebarHeader>
           <SidebarContent>
