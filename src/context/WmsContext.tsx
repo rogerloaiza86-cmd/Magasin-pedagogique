@@ -144,6 +144,32 @@ const getInitialState = (): WmsState => {
   const initialUsers = new Map<string, User>();
   initialUsers.set('admin', { username: 'admin', password: 'admin', profile: 'Administrateur', createdAt: new Date().toISOString(), roleId: 'super_admin' });
   initialUsers.set('prof', { username: 'prof', password: 'prof', profile: 'professeur', createdAt: new Date().toISOString(), roleId: 'super_admin' });
+  
+  const demoClassId = 1;
+  const initialClasses = new Map<number, Class>();
+  initialClasses.set(demoClassId, { id: demoClassId, name: 'Classe Démo', teacherIds: ['prof']});
+  initialUsers.set('eleve', { username: 'eleve', password: 'eleve', profile: 'élève', createdAt: new Date().toISOString(), roleId: 'equipe_reception', classId: demoClassId });
+  initialUsers.set('eleve2', { username: 'eleve2', password: 'eleve2', profile: 'élève', createdAt: new Date().toISOString(), roleId: 'equipe_preparation', classId: demoClassId });
+
+  const initialScenarioTemplates = new Map<number, ScenarioTemplate>();
+  const demoTemplateId = 1;
+  initialScenarioTemplates.set(demoTemplateId, {
+    id: demoTemplateId,
+    title: "Flux Logistique Complet",
+    description: "Un scénario complet qui couvre la création des tiers, la réception et l'expédition.",
+    competences: ["Création Tiers", "Réception", "Expédition"],
+    rolesRequis: ["equipe_reception", "equipe_preparation"],
+    tasks: [
+        { taskOrder: 1, description: "Créez un nouveau fournisseur pour les pièces auto.", roleId: "equipe_reception", taskType: "CREATE_TIERS_FOURNISSEUR" },
+        { taskOrder: 2, description: "Passez un Bon de Commande chez le fournisseur que vous venez de créer.", roleId: "equipe_reception", taskType: "CREATE_BC", prerequisite: 1 },
+        { taskOrder: 3, description: "Réceptionnez la marchandise du Bon de Commande.", roleId: "equipe_reception", taskType: "RECEIVE_BC", prerequisite: 2 },
+        { taskOrder: 4, description: "Créez un nouveau client.", roleId: "equipe_preparation", taskType: "CREATE_TIERS_CLIENT"},
+        { taskOrder: 5, description: "Créez un Bon de Livraison pour le client que vous venez de créer.", roleId: "equipe_preparation", taskType: "CREATE_BL", prerequisite: 4 },
+        { taskOrder: 6, description: "Expédiez la commande du client.", roleId: "equipe_preparation", taskType: "SHIP_BL", prerequisite: 5 },
+    ],
+    createdBy: 'admin',
+    environnementId: defaultEnvId,
+  });
 
   return {
     articles: articlesMap,
@@ -151,21 +177,21 @@ const getInitialState = (): WmsState => {
     documents: new Map(),
     movements: initialMovements,
     users: initialUsers,
-    classes: new Map(),
+    classes: initialClasses,
     emails: new Map(),
     roles: ROLES,
     environments: ENVIRONMENTS,
     maintenances: new Map(),
-    scenarioTemplates: new Map(),
+    scenarioTemplates: initialScenarioTemplates,
     activeScenarios: new Map(),
     tasks: new Map(),
     tierIdCounter: 1,
     docIdCounter: 1,
     movementIdCounter: initialMovements.length + 1,
-    classIdCounter: 1,
+    classIdCounter: 2,
     emailIdCounter: 1,
     maintenanceIdCounter: 1,
-    scenarioTemplateIdCounter: 1,
+    scenarioTemplateIdCounter: 2,
     activeScenarioIdCounter: 1,
     taskIdCounter: 1,
     currentUser: null,
@@ -735,8 +761,11 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                     const originalTemplate = template.tasks.find(t => t.taskOrder === task.taskOrder && t.roleId === roleId);
                     if (originalTemplate) {
                        if (originalTemplate.prerequisite) {
-                           const prereqNewId = taskCreationMap.get(originalTemplate.prerequisite);
-                           task.prerequisiteTaskId = prereqNewId;
+                           const prereqTemplateTask = template.tasks.find(t => t.roleId === roleId && t.taskOrder === originalTemplate.prerequisite);
+                           if(prereqTemplateTask) {
+                               const prereqNewId = taskCreationMap.get(prereqTemplateTask.taskOrder);
+                               task.prerequisiteTaskId = prereqNewId;
+                           }
                        }
                        if (!task.prerequisiteTaskId) {
                            task.status = 'todo';
@@ -1042,3 +1071,5 @@ export const useWms = () => {
   }
   return context;
 };
+
+    

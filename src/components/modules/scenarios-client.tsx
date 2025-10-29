@@ -162,7 +162,7 @@ function ScenarioTemplateForm({ template, onSave, onCancel }: { template?: Scena
                  </div>
                   <div>
                     <Label>Prérequis (Tâche #)</Label>
-                    <Input type="number" {...register(`tasks.${index}.prerequisite`, { valueAsNumber: true })} placeholder="Optionnel"/>
+                    <Input type="number" {...register(`tasks.${index}.prerequisite`, { valueAsNumber: true, min: 1, max: index })} placeholder="Optionnel"/>
                   </div>
             </div>
           </div>
@@ -182,7 +182,7 @@ function ScenarioTemplateForm({ template, onSave, onCancel }: { template?: Scena
 
 export function ScenariosClient() {
   const { state, dispatch } = useWms();
-  const { currentUserPermissions, scenarioTemplates, classes, currentEnvironmentId } = state;
+  const { currentUser, currentUserPermissions, scenarioTemplates, classes, currentEnvironmentId, activeScenarios } = state;
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<ScenarioTemplate | undefined>(undefined);
@@ -228,6 +228,9 @@ export function ScenariosClient() {
   }
 
   const templates = Array.from(scenarioTemplates.values()).filter(t => t.environnementId === currentEnvironmentId);
+  const teacherClasses = currentUser?.profile === 'Administrateur' 
+    ? Array.from(classes.values())
+    : Array.from(classes.values()).filter(c => c.teacherIds?.includes(currentUser?.username || ''));
 
   return (
     <div className="space-y-6">
@@ -257,13 +260,16 @@ export function ScenariosClient() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {templates.length > 0 ? templates.map(template => (
+            {templates.length > 0 ? templates.map(template => {
+                const runningInstance = Array.from(activeScenarios.values()).find(sc => sc.templateId === template.id && sc.status === 'running');
+                return (
                 <Card key={template.id} className="flex flex-col md:flex-row justify-between items-start p-4">
                     <div className="flex-1 mb-4 md:mb-0">
                         <h3 className="font-bold text-lg">{template.title}</h3>
                         <p className="text-sm text-muted-foreground mt-1">{template.description}</p>
                         <div className="flex gap-2 flex-wrap mt-2">
                             {template.competences.map(c => <Badge key={c} variant="secondary">{c}</Badge>)}
+                            {runningInstance && <Badge variant="default">Lancé (Classe: {classes.get(runningInstance.classId)?.name})</Badge>}
                         </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -279,10 +285,10 @@ export function ScenariosClient() {
                                 </DialogFooter>
                             </DialogContent>
                         </Dialog>
-                        <Button size="sm" onClick={() => setLaunchingTemplate(template)}><Rocket className="mr-2"/>Lancer</Button>
+                        <Button size="sm" onClick={() => setLaunchingTemplate(template)} disabled={!!runningInstance}><Rocket className="mr-2"/>Lancer</Button>
                     </div>
                 </Card>
-            )) : <p className="text-muted-foreground text-center py-8">Aucun modèle de scénario. Créez-en un pour commencer !</p>}
+            )}) : <p className="text-muted-foreground text-center py-8">Aucun modèle de scénario. Créez-en un pour commencer !</p>}
           </div>
         </CardContent>
       </Card>
@@ -299,7 +305,7 @@ export function ScenariosClient() {
                  <Select onValueChange={setSelectedClass} value={selectedClass}>
                     <SelectTrigger id="class-select"><SelectValue placeholder="Choisir une classe..." /></SelectTrigger>
                     <SelectContent>
-                        {Array.from(classes.values()).map(c => (
+                        {teacherClasses.map(c => (
                             <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
                         ))}
                     </SelectContent>
@@ -315,3 +321,5 @@ export function ScenariosClient() {
     </div>
   );
 }
+
+    
