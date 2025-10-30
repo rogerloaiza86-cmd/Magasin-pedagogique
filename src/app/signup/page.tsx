@@ -170,7 +170,7 @@ export default function SignUpPage() {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="élève">Élève</SelectItem>
-                            <SelectItem value="professeur">Professeur</SelectItem>
+                            <SelectItem value="professeur">Enseignant</SelectItem>
                             <SelectItem value="Administrateur">Administrateur</SelectItem>
                         </SelectContent>
                         </Select>

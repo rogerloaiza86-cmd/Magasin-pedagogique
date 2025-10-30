@@ -78,7 +78,7 @@ const navItems: NavItem[] = [
   { href: "/stock", label: "Gestion des Stocks", icon: Warehouse, permission: 'canViewStock', envType: 'WMS' },
   { href: "/documents", label: "Documents", icon: FileText, permission: 'canViewDashboard', envType: 'ALL' },
   { href: "/messaging", label: "Messagerie", icon: Mail, permission: 'canUseMessaging', envType: 'ALL' },
-  { href: "/classes", label: "Gestion des Classes", icon: BookUser, permission: 'canManageClasses', isSuperAdminOnly: true, envType: 'ALL' },
+  { href: "/classes", label: "Gestion des Classes", icon: BookUser, permission: 'canManageClasses', envType: 'ALL' },
   { href: "/ia-tools", label: "Outils d'IA", icon: BrainCircuit, permission: 'canUseIaTools', envType: 'ALL' },
 ];
 

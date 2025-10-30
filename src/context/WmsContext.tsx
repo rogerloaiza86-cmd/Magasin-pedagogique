@@ -11,11 +11,25 @@ const ROLES: Map<string, Role> = new Map();
 
 ROLES.set('super_admin', {
     id: 'super_admin',
-    name: "Superviseur (Enseignant/Admin)",
-    description: "Accès total à l'application.",
+    name: "Superviseur (Admin)",
+    description: "Accès total à l'application pour la configuration.",
     isStudentRole: false,
     permissions: {
         isSuperAdmin: true,
+        canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true, canReceiveBC: true,
+        canCreateBL: true, canPrepareBL: true, canShipBL: true, canManageStock: true, canViewStock: true,
+        canManageClasses: true, canUseIaTools: true, canUseMessaging: true, canManageScenarios: true,
+        canManageFleet: true, canManageQuotes: true,
+    }
+});
+
+ROLES.set('professeur', {
+    id: 'professeur',
+    name: "Enseignant",
+    description: "Gère les classes, les scénarios et supervise les élèves.",
+    isStudentRole: false,
+    permissions: {
+        isSuperAdmin: false, // Ne peut pas modifier la structure profonde, mais a des droits élevés
         canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true, canReceiveBC: true,
         canCreateBL: true, canPrepareBL: true, canShipBL: true, canManageStock: true, canViewStock: true,
         canManageClasses: true, canUseIaTools: true, canUseMessaging: true, canManageScenarios: true,
@@ -163,7 +177,7 @@ const getInitialState = (): WmsState => {
 
   const initialUsers = new Map<string, User>();
   initialUsers.set('admin', { username: 'admin', password: 'admin', profile: 'Administrateur', createdAt: new Date().toISOString(), roleId: 'super_admin' });
-  initialUsers.set('prof', { username: 'prof', password: 'prof', profile: 'professeur', createdAt: new Date().toISOString(), roleId: 'super_admin' });
+  initialUsers.set('prof', { username: 'prof', password: 'prof', profile: 'professeur', createdAt: new Date().toISOString(), roleId: 'professeur' });
   
   const demoClassId = 1;
   const initialClasses = new Map<number, Class>();
@@ -364,12 +378,20 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
              throw new Error("Aucune classe n'a été créée. Inscription impossible.");
         }
         const newUsers = new Map(state.users);
+        
+        let roleId = 'equipe_preparation'; // default for student
+        if (profile === 'professeur') {
+            roleId = 'professeur';
+        } else if (profile === 'Administrateur') {
+            roleId = 'super_admin';
+        }
+
         const newUser: User = { 
             username, 
             password, 
             profile, 
             createdAt: new Date().toISOString(),
-            roleId: profile === 'élève' ? 'equipe_preparation' : 'super_admin' // Default role
+            roleId: roleId
         };
         if (profile === 'élève' && classId) {
             newUser.classId = classId;

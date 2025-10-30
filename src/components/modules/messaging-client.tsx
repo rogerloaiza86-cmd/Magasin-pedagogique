@@ -44,7 +44,7 @@ type EmailFormData = {
 function ComposeEmail() {
   const { state, dispatch } = useWms();
   const { toast } = useToast();
-  const { currentUser, users, classes, tiers } = state;
+  const { currentUser, users, classes, tiers, currentEnvironmentId } = state;
 
   const getPossibleRecipients = () => {
     if (!currentUser) return { users: [], tiers: [] };
@@ -66,8 +66,11 @@ function ComposeEmail() {
                });
             }
         }
-    } else if (currentUser.profile === 'professeur') {
-        const teacherClasses = Array.from(classes.values()).filter(c => c.teacherIds?.includes(currentUser.username));
+    } else if (currentUser.profile === 'professeur' || currentUser.profile === 'Administrateur') {
+        const teacherClasses = currentUser.profile === 'Administrateur' 
+          ? Array.from(classes.values())
+          : Array.from(classes.values()).filter(c => c.teacherIds?.includes(currentUser.username));
+
         const studentUsernames = new Set<string>();
         teacherClasses.forEach(c => {
              Array.from(users.values()).forEach(u => {
@@ -77,11 +80,13 @@ function ComposeEmail() {
              })
         });
         userRecipients = Array.from(studentUsernames).map(username => users.get(username)).filter(Boolean) as any[];
-    } else if (currentUser.profile === 'Administrateur') {
-        userRecipients = Array.from(users.values()).filter(u => u.username !== currentUser.username);
+
+        if(currentUser.profile === 'Administrateur') {
+             userRecipients.push(...Array.from(users.values()).filter(u => u.username !== currentUser.username && u.profile !== 'élève'));
+        }
     }
     
-    const tierRecipients = Array.from(tiers.values()).filter(t => t.createdBy === currentUser.username);
+    const tierRecipients = Array.from(tiers.values()).filter(t => t.environnementId === currentEnvironmentId);
 
     return { users: userRecipients, tiers: tierRecipients };
   };
