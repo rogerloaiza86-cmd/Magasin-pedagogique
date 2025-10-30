@@ -15,10 +15,12 @@ import {
     Swords,
     Truck,
     Archive,
-    FileSignature
+    FileSignature,
+    CheckCircle2
 } from "lucide-react";
 import Link from "next/link";
-import type { Environment } from "@/lib/types";
+import type { Environment, Task } from "@/lib/types";
+import { Badge } from "../ui/badge";
 
 type AppItem = {
   href: string;
@@ -74,6 +76,57 @@ function AppCard({ item }: { item: AppItem }) {
   );
 }
 
+function ScenarioProgress() {
+    const { state } = useWms();
+    const { currentUser, tasks, activeScenarios, currentEnvironmentId, environments } = state;
+    
+    if (!currentUser || !currentUser.classId) return null;
+
+    const userActiveScenario = Array.from(activeScenarios.values()).find(sc => sc.classId === currentUser.classId && sc.status === 'running');
+    if (!userActiveScenario) return null;
+
+    const userTasks = Array.from(tasks.values()).filter(t => t.userId === currentUser.username && t.scenarioId === userActiveScenario.id);
+    const tasksInCurrentEnv = userTasks.filter(t => t.environnementId === currentEnvironmentId && t.status === 'todo');
+    const totalTasks = userTasks.length;
+    const completedTasks = userTasks.filter(t => t.status === 'completed').length;
+    
+    const otherEnvTasks = userTasks.filter(t => t.environnementId !== currentEnvironmentId && t.status === 'todo');
+    const nextEnvId = otherEnvTasks.length > 0 ? otherEnvTasks[0].environnementId : null;
+    const nextEnv = nextEnvId ? environments.get(nextEnvId) : null;
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Progression du Scénario</CardTitle>
+                <CardDescription>Suivez les tâches qui vous sont assignées pour le scénario en cours.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {tasksInCurrentEnv.length > 0 ? (
+                    <ul className="space-y-2">
+                        {tasksInCurrentEnv.map(task => (
+                             <li key={task.id} className="flex items-start gap-3">
+                                <CheckCircle2 className="h-5 w-5 mt-1 text-sky-500" />
+                                <div>
+                                    <p className="font-semibold">{task.description}</p>
+                                    <Badge variant="secondary" className="mt-1">{state.roles.get(currentUser.roleId)?.name}</Badge>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <div className="text-center text-muted-foreground p-4">
+                        <p>Vous avez terminé toutes vos tâches dans cet environnement.</p>
+                        {nextEnv && <p className="font-semibold mt-2">Passez à l'environnement "{nextEnv.name}" pour continuer !</p>}
+                    </div>
+                )}
+                 <div className="mt-4 text-sm text-muted-foreground">
+                    <p>Tâches complétées : {completedTasks} / {totalTasks}</p>
+                </div>
+            </CardContent>
+        </Card>
+    )
+}
+
 export function DashboardClient() {
   const { state } = useWms();
   const { currentUser, currentUserPermissions, environments, currentEnvironmentId } = state;
@@ -104,6 +157,8 @@ export function DashboardClient() {
             <h1 className="text-3xl font-bold tracking-tight">Bonjour, {currentUser?.username} !</h1>
             <p className="text-muted-foreground">Bienvenue dans votre espace {currentEnv?.name}. Choisissez une application pour commencer.</p>
         </div>
+
+        {currentUser?.profile === 'élève' && <ScenarioProgress />}
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
             {visibleAppItems.map((item) => (

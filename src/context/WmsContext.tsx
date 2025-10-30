@@ -176,20 +176,22 @@ const getInitialState = (): WmsState => {
   const demoTemplateId = 1;
   initialScenarioTemplates.set(demoTemplateId, {
     id: demoTemplateId,
-    title: "Flux Logistique Complet",
-    description: "Un scénario complet qui couvre la création des tiers, la réception et l'expédition.",
-    competences: ["Création Tiers", "Réception", "Expédition"],
-    rolesRequis: ["equipe_reception", "equipe_preparation"],
+    title: "Flux Logistique Complet (Transversal)",
+    description: "Un scénario complet qui couvre la création des tiers, la réception (WMS) et l'expédition (TMS).",
+    competences: ["Création Tiers", "Réception", "Expédition", "Planification Transport"],
+    rolesRequis: ["equipe_reception", "equipe_preparation", "tms_exploitation"],
     tasks: [
-        { taskOrder: 1, description: "Créez un nouveau fournisseur pour les pièces auto.", roleId: "equipe_reception", taskType: "CREATE_TIERS_FOURNISSEUR" },
-        { taskOrder: 2, description: "Passez un Bon de Commande chez le fournisseur que vous venez de créer.", roleId: "equipe_reception", taskType: "CREATE_BC", prerequisite: 1 },
-        { taskOrder: 3, description: "Réceptionnez la marchandise du Bon de Commande.", roleId: "equipe_reception", taskType: "RECEIVE_BC", prerequisite: 2 },
-        { taskOrder: 4, description: "Créez un nouveau client.", roleId: "equipe_preparation", taskType: "CREATE_TIERS_CLIENT"},
-        { taskOrder: 5, description: "Créez un Bon de Livraison pour le client que vous venez de créer.", roleId: "equipe_preparation", taskType: "CREATE_BL", prerequisite: 4 },
-        { taskOrder: 6, description: "Expédiez la commande du client.", roleId: "equipe_preparation", taskType: "SHIP_BL", prerequisite: 5 },
+        { taskOrder: 1, description: "Créez un nouveau fournisseur pour les pièces auto.", roleId: "equipe_reception", taskType: "CREATE_TIERS_FOURNISSEUR", environnementId: 'magasin_pedago' },
+        { taskOrder: 2, description: "Passez un Bon de Commande chez le fournisseur que vous venez de créer.", roleId: "equipe_reception", taskType: "CREATE_BC", prerequisite: 1, environnementId: 'magasin_pedago' },
+        { taskOrder: 3, description: "Réceptionnez la marchandise du Bon de Commande.", roleId: "equipe_reception", taskType: "RECEIVE_BC", prerequisite: 2, environnementId: 'magasin_pedago' },
+        { taskOrder: 4, description: "Créez un nouveau client.", roleId: "equipe_preparation", taskType: "CREATE_TIERS_CLIENT", environnementId: 'magasin_pedago'},
+        { taskOrder: 5, description: "Créez un Bon de Livraison pour le client que vous venez de créer.", roleId: "equipe_preparation", taskType: "CREATE_BL", prerequisite: 4, environnementId: 'magasin_pedago' },
+        { taskOrder: 6, description: "Basculez sur l'environnement 'Agence de Transport' (TMS). Votre BL est prêt, il faut maintenant l'expédier.", roleId: "tms_exploitation", taskType: "MANUAL_VALIDATION", prerequisite: 5, environnementId: 'agence_transport' },
+        { taskOrder: 7, description: "Créez un transporteur pour livrer la commande.", roleId: "tms_exploitation", taskType: "CREATE_TIERS_TRANSPORTEUR", prerequisite: 6, environnementId: 'agence_transport' },
+        { taskOrder: 8, description: "Expédiez la commande du client en utilisant le transporteur créé.", roleId: "tms_exploitation", taskType: "SHIP_BL", prerequisite: 7, environnementId: 'magasin_pedago' },
     ],
     createdBy: 'admin',
-    environnementId: defaultEnvId,
+    environnementId: 'magasin_pedago', // Default env for launching
   });
 
   return {
@@ -247,13 +249,14 @@ type WmsAction =
   | { type: 'SET_ENVIRONMENT'; payload: { environmentId: string } };
 
 const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState => {
-    const { currentUser, tasks, activeScenarios } = state;
+    const { currentUser, tasks, activeScenarios, currentEnvironmentId } = state;
     if (!currentUser) return state;
 
-    const userActiveScenario = Array.from(activeScenarios.values()).find(sc => sc.classId === currentUser.classId && sc.status === 'running' && sc.environnementId === state.currentEnvironmentId);
+    const userActiveScenario = Array.from(activeScenarios.values()).find(sc => sc.classId === currentUser.classId && sc.status === 'running');
     if (!userActiveScenario) return state;
 
-    const userTasks = Array.from(tasks.values()).filter(t => t.userId === currentUser.username && t.scenarioId === userActiveScenario.id);
+    // A task can only be completed in its designated environment.
+    const userTasks = Array.from(tasks.values()).filter(t => t.userId === currentUser.username && t.scenarioId === userActiveScenario.id && t.environnementId === currentEnvironmentId);
     const todoTasks = userTasks.filter(t => t.status === 'todo');
 
     let completedTaskId: number | null = null;
@@ -262,26 +265,26 @@ const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState =>
         let taskCompleted = false;
         switch (task.taskType) {
             case 'CREATE_TIERS_CLIENT':
-                if (action.type === 'ADD_TIER' && action.payload.type === 'Client') taskCompleted = true;
+                if (action.type === 'ADD_TIER' && action.payload.type === 'Client' && action.payload.environnementId === currentEnvironmentId) taskCompleted = true;
                 break;
             case 'CREATE_TIERS_FOURNISSEUR':
-                if (action.type === 'ADD_TIER' && action.payload.type === 'Fournisseur') taskCompleted = true;
+                if (action.type === 'ADD_TIER' && action.payload.type === 'Fournisseur' && action.payload.environnementId === currentEnvironmentId) taskCompleted = true;
                 break;
             case 'CREATE_TIERS_TRANSPORTEUR':
-                if (action.type === 'ADD_TIER' && action.payload.type === 'Transporteur') taskCompleted = true;
+                if (action.type === 'ADD_TIER' && action.payload.type === 'Transporteur' && action.payload.environnementId === currentEnvironmentId) taskCompleted = true;
                 break;
             case 'CREATE_BC':
-                if (action.type === 'CREATE_DOCUMENT' && action.payload.type === 'Bon de Commande Fournisseur') taskCompleted = true;
+                if (action.type === 'CREATE_DOCUMENT' && action.payload.type === 'Bon de Commande Fournisseur' && action.payload.environnementId === currentEnvironmentId) taskCompleted = true;
                 break;
             case 'RECEIVE_BC':
-                 if (action.type === 'UPDATE_DOCUMENT' && action.payload.type === 'Bon de Commande Fournisseur' && action.payload.status.startsWith('Réceptionné')) taskCompleted = true;
+                 if (action.type === 'UPDATE_DOCUMENT' && action.payload.type === 'Bon de Commande Fournisseur' && action.payload.status.startsWith('Réceptionné') && action.payload.environnementId === currentEnvironmentId) taskCompleted = true;
                 break;
             case 'CREATE_BL':
-                 if (action.type === 'CREATE_DOCUMENT' && action.payload.type === 'Bon de Livraison Client') taskCompleted = true;
+                 if (action.type === 'CREATE_DOCUMENT' && action.payload.type === 'Bon de Livraison Client' && action.payload.environnementId === currentEnvironmentId) taskCompleted = true;
                 break;
             case 'PREPARE_BL': // This is a virtual step for now, linked to SHIP_BL
             case 'SHIP_BL':
-                if (action.type === 'UPDATE_DOCUMENT' && action.payload.type === 'Bon de Livraison Client' && action.payload.status === 'Expédié') taskCompleted = true;
+                if (action.type === 'UPDATE_DOCUMENT' && action.payload.type === 'Bon de Livraison Client' && action.payload.status === 'Expédié' && action.payload.environnementId === currentEnvironmentId) taskCompleted = true;
                 break;
         }
         if (taskCompleted) {
@@ -296,7 +299,7 @@ const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState =>
         if (completedTask) {
             newTasks.set(completedTaskId, { ...completedTask, status: 'completed' });
 
-            // Unlock next tasks
+            // Unlock next tasks for all users in the scenario, not just the current user
             newTasks.forEach(task => {
                 if (task.prerequisiteTaskId === completedTaskId) {
                     const taskToUnlock = newTasks.get(task.id);
@@ -812,7 +815,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                     details: taskTemplate.details,
                     taskOrder: taskTemplate.taskOrder,
                     prerequisiteTaskId: undefined,
-                    environnementId: state.currentEnvironmentId,
+                    environnementId: taskTemplate.environnementId || template.environnementId,
                 };
                 newTasks.set(taskIdCounter, newTask);
                 taskCreationMap.set(taskTemplate.taskOrder, taskIdCounter);

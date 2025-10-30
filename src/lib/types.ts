@@ -189,6 +189,7 @@ export type ScenarioTaskTemplate = {
     taskType: TaskType;
     prerequisite?: number; // Refers to taskOrder
     details?: Record<string, any>; // e.g., { tierName: 'PneuExpress', articleId: '123', quantity: 20 }
+    environnementId?: string; // If undefined, uses the scenario's default environment
 };
 
 export type ScenarioTemplate = {
@@ -199,7 +200,7 @@ export type ScenarioTemplate = {
     rolesRequis: string[];
     tasks: ScenarioTaskTemplate[];
     createdBy: string;
-    environnementId: string;
+    environnementId: string; // Default environment for the scenario
 };
 
 export type ScenarioStatus = 'preparing' | 'running' | 'completed';
@@ -210,7 +211,7 @@ export type ActiveScenario = {
     classId: number;
     status: ScenarioStatus;
     createdAt: string;
-    environnementId: string;
+    environnementId: string; // The environment where the scenario was launched
 };
 
 export type TaskStatus = 'blocked' | 'todo' | 'completed';
@@ -225,7 +226,7 @@ export type Task = {
     taskOrder: number;
     prerequisiteTaskId?: number;
     details?: Record<string, any>;
-    environnementId: string;
+    environnementId: string; // The specific environment where this task must be done
 };
 
 // --- TMS SPECIFIC TYPES ---
