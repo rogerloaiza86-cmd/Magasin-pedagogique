@@ -19,12 +19,12 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye } from "lucide-react";
+import { Eye, Download } from "lucide-react";
 import Link from "next/link";
 import { Document } from "@/lib/types";
 
 export function DocumentsClient() {
-  const { state, getTier } = useWms();
+  const { state, getTier, getArticle } = useWms();
   const { currentUser, currentEnvironmentId } = state;
   const documents = Array.from(state.documents.values())
     .filter(doc => doc.createdBy === currentUser?.username && doc.environnementId === currentEnvironmentId)
@@ -36,18 +36,56 @@ export function DocumentsClient() {
         case 'Validé':
         case 'Réceptionné':
         case 'Expédié':
+        case 'Accepté':
             return 'default';
+        case 'Réceptionné avec anomalies':
+        case 'Refusé':
+            return 'destructive';
         default: return 'outline';
     }
   }
 
+  const handleExport = () => {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "ID,Type,Tiers,Date,Statut,Articles\n";
+
+    documents.forEach(doc => {
+      const tierName = getTier(doc.tierId)?.name || "N/A";
+      const articles = doc.lines.map(l => `${getArticle(l.articleId)?.name} (x${l.quantity})`).join('; ');
+      const row = [
+        doc.id,
+        doc.type,
+        `"${tierName.replace(/"/g, '""')}"`,
+        new Date(doc.createdAt).toLocaleDateString(),
+        doc.status,
+        `"${articles.replace(/"/g, '""')}"`
+      ].join(',');
+      csvContent += row + "\n";
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "historique_documents.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Vos documents</CardTitle>
-        <CardDescription>
-          Consultez tous les bons de commande, bons de livraison et lettres de voiture que vous avez créés dans cet environnement.
-        </CardDescription>
+      <CardHeader className="flex-row justify-between items-start">
+        <div>
+            <CardTitle>Vos documents</CardTitle>
+            <CardDescription>
+            Consultez tous les bons de commande, bons de livraison et lettres de voiture que vous avez créés dans cet environnement.
+            </CardDescription>
+        </div>
+        <Button onClick={handleExport} variant="outline" disabled={documents.length === 0}>
+            <Download className="mr-2 h-4 w-4" />
+            Exporter tout en CSV
+        </Button>
       </CardHeader>
       <CardContent>
         <Table>
@@ -97,3 +135,5 @@ export function DocumentsClient() {
     </Card>
   );
 }
+
+    

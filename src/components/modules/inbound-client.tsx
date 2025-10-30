@@ -33,7 +33,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, PlusCircle, RotateCcw } from "lucide-react";
+import { Trash2, PlusCircle, RotateCcw, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -56,6 +56,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { ArticleCombobox } from "@/components/shared/ArticleCombobox";
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
+
 
 type PurchaseOrderFormData = {
   supplierId: string;
@@ -416,7 +418,7 @@ function ReceivePurchaseOrder() {
 }
 
 function CustomerReturns() {
-    const { state, dispatch, getArticle, getTier } = useWms();
+    const { state, dispatch, getTier } = useWms();
     const { toast } = useToast();
     const { currentUser, currentEnvironmentId, documents } = state;
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -573,7 +575,7 @@ function CustomerReturns() {
                                 <TableBody>
                                     {watchProcess('lines')?.map((line, index) => (
                                         <TableRow key={index}>
-                                            <TableCell>{getArticle(line.articleId)?.name}</TableCell>
+                                            <TableCell>{state.articles.get(line.articleId)?.name}</TableCell>
                                             <TableCell>{line.quantity}</TableCell>
                                             <TableCell>{line.returnReason}</TableCell>
                                             <TableCell>
@@ -594,6 +596,125 @@ function CustomerReturns() {
     );
 }
 
+function ReturnsAnalysis() {
+    const { state, getArticle } = useWms();
+    const { documents, currentEnvironmentId } = state;
+
+    const processedReturns = Array.from(documents.values()).filter(d => 
+        d.type === 'Retour Client' && 
+        d.status === 'Traité' &&
+        d.environnementId === currentEnvironmentId
+    );
+
+    const returnReasonCounts = processedReturns.flatMap(d => d.lines).reduce((acc, line) => {
+        if (line.returnReason) {
+            acc[line.returnReason] = (acc[line.returnReason] || 0) + line.quantity;
+        }
+        return acc;
+    }, {} as Record<ReturnReason, number>);
+    
+    const chartData = Object.entries(returnReasonCounts)
+        .map(([name, total]) => ({ name, total }))
+        .sort((a,b) => b.total - a.total)
+        .slice(0,3);
+
+    const handleExport = () => {
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "ID Retour,Date,Client,Article,Quantité,Raison,Décision\n";
+
+        processedReturns.forEach(doc => {
+            const clientName = state.tiers.get(doc.tierId)?.name || "N/A";
+            doc.lines.forEach(line => {
+                const articleName = getArticle(line.articleId)?.name || "N/A";
+                const row = [
+                    doc.id,
+                    new Date(doc.createdAt).toLocaleDateString(),
+                    `"${clientName.replace(/"/g, '""')}"`,
+                    `"${articleName.replace(/"/g, '""')}"`,
+                    line.quantity,
+                    line.returnReason,
+                    line.returnDecision
+                ].join(",");
+                csvContent += row + "\n";
+            });
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "historique_retours.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    return (
+        <div className="space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Top 3 des Motifs de Retour</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {chartData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={250}>
+                            <BarChart data={chartData}>
+                                <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false}/>
+                                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                                <Tooltip />
+                                <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <p className="text-center text-muted-foreground">Pas de données de retour à analyser.</p>
+                    )}
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="flex-row justify-between items-center">
+                    <div>
+                        <CardTitle>Historique des Retours Traités</CardTitle>
+                        <CardDescription>Consultez et exportez l'historique complet des retours.</CardDescription>
+                    </div>
+                    <Button onClick={handleExport} variant="outline" disabled={processedReturns.length === 0}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Exporter en CSV
+                    </Button>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Retour #</TableHead>
+                                <TableHead>Article</TableHead>
+                                <TableHead>Quantité</TableHead>
+                                <TableHead>Raison</TableHead>
+                                <TableHead>Décision</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {processedReturns.length > 0 ? (
+                                processedReturns.flatMap(doc => doc.lines.map((line, index) => (
+                                    <TableRow key={`${doc.id}-${index}`}>
+                                        <TableCell>{doc.id}</TableCell>
+                                        <TableCell>{getArticle(line.articleId)?.name}</TableCell>
+                                        <TableCell>{line.quantity}</TableCell>
+                                        <TableCell>{line.returnReason}</TableCell>
+                                        <TableCell>{line.returnDecision}</TableCell>
+                                    </TableRow>
+                                )))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="h-24 text-center">Aucun retour traité.</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+        </div>
+    )
+}
+
 export function InboundClient() {
   const { state } = useWms();
   const perms = state.currentUserPermissions;
@@ -603,6 +724,7 @@ export function InboundClient() {
   if (perms?.canReceiveBC) {
     tabs.push({ value: "receive", label: "2. Réceptionner un BC" });
     tabs.push({ value: "returns", label: "3. Gérer un Retour Client" });
+    tabs.push({ value: "analysis", label: "4. Analyse des Retours" });
   }
   
   if (tabs.length === 0) {
@@ -626,6 +748,9 @@ export function InboundClient() {
       {perms?.canCreateBC && <TabsContent value="create"><CreatePurchaseOrder /></TabsContent>}
       {perms?.canReceiveBC && <TabsContent value="receive"><ReceivePurchaseOrder /></TabsContent>}
       {perms?.canReceiveBC && <TabsContent value="returns"><CustomerReturns /></TabsContent>}
+      {perms?.canReceiveBC && <TabsContent value="analysis"><ReturnsAnalysis /></TabsContent>}
     </Tabs>
   );
 }
+
+    
