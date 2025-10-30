@@ -28,7 +28,8 @@ import { useToast } from "@/hooks/use-toast";
 import type { Article, Movement } from "@/lib/types";
 import { ArticleCombobox } from "@/components/shared/ArticleCombobox";
 import { Badge } from "../ui/badge";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Download } from "lucide-react";
+import { faker } from "@faker-js/faker/locale/fr";
 
 function CreateArticleForm() {
     const { dispatch } = useWms();
@@ -310,9 +311,68 @@ function AdjustInventory() {
   );
 }
 
+function GenerateFictitiousData() {
+    const { toast } = useToast();
+
+    const generateAndDownloadCsv = () => {
+        const headers = ["id", "name", "location", "stock", "price", "packaging", "status"];
+        let csvContent = headers.join(",") + "\n";
+
+        for (let i = 0; i < 50; i++) {
+            const row = [
+                `SKU-FICTIF-${faker.string.alphanumeric(6).toUpperCase()}`,
+                `"${faker.commerce.productName().replace(/"/g, '""')}"`,
+                `${faker.string.alpha(1).toUpperCase()}.${faker.number.int({min:1, max:10})}.${faker.number.int({min:1, max:6})}.${faker.string.alpha(1).toUpperCase()}`,
+                faker.number.int({ min: 10, max: 2000 }),
+                parseFloat(faker.commerce.price()),
+                "PIEC",
+                "Actif"
+            ];
+            csvContent += row.join(",") + "\n";
+        }
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "stock-fictif.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        toast({
+            title: "Téléchargement lancé",
+            description: "Le fichier stock-fictif.csv a été généré."
+        })
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Génération de Données Fictives</CardTitle>
+                <CardDescription>
+                    Créez un fichier CSV avec 50 articles fictifs que vous pourrez ensuite importer ou utiliser
+                    pour vos scénarios dans cet entrepôt de simulation.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button onClick={generateAndDownloadCsv}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Générer et Télécharger le CSV
+                </Button>
+            </CardContent>
+        </Card>
+    )
+}
+
+
 export function StockClient() {
   const { state } = useWms();
   const perms = state.currentUserPermissions;
+  const { currentEnvironmentId } = state;
 
   if (!perms?.canViewStock) {
     return (
@@ -332,18 +392,22 @@ export function StockClient() {
   }
 
   return (
-    <Tabs defaultValue="view" className="w-full">
-      <TabsList className={`grid w-full grid-cols-${tabs.length}`}>
-        {tabs.map(tab => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
-      </TabsList>
-      <TabsContent value="view">
-        <ViewStock />
-      </TabsContent>
-      <TabsContent value="movements">
-        <ViewMovements />
-      </TabsContent>
-       {perms.canManageStock && <TabsContent value="create"><CreateArticleForm /></TabsContent>}
-      {perms.canManageStock && <TabsContent value="adjust"><AdjustInventory /></TabsContent>}
-    </Tabs>
+    <div className="space-y-6">
+        {currentEnvironmentId === 'entrepot_fictif_ecommerce' && <GenerateFictitiousData />}
+
+        <Tabs defaultValue="view" className="w-full">
+        <TabsList className={`grid w-full grid-cols-${tabs.length}`}>
+            {tabs.map(tab => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
+        </TabsList>
+        <TabsContent value="view">
+            <ViewStock />
+        </TabsContent>
+        <TabsContent value="movements">
+            <ViewMovements />
+        </TabsContent>
+        {perms.canManageStock && <TabsContent value="create"><CreateArticleForm /></TabsContent>}
+        {perms.canManageStock && <TabsContent value="adjust"><AdjustInventory /></TabsContent>}
+        </Tabs>
+    </div>
   );
 }
