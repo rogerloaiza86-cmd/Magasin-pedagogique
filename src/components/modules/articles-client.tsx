@@ -23,6 +23,7 @@ import { Article, ArticleStatus } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Eye } from "lucide-react";
+import Link from "next/link";
 
 export function ArticlesClient() {
   const { state } = useWms();
@@ -98,9 +99,11 @@ export function ArticlesClient() {
                     <TableCell className="font-mono">{article.location}</TableCell>
                     <TableCell>{article.price.toFixed(2)} €</TableCell>
                     <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" disabled>
-                           <Eye className="h-4 w-4"/>
-                        </Button>
+                        <Link href={`/articles/${article.id}`}>
+                            <Button variant="ghost" size="icon">
+                               <Eye className="h-4 w-4"/>
+                            </Button>
+                        </Link>
                     </TableCell>
                     </TableRow>
                 ))
