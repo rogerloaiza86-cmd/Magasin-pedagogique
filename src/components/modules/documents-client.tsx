@@ -25,10 +25,15 @@ import { Document } from "@/lib/types";
 
 export function DocumentsClient() {
   const { state, getTier, getArticle } = useWms();
-  const { currentUser, currentEnvironmentId } = state;
-  const documents = Array.from(state.documents.values())
-    .filter(doc => doc.createdBy === currentUser?.username && doc.environnementId === currentEnvironmentId)
-    .sort((a,b) => b.id - a.id);
+  const { currentUser, currentUserPermissions, currentEnvironmentId, documents, users, roles } = state;
+  
+  const docsInEnv = Array.from(state.documents.values()).filter(doc => doc.environnementId === currentEnvironmentId);
+
+  const viewableDocuments = currentUserPermissions?.isSuperAdmin 
+    ? docsInEnv
+    : docsInEnv.filter(doc => doc.createdBy === currentUser?.username);
+
+  viewableDocuments.sort((a,b) => b.id - a.id);
 
   const getStatusVariant = (status: Document['status']): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
@@ -44,21 +49,30 @@ export function DocumentsClient() {
         default: return 'outline';
     }
   }
+  
+  const getCreatorSignature = (username: string) => {
+    const user = users.get(username);
+    if (!user) return username;
+    const roleName = roles.get(user.roleId)?.name || user.profile;
+    return `${user.username} (${roleName})`;
+  }
 
   const handleExport = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "ID,Type,Tiers,Date,Statut,Articles\n";
+    csvContent += "ID,Type,Tiers,Date,Statut,Articles,CreePar\n";
 
-    documents.forEach(doc => {
+    viewableDocuments.forEach(doc => {
       const tierName = getTier(doc.tierId)?.name || "N/A";
       const articles = doc.lines.map(l => `${getArticle(l.articleId)?.name} (x${l.quantity})`).join('; ');
+      const creator = getCreatorSignature(doc.createdBy);
       const row = [
         doc.id,
         doc.type,
         `"${tierName.replace(/"/g, '""')}"`,
         new Date(doc.createdAt).toLocaleDateString(),
         doc.status,
-        `"${articles.replace(/"/g, '""')}"`
+        `"${articles.replace(/"/g, '""')}"`,
+        `"${creator.replace(/"/g, '""')}"`,
       ].join(',');
       csvContent += row + "\n";
     });
@@ -77,14 +91,14 @@ export function DocumentsClient() {
     <Card>
       <CardHeader className="flex-row justify-between items-start">
         <div>
-            <CardTitle>Vos documents</CardTitle>
+            <CardTitle>Documents de l'environnement</CardTitle>
             <CardDescription>
-            Consultez tous les bons de commande, bons de livraison et lettres de voiture que vous avez créés dans cet environnement.
+              Consultez tous les documents créés dans cet environnement. Les administrateurs voient tout, les autres ne voient que leurs propres documents.
             </CardDescription>
         </div>
-        <Button onClick={handleExport} variant="outline" disabled={documents.length === 0}>
+        <Button onClick={handleExport} variant="outline" disabled={viewableDocuments.length === 0}>
             <Download className="mr-2 h-4 w-4" />
-            Exporter tout en CSV
+            Exporter la vue en CSV
         </Button>
       </CardHeader>
       <CardContent>
@@ -96,12 +110,13 @@ export function DocumentsClient() {
               <TableHead>Tiers</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Statut</TableHead>
+              <TableHead>Créé par</TableHead>
               <TableHead className="text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {documents.length > 0 ? (
-              documents.map((doc) => (
+            {viewableDocuments.length > 0 ? (
+              viewableDocuments.map((doc) => (
                 <TableRow key={doc.id}>
                   <TableCell className="font-medium">{doc.id}</TableCell>
                   <TableCell>{doc.type}</TableCell>
@@ -110,6 +125,7 @@ export function DocumentsClient() {
                   <TableCell>
                     <Badge variant={getStatusVariant(doc.status)}>{doc.status}</Badge>
                   </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{getCreatorSignature(doc.createdBy)}</TableCell>
                   <TableCell className="text-right">
                     <Link href={`/documents/${doc.id}`} passHref>
                         <Button variant="outline" size="sm" asChild>
@@ -124,8 +140,8 @@ export function DocumentsClient() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
-                  Aucun document n'a encore été créé.
+                <TableCell colSpan={7} className="h-24 text-center">
+                  Aucun document n'a encore été créé dans cet environnement.
                 </TableCell>
               </TableRow>
             )}
@@ -135,5 +151,3 @@ export function DocumentsClient() {
     </Card>
   );
 }
-
-    

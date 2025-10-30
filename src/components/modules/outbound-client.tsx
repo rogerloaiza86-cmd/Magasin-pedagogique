@@ -327,12 +327,19 @@ function PrepareOrder() {
 function ShipOrder() {
     const { state, dispatch, getTier, getArticle } = useWms();
     const { toast } = useToast();
-    const {currentUser, currentEnvironmentId} = state;
+    const {currentUser, currentEnvironmentId, users, roles} = state;
     const transporters = Array.from(state.tiers.values()).filter(t => t.type === 'Transporteur' && t.environnementId === currentEnvironmentId).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
     const shippableDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "En préparation" && d.environnementId === currentEnvironmentId).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
 
     const [selectedTransporter, setSelectedTransporter] = useState<string>("");
     const [finalDoc, setFinalDoc] = useState<{bl: WmsDocument, cmr: WmsDocument} | null>(null);
+
+    const getCreatorSignature = (username: string) => {
+        const user = users.get(username);
+        if (!user) return username;
+        const roleName = roles.get(user.roleId)?.name || user.profile;
+        return `${user.username} (${roleName})`;
+    }
 
     const handleShip = (doc: WmsDocument) => {
         if (!selectedTransporter) {
@@ -424,6 +431,7 @@ function ShipOrder() {
                             <p><strong>Client:</strong> {getTier(finalDoc?.bl.tierId || 0)?.name}</p>
                             <p><strong>Adresse:</strong> {getTier(finalDoc?.bl.tierId || 0)?.address}</p>
                             <p><strong>Statut:</strong> <span className="font-bold text-green-600">{finalDoc?.bl.status}</span></p>
+                             <p className="text-sm text-muted-foreground mt-2">Créé par: {getCreatorSignature(finalDoc?.bl.createdBy || '')}</p>
                             <h4 className="font-bold mt-4">Articles:</h4>
                             <ul>{finalDoc?.bl.lines.map(l => <li key={l.articleId}>{getArticle(l.articleId)?.name} x {l.quantity}</li>)}</ul>
                         </CardContent>
@@ -435,6 +443,7 @@ function ShipOrder() {
                              <p><strong>Expéditeur:</strong> Lycée Gaspard Monge</p>
                              <p><strong>Destinataire:</strong> {getTier(finalDoc?.cmr.tierId || 0)?.name} - {getTier(finalDoc?.cmr.tierId || 0)?.address}</p>
                              <p><strong>Transporteur:</strong> {getTier(finalDoc?.cmr.transporterId || 0)?.name}</p>
+                             <p className="text-sm text-muted-foreground">Créé par: {getCreatorSignature(finalDoc?.cmr.createdBy || '')}</p>
                              <h4 className="font-bold mt-4">Marchandise:</h4>
                              <ul>{finalDoc?.cmr.lines.map(l => <li key={l.articleId}>{getArticle(l.articleId)?.name} ({getArticle(l.articleId)?.packaging}) x {l.quantity}</li>)}</ul>
                         </CardContent>
