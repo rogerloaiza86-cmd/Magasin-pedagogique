@@ -28,6 +28,81 @@ import { useToast } from "@/hooks/use-toast";
 import type { Article, Movement } from "@/lib/types";
 import { ArticleCombobox } from "@/components/shared/ArticleCombobox";
 import { Badge } from "../ui/badge";
+import { PlusCircle } from "lucide-react";
+
+function CreateArticleForm() {
+    const { dispatch } = useWms();
+    const { toast } = useToast();
+    const { control, handleSubmit, reset, formState: { errors } } = useForm<Omit<Article, 'environnementId' | 'status'>>({
+        defaultValues: {
+            id: "",
+            name: "",
+            location: "",
+            stock: 0,
+            price: 0,
+            packaging: ""
+        }
+    });
+
+    const onSubmit = (data: Omit<Article, 'environnementId' | 'status'>) => {
+        dispatch({ type: 'ADD_ARTICLE', payload: data });
+        toast({
+            title: "Article Créé",
+            description: `L'article "${data.name}" a été ajouté avec un stock initial de ${data.stock}.`
+        });
+        reset();
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Créer un nouvel article</CardTitle>
+                <CardDescription>Remplissez le formulaire pour ajouter un nouvel article au catalogue de cet environnement.</CardDescription>
+            </CardHeader>
+            <form onSubmit={handleSubmit(onSubmit)}>
+                <CardContent className="space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="id">Référence</Label>
+                            <Controller name="id" control={control} rules={{ required: "La référence est requise."}} render={({field}) => <Input id="id" {...field} />} />
+                            {errors.id && <p className="text-sm text-destructive mt-1">{errors.id.message}</p>}
+                        </div>
+                         <div>
+                            <Label htmlFor="name">Désignation</Label>
+                            <Controller name="name" control={control} rules={{ required: "La désignation est requise."}} render={({field}) => <Input id="name" {...field} />} />
+                             {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+                        </div>
+                    </div>
+                     <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="location">Emplacement</Label>
+                            <Controller name="location" control={control} rules={{ required: "L'emplacement est requis."}} render={({field}) => <Input id="location" placeholder="Ex: A.1.1.A" {...field} />} />
+                             {errors.location && <p className="text-sm text-destructive mt-1">{errors.location.message}</p>}
+                        </div>
+                         <div>
+                            <Label htmlFor="packaging">Conditionnement</Label>
+                            <Controller name="packaging" control={control} rules={{ required: "Le conditionnement est requis."}} render={({field}) => <Input id="packaging" placeholder="Ex: PIEC, BOTE,..." {...field} />} />
+                             {errors.packaging && <p className="text-sm text-destructive mt-1">{errors.packaging.message}</p>}
+                        </div>
+                    </div>
+                     <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="stock">Stock Initial</Label>
+                            <Controller name="stock" control={control} rules={{ required: "Stock requis.", min: 0, valueAsNumber: true }} render={({field}) => <Input id="stock" type="number" {...field} />} />
+                        </div>
+                         <div>
+                            <Label htmlFor="price">Prix Unitaire HT</Label>
+                            <Controller name="price" control={control} rules={{ required: "Prix requis.", min: 0, valueAsNumber: true }} render={({field}) => <Input id="price" type="number" step="0.01" {...field} />} />
+                        </div>
+                    </div>
+                </CardContent>
+                <CardFooter>
+                    <Button type="submit"><PlusCircle className="mr-2 h-4 w-4"/>Créer l'article</Button>
+                </CardFooter>
+            </form>
+        </Card>
+    )
+}
 
 function ViewStock() {
   const { state, getArticle } = useWms();
@@ -248,7 +323,10 @@ export function StockClient() {
   const tabs = [];
   tabs.push({ value: "view", label: "Consulter le Stock" });
   tabs.push({ value: "movements", label: "Consulter les Mouvements" });
-  if(perms.canManageStock) tabs.push({ value: "adjust", label: "Inventaire / Ajustement" });
+  if(perms.canManageStock) {
+    tabs.push({ value: "create", label: "Créer un Article" });
+    tabs.push({ value: "adjust", label: "Inventaire / Ajustement" });
+  }
 
   return (
     <Tabs defaultValue="view" className="w-full">
@@ -261,6 +339,7 @@ export function StockClient() {
       <TabsContent value="movements">
         <ViewMovements />
       </TabsContent>
+       {perms.canManageStock && <TabsContent value="create"><CreateArticleForm /></TabsContent>}
       {perms.canManageStock && <TabsContent value="adjust"><AdjustInventory /></TabsContent>}
     </Tabs>
   );

@@ -201,6 +201,7 @@ const getInitialState = (): WmsState => {
 };
 
 type WmsAction =
+  | { type: 'ADD_ARTICLE', payload: Omit<Article, 'environnementId' | 'status'> }
   | { type: 'ADD_TIER'; payload: Omit<Tier, 'id' | 'createdAt' | 'createdBy' | 'environnementId'> }
   | { type: 'CREATE_DOCUMENT'; payload: Omit<Document, 'id' | 'createdAt' | 'createdBy' | 'environnementId'> }
   | { type: 'UPDATE_DOCUMENT'; payload: Document }
@@ -351,6 +352,46 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         newUsers.set(username, newUser);
         newState = { ...state, users: newUsers };
         break;
+    }
+     case 'ADD_ARTICLE': {
+      if (!state.currentUserPermissions?.canManageStock || !state.currentUser) return state;
+      const { id, name, location, stock, price, packaging } = action.payload;
+      if (state.articles.has(id)) {
+        // In a real app, you'd probably want to throw an error here or show a toast.
+        // For now, we'll just log it and not add the article.
+        console.error(`Article with ID ${id} already exists.`);
+        return state;
+      }
+      const newArticle: Article = {
+        id,
+        name,
+        location,
+        stock,
+        price,
+        packaging,
+        status: 'Actif',
+        environnementId: state.currentEnvironmentId,
+      };
+      const newArticles = new Map(state.articles);
+      newArticles.set(id, newArticle);
+
+      const newMovements = [...state.movements];
+      let newMovementIdCounter = state.movementIdCounter;
+      if (stock > 0) {
+        newMovements.push({
+            id: newMovementIdCounter++,
+            timestamp: new Date().toISOString(),
+            articleId: id,
+            type: 'Initial',
+            quantity: stock,
+            stockAfter: stock,
+            user: state.currentUser.username,
+            environnementId: state.currentEnvironmentId,
+        });
+      }
+
+      newState = { ...state, articles: newArticles, movements: newMovements, movementIdCounter: newMovementIdCounter };
+      break;
     }
     case 'ADD_CLASS': {
         if (!state.currentUserPermissions?.canManageClasses) return state;
@@ -1071,5 +1112,3 @@ export const useWms = () => {
   }
   return context;
 };
-
-    
