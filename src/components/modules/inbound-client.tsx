@@ -55,6 +55,7 @@ import {
   DialogClose,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { ArticleCombobox } from "@/components/shared/ArticleCombobox";
 
 type PurchaseOrderFormData = {
   supplierId: string;
@@ -187,18 +188,12 @@ function CreatePurchaseOrder() {
                     control={control}
                     rules={{ required: "Article requis."}}
                     render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choisir un article..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {articles.map((a) => (
-                            <SelectItem key={a.id} value={a.id}>
-                              {a.name} ({a.id})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                       <ArticleCombobox
+                          articles={articles}
+                          value={field.value}
+                          onSelect={field.onChange}
+                          placeholder="Choisir un article..."
+                        />
                     )}
                   />
                   {errors.lines?.[index]?.articleId && <p className="text-sm text-destructive mt-1">{errors.lines[index]?.articleId?.message}</p>}
@@ -535,7 +530,12 @@ function CustomerReturns() {
                                     <div className="col-span-3 sm:col-span-2">
                                         <Label>Article</Label>
                                         <Controller name={`lines.${index}.articleId`} control={createControl} rules={{ required: true }} render={({ field }) => (
-                                             <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue placeholder="Choisir..."/></SelectTrigger><SelectContent>{articles.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent></Select>
+                                            <ArticleCombobox
+                                                articles={articles}
+                                                value={field.value}
+                                                onSelect={field.onChange}
+                                                placeholder="Choisir un article..."
+                                            />
                                         )}/>
                                     </div>
                                     <div className="col-span-2 sm:col-span-1">
