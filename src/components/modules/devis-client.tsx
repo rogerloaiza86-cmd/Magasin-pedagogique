@@ -95,16 +95,17 @@ function DevisForm({ onSave, onCancel }: { onSave: (data: Document) => void, onC
         }
     });
 
-    const watchedData = watch();
+    const watchedDistance = watch("distance");
+    const watchedPoids = watch("poids");
 
     useEffect(() => {
-        const newPrice = calculatePrice(watchedData, grille);
+        const newPrice = calculatePrice({ distance: watchedDistance, poids: watchedPoids }, grille);
         setValue('prixCalculeHT', newPrice, { shouldValidate: true });
-    }, [watchedData.distance, watchedData.poids, grille, setValue, watchedData]);
+    }, [watchedDistance, watchedPoids, grille, setValue]);
 
     const onSubmit = (data: DevisFormData) => {
         const { tierId, ...devisDetails } = data;
-        const finalPrice = calculatePrice(devisDetails, grille);
+        const finalPrice = calculatePrice(data, grille);
         
         const newDocument: Omit<Document, 'id' | 'createdAt' | 'createdBy' | 'environnementId'> = {
             type: 'Devis Transport',
@@ -171,7 +172,7 @@ function DevisForm({ onSave, onCancel }: { onSave: (data: Document) => void, onC
                 <Card className="mt-4">
                     <CardHeader><CardTitle>Estimation du Prix</CardTitle></CardHeader>
                     <CardContent>
-                        <p className="text-3xl font-bold">{calculatePrice(watchedData, grille).toFixed(2)} € <span className="text-sm font-normal text-muted-foreground">HT</span></p>
+                        <p className="text-3xl font-bold">{calculatePrice({ distance: watchedDistance, poids: watchedPoids }, grille).toFixed(2)} € <span className="text-sm font-normal text-muted-foreground">HT</span></p>
                         <p className="text-xs text-muted-foreground mt-2">Calculé avec la grille tarifaire: {grille?.name}</p>
                     </CardContent>
                 </Card>
