@@ -163,7 +163,6 @@ function CreateDeliveryNote() {
                             value={field.value}
                             onSelect={(value) => { field.onChange(value); clearErrors(`lines.${index}.quantity`); }}
                             placeholder="Choisir un article..."
-                            disabled={false}
                         />
                     )}
                   />
