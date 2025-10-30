@@ -1,16 +1,19 @@
 
+
 "use client";
 
 import { useWms } from "@/context/WmsContext";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Boxes, Users, FileText, Truck, User, Activity, Clock, CheckSquare, ListTodo, Lock } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Boxes, Users, FileText, Truck, User, Activity, Clock, CheckSquare, ListTodo, Lock, ArrowRight } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
-import type { User as UserType, Document, Tier, Movement as MovementType } from "@/lib/types";
+import type { User as UserType, Document, Tier, Movement as MovementType, Task } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import Link from "next/link";
 
 function StudentDashboard() {
   const { state } = useWms();
@@ -213,20 +216,11 @@ function TeacherDashboard() {
 
     const studentProgressData = managedStudents.map(student => getStudentProgress(student, Array.from(documents.values()), Array.from(tiers.values()), movements, currentEnvironmentId));
 
-    // KPIs
-    const now = new Date();
-    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const activeStudents24h = studentProgressData.filter(s => new Date(s.lastActivity) > twentyFourHoursAgo).length;
-    
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const docsThisWeek = Array.from(documents.values()).filter(d => new Date(d.createdAt) > weekAgo && d.environnementId === currentEnvironmentId);
-    
-    const bcThisWeek = docsThisWeek.filter(d => d.type === 'Bon de Commande Fournisseur').length;
-    const blThisWeek = docsThisWeek.filter(d => d.type === 'Bon de Livraison Client').length;
-    const receptionsThisWeek = docsThisWeek.filter(d => d.type === 'Bon de Commande Fournisseur' && d.status.startsWith('Réceptionné')).length;
-    const shipmentsThisWeek = docsThisWeek.filter(d => d.type === 'Bon de Livraison Client' && d.status === 'Expédié').length;
     const currentEnv = state.environments.get(currentEnvironmentId);
 
+    // KPIs for the new blocks
+    const pendingReceptions = Array.from(documents.values()).filter(d => d.type === 'Bon de Commande Fournisseur' && d.status === 'En préparation' && d.environnementId === currentEnvironmentId).length;
+    const pendingShipments = Array.from(documents.values()).filter(d => d.type === 'Bon de Livraison Client' && d.status === 'En préparation' && d.environnementId === currentEnvironmentId).length;
 
     return (
         <div className="space-y-6">
@@ -245,46 +239,34 @@ function TeacherDashboard() {
                 </Card>
             ) : (
                 <>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-6 md:grid-cols-2">
                     <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Élèves Actifs (24h)</CardTitle>
-                            <Activity className="h-4 w-4 text-muted-foreground" />
+                        <CardHeader>
+                            <CardTitle className="text-accent">Flux Entrant (Réceptions)</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{activeStudents24h} / {managedStudents.length}</div>
-                            <p className="text-xs text-muted-foreground">sur les classes gérées</p>
+                            <p className="text-2xl font-bold">{pendingReceptions}</p>
+                            <p className="text-muted-foreground">bons de commande à réceptionner</p>
                         </CardContent>
+                        <CardFooter>
+                             <Button asChild variant="outline">
+                                <Link href="/flux-entrant">Ouvrir Réceptions <ArrowRight className="ml-2 h-4 w-4" /></Link>
+                            </Button>
+                        </CardFooter>
                     </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">BC créés (semaine)</CardTitle>
-                            <FileText className="h-4 w-4 text-muted-foreground" />
+                     <Card>
+                        <CardHeader>
+                            <CardTitle className="text-accent">Flux Sortant (Expéditions)</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{bcThisWeek}</div>
-                            <p className="text-xs text-muted-foreground">Bons de commande</p>
+                            <p className="text-2xl font-bold">{pendingShipments}</p>
+                            <p className="text-muted-foreground">bons de livraison à préparer</p>
                         </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">BL créés (semaine)</CardTitle>
-                            <Truck className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{blThisWeek}</div>
-                            <p className="text-xs text-muted-foreground">Bons de livraison</p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Opérations (semaine)</CardTitle>
-                            <Boxes className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{receptionsThisWeek + shipmentsThisWeek}</div>
-                            <p className="text-xs text-muted-foreground">{receptionsThisWeek} réceptions, {shipmentsThisWeek} expéditions</p>
-                        </CardContent>
+                        <CardFooter>
+                             <Button asChild variant="outline">
+                                <Link href="/flux-sortant">Ouvrir Expéditions <ArrowRight className="ml-2 h-4 w-4" /></Link>
+                            </Button>
+                        </CardFooter>
                     </Card>
                 </div>
 
@@ -354,5 +336,7 @@ export function DashboardClient() {
 
   return <StudentDashboard />;
 }
+
+    
 
     
