@@ -16,7 +16,10 @@ import {
     Truck,
     Archive,
     FileSignature,
-    CheckCircle2
+    CheckCircle2,
+    Package,
+    AlertTriangle,
+    RotateCcw
 } from "lucide-react";
 import Link from "next/link";
 import type { Environment, Task } from "@/lib/types";
@@ -76,6 +79,20 @@ function AppCard({ item }: { item: AppItem }) {
   );
 }
 
+function KpiCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: React.ElementType, color: string }) {
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{title}</CardTitle>
+                <Icon className={`h-4 w-4 text-muted-foreground ${color}`} />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">{value}</div>
+            </CardContent>
+        </Card>
+    )
+}
+
 function ScenarioProgress() {
     const { state } = useWms();
     const { currentUser, tasks, activeScenarios, currentEnvironmentId, environments } = state;
@@ -129,7 +146,7 @@ function ScenarioProgress() {
 
 export function DashboardClient() {
   const { state } = useWms();
-  const { currentUser, currentUserPermissions, environments, currentEnvironmentId } = state;
+  const { currentUser, currentUserPermissions, environments, currentEnvironmentId, documents, articles } = state;
   const currentEnv = environments.get(currentEnvironmentId);
 
   const visibleAppItems = appItems.filter(item => {
@@ -151,12 +168,29 @@ export function DashboardClient() {
     return true;
   });
 
+  // KPIs
+  const pendingPOs = Array.from(documents.values()).filter(d => d.environnementId === currentEnvironmentId && d.type === 'Bon de Commande Fournisseur' && d.status === 'En préparation').length;
+  const pendingSOs = Array.from(documents.values()).filter(d => d.environnementId === currentEnvironmentId && d.type === 'Bon de Livraison Client' && d.status === 'En préparation').length;
+  const articlesInStock = Array.from(articles.values()).filter(a => a.environnementId === currentEnvironmentId).length;
+  const pendingReturns = Array.from(documents.values()).filter(d => d.environnementId === currentEnvironmentId && d.type === 'Retour Client' && d.status === 'En attente de traitement').length;
+
+  const showKpis = currentEnv?.type === 'WMS';
+
   return (
     <div className="space-y-6">
         <div>
             <h1 className="text-3xl font-bold tracking-tight">Bonjour, {currentUser?.username} !</h1>
             <p className="text-muted-foreground">Bienvenue dans votre espace {currentEnv?.name}. Choisissez une application pour commencer.</p>
         </div>
+
+        {showKpis && (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <KpiCard title="BC en attente de réception" value={pendingPOs} icon={ArrowDownToLine} color="text-sky-500" />
+                <KpiCard title="BL en attente de préparation" value={pendingSOs} icon={ArrowUpFromLine} color="text-red-500" />
+                <KpiCard title="Articles en Stock" value={articlesInStock} icon={Package} color="text-purple-500" />
+                <KpiCard title="Retours à traiter" value={pendingReturns} icon={RotateCcw} color="text-orange-500" />
+            </div>
+        )}
 
         {currentUser?.profile === 'élève' && <ScenarioProgress />}
 
