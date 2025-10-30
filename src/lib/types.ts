@@ -76,11 +76,21 @@ export type DocumentLine = {
   returnDecision?: ReturnDecision;
 };
 
+export type DevisTransportDetails = {
+  departAddress: string;
+  arriveeAddress: string;
+  distance: number; // in km
+  poids: number; // in kg
+  nombrePalettes: number;
+  prixCalculeHT: number;
+  dateEnlevement: string;
+};
+
 export type Document = {
   id: number;
-  type: 'Bon de Commande Fournisseur' | 'Bon de Livraison Client' | 'Lettre de Voiture' | 'Retour Client';
+  type: 'Bon de Commande Fournisseur' | 'Bon de Livraison Client' | 'Lettre de Voiture' | 'Retour Client' | 'Devis Transport';
   tierId: number;
-  status: 'En préparation' | 'Validé' | 'Expédié' | 'Réceptionné' | 'Réceptionné avec anomalies' | 'En attente de traitement' | 'Traité';
+  status: 'En préparation' | 'Validé' | 'Expédié' | 'Réceptionné' | 'Réceptionné avec anomalies' | 'En attente de traitement' | 'Traité' | 'Brouillon' | 'Envoyé' | 'Accepté' | 'Refusé';
   lines: DocumentLine[];
   createdAt: string;
   createdBy: string;
@@ -88,6 +98,7 @@ export type Document = {
   environnementId: string;
   receptionNotes?: string; // Réserves à la réception
   originalDocumentId?: number; // For returns
+  devisDetails?: DevisTransportDetails;
 };
 
 export type Movement = {
@@ -121,6 +132,7 @@ export type Permissions = {
     canManageScenarios: boolean;
     // TMS Permissions to be added
     canManageFleet: boolean;
+    canManageQuotes: boolean;
 }
 
 export type Role = {
@@ -215,3 +227,14 @@ export type Task = {
     details?: Record<string, any>;
     environnementId: string;
 };
+
+// --- TMS SPECIFIC TYPES ---
+export type GrilleTarifaire = {
+    id: string;
+    name: string;
+    tarifs: {
+        distance: { palier: number; prixKm: number }[];
+        poids: { palier: number; supplement: number }[];
+        base: number;
+    }
+}

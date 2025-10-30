@@ -4,19 +4,18 @@
 import { useWms } from "@/context/WmsContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
-    Home,
     Users,
     Warehouse,
     ArrowDownToLine,
     ArrowUpFromLine,
     BrainCircuit,
-    Boxes,
     FileText,
     BookUser,
     Mail,
     Swords,
     Truck,
-    Archive
+    Archive,
+    FileSignature
 } from "lucide-react";
 import Link from "next/link";
 import type { Environment } from "@/lib/types";
@@ -39,7 +38,8 @@ type AppItem = {
     | 'canUseIaTools'
     | 'canUseMessaging'
     | 'canManageScenarios'
-    | 'canManageFleet';
+    | 'canManageFleet'
+    | 'canManageQuotes';
   envType: Environment['type'] | 'ALL';
   isSuperAdminOnly?: boolean;
 };
@@ -50,6 +50,7 @@ const appItems: AppItem[] = [
   { href: "/flux-entrant", label: "Achats", icon: ArrowDownToLine, color: "text-sky-500", permission: 'canCreateBC', envType: 'WMS' },
   { href: "/flux-sortant", label: "Ventes", icon: ArrowUpFromLine, color: "text-red-500", permission: 'canCreateBL', envType: 'WMS' },
   { href: "/tiers", label: "Tiers", icon: Users, color: "text-green-500", permission: 'canViewTiers', envType: 'ALL' },
+  { href: "/devis", label: "Devis", icon: FileSignature, color: "text-pink-500", permission: 'canManageQuotes', envType: 'TMS' },
   { href: "/flotte", label: "Flotte", icon: Truck, color: "text-yellow-500", permission: 'canManageFleet', envType: 'TMS' },
   { href: "/documents", label: "Documents", icon: FileText, color: "text-indigo-500", permission: 'canViewDashboard', envType: 'ALL' },
   { href: "/messaging", label: "Messagerie", icon: Mail, color: "text-blue-500", permission: 'canUseMessaging', envType: 'ALL' },

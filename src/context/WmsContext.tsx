@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
-import type { Article, Tier, Document, Movement, User, Class, Email, Role, Permissions, ScenarioTemplate, ActiveScenario, Task, Environment, Maintenance, DocumentLine } from '@/lib/types';
+import type { Article, Tier, Document, Movement, User, Class, Email, Role, Permissions, ScenarioTemplate, ActiveScenario, Task, Environment, Maintenance, DocumentLine, GrilleTarifaire } from '@/lib/types';
 import { initialArticles } from '@/lib/articles-data';
 import { faker } from '@faker-js/faker/locale/fr';
 
@@ -19,7 +19,7 @@ ROLES.set('super_admin', {
         canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true, canReceiveBC: true,
         canCreateBL: true, canPrepareBL: true, canShipBL: true, canManageStock: true, canViewStock: true,
         canManageClasses: true, canUseIaTools: true, canUseMessaging: true, canManageScenarios: true,
-        canManageFleet: true,
+        canManageFleet: true, canManageQuotes: true,
     }
 });
 
@@ -32,7 +32,7 @@ ROLES.set('equipe_reception', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true,
         canReceiveBC: true, canCreateBL: false, canPrepareBL: false, canShipBL: false,
         canManageStock: true, canViewStock: true, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageFleet: false,
+        canManageScenarios: false, canManageFleet: false, canManageQuotes: false,
     }
 });
 
@@ -45,7 +45,7 @@ ROLES.set('equipe_preparation', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: false,
         canReceiveBC: false, canCreateBL: true, canPrepareBL: true, canShipBL: true,
         canManageStock: false, canViewStock: true, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageFleet: false,
+        canManageScenarios: false, canManageFleet: false, canManageQuotes: false,
     }
 });
 
@@ -58,7 +58,7 @@ ROLES.set('tms_affreteur', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: false,
         canReceiveBC: false, canCreateBL: false, canPrepareBL: false, canShipBL: false,
         canManageStock: false, canViewStock: false, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageFleet: false,
+        canManageScenarios: false, canManageFleet: false, canManageQuotes: true,
     }
 });
 
@@ -71,7 +71,7 @@ permissions: {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: false, canViewTiers: true, canCreateBC: false,
         canReceiveBC: false, canCreateBL: false, canPrepareBL: false, canShipBL: false,
         canManageStock: false, canViewStock: false, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageFleet: true,
+        canManageScenarios: false, canManageFleet: true, canManageQuotes: false,
     }
 });
 
@@ -96,6 +96,25 @@ ENVIRONMENTS.set('agence_transport', {
     description: 'Gestion des devis et des tournées.'
 });
 
+const GRILLES_TARIFAIRES: Map<string, GrilleTarifaire> = new Map();
+GRILLES_TARIFAIRES.set('default_tms', {
+    id: 'default_tms',
+    name: 'Grille Standard 2024',
+    tarifs: {
+        base: 50, // Prix de base pour tout transport
+        distance: [
+            { palier: 100, prixKm: 2.5 }, // Jusqu'à 100km
+            { palier: 500, prixKm: 2.2 }, // de 101km à 500km
+            { palier: Infinity, prixKm: 2.0 }, // Au-delà de 500km
+        ],
+        poids: [
+            { palier: 1000, supplement: 0 }, // Jusqu'à 1000kg
+            { palier: 5000, supplement: 75 }, // de 1001kg à 5000kg
+            { palier: Infinity, supplement: 150 }, // Au-delà de 5000kg
+        ]
+    }
+})
+
 
 interface WmsState {
   articles: Map<string, Article>;
@@ -108,6 +127,7 @@ interface WmsState {
   roles: Map<string, Role>;
   environments: Map<string, Environment>;
   maintenances: Map<number, Maintenance>;
+  grillesTarifaires: Map<string, GrilleTarifaire>;
   scenarioTemplates: Map<number, ScenarioTemplate>;
   activeScenarios: Map<number, ActiveScenario>;
   tasks: Map<number, Task>;
@@ -150,6 +170,7 @@ const getInitialState = (): WmsState => {
   initialClasses.set(demoClassId, { id: demoClassId, name: 'Classe Démo', teacherIds: ['prof']});
   initialUsers.set('eleve', { username: 'eleve', password: 'eleve', profile: 'élève', createdAt: new Date().toISOString(), roleId: 'equipe_reception', classId: demoClassId });
   initialUsers.set('eleve2', { username: 'eleve2', password: 'eleve2', profile: 'élève', createdAt: new Date().toISOString(), roleId: 'equipe_preparation', classId: demoClassId });
+  initialUsers.set('affreteur', { username: 'affreteur', password: 'affreteur', profile: 'élève', createdAt: new Date().toISOString(), roleId: 'tms_affreteur', classId: demoClassId });
 
   const initialScenarioTemplates = new Map<number, ScenarioTemplate>();
   const demoTemplateId = 1;
@@ -182,6 +203,7 @@ const getInitialState = (): WmsState => {
     roles: ROLES,
     environments: ENVIRONMENTS,
     maintenances: new Map(),
+    grillesTarifaires: GRILLES_TARIFAIRES,
     scenarioTemplates: initialScenarioTemplates,
     activeScenarios: new Map(),
     tasks: new Map(),
@@ -548,7 +570,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
     case 'CREATE_DOCUMENT': {
         const { type } = action.payload;
         const perms = state.currentUserPermissions;
-        if (!state.currentUser || (type === 'Bon de Commande Fournisseur' && !perms?.canCreateBC) || (type === 'Bon de Livraison Client' && !perms?.canCreateBL) || (type === 'Lettre de Voiture' && !perms?.canShipBL) || (type === 'Retour Client' && !perms?.canReceiveBC) ) {
+        if (!state.currentUser || (type === 'Bon de Commande Fournisseur' && !perms?.canCreateBC) || (type === 'Bon de Livraison Client' && !perms?.canCreateBL) || (type === 'Lettre de Voiture' && !perms?.canShipBL) || (type === 'Retour Client' && !perms?.canReceiveBC) || (type === 'Devis Transport' && !perms?.canManageQuotes) ) {
             return state;
         }
         const newDoc: Document = { 
@@ -1028,6 +1050,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
 
             roles: ROLES,
             environments: ENVIRONMENTS,
+            grillesTarifaires: GRILLES_TARIFAIRES,
         };
       } else {
         combinedState = initialState;
@@ -1072,6 +1095,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
           tasks: Array.from(state.tasks.values()),
           roles: [], // Static, no need to save
           environments: [], // Static
+          grillesTarifaires: [], // Static
           currentUser: null, 
           currentUserPermissions: null,
       };

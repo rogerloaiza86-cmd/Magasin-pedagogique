@@ -20,6 +20,7 @@ import {
   Globe,
   Truck,
   Archive,
+  FileSignature,
 } from "lucide-react";
 
 import {
@@ -59,7 +60,8 @@ type NavItem = {
     | 'canUseIaTools'
     | 'canUseMessaging'
     | 'canManageScenarios'
-    | 'canManageFleet';
+    | 'canManageFleet'
+    | 'canManageQuotes';
   envType: Environment['type'] | 'ALL';
   isSuperAdminOnly?: boolean;
 };
@@ -69,6 +71,7 @@ const navItems: NavItem[] = [
   { href: "/scenarios", label: "Scénarios", icon: Swords, permission: 'canManageScenarios', envType: 'ALL'},
   { href: "/articles", label: "Fichier Articles", icon: Archive, permission: 'canViewStock', envType: 'WMS'},
   { href: "/tiers", label: "Gestion des Tiers", icon: Users, permission: 'canViewTiers', envType: 'ALL' },
+  { href: "/devis", label: "Devis Transport", icon: FileSignature, permission: 'canManageQuotes', envType: 'TMS' },
   { href: "/flotte", label: "Flotte", icon: Truck, permission: 'canManageFleet', envType: 'TMS' },
   { href: "/flux-entrant", label: "Flux Entrant", icon: ArrowDownToLine, permission: 'canCreateBC', envType: 'WMS' },
   { href: "/flux-sortant", label: "Flux Sortant", icon: ArrowUpFromLine, permission: 'canCreateBL', envType: 'WMS' },
