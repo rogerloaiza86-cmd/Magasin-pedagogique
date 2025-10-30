@@ -301,7 +301,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         const permissions = state.roles.get(user.roleId)?.permissions || null;
         newState = { ...state, currentUser: user, currentUserPermissions: permissions };
       } else {
-        throw new Error("Identifiant ou mot de passe incorrect.");
+        newState = state; // Do not throw, just return current state
       }
       break;
     }

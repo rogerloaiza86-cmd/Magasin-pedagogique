@@ -24,7 +24,7 @@ type LoginFormData = {
 };
 
 export default function LoginPage() {
-  const { dispatch } = useWms();
+  const { state, dispatch } = useWms();
   const router = useRouter();
   const { toast } = useToast();
   const {
@@ -39,14 +39,15 @@ export default function LoginPage() {
   });
 
   const onSubmit = (data: LoginFormData) => {
-    try {
+    const user = state.users.get(data.username);
+    if (user && user.password === data.password) {
       dispatch({ type: "LOGIN", payload: data });
       router.push("/dashboard");
-    } catch (error: any) {
+    } else {
         toast({
             variant: "destructive",
             title: "Erreur de connexion",
-            description: error.message,
+            description: "Identifiant ou mot de passe incorrect.",
         })
     }
   };
