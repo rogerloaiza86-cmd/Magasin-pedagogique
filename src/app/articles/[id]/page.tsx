@@ -10,6 +10,7 @@ import type { Article, ArticleStatus } from "@/lib/types";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { format } from "date-fns";
 
 export default function ArticleDetailPage() {
     const { id } = useParams();
@@ -117,7 +118,7 @@ export default function ArticleDetailPage() {
                         <TableBody>
                             {articleMovements.length > 0 ? articleMovements.map(m => (
                                 <TableRow key={m.id}>
-                                <TableCell>{new Date(m.timestamp).toLocaleString()}</TableCell>
+                                <TableCell>{format(new Date(m.timestamp), 'dd/MM/yyyy HH:mm:ss')}</TableCell>
                                 <TableCell>{m.type}</TableCell>
                                 <TableCell className={m.quantity > 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
                                     {m.quantity > 0 ? `+${m.quantity}`: m.quantity}
