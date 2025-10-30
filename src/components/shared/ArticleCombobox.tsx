@@ -20,7 +20,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 
-export function ArticleCombobox({ articles, value, onSelect, placeholder, disabled = false }: { articles: Article[], value: string, onSelect: (value: string) => void, placeholder?: string, disabled?: boolean }) {
+export function ArticleCombobox({ articles, value, onSelect, placeholder, disabled = false, disableZeroStock = true }: { articles: Article[], value: string, onSelect: (value: string) => void, placeholder?: string, disabled?: boolean, disableZeroStock?: boolean }) {
     const [open, setOpen] = useState(false);
     const selectedArticle = articles.find(a => a.id === value);
 
@@ -54,7 +54,7 @@ export function ArticleCombobox({ articles, value, onSelect, placeholder, disabl
                                         onSelect(article.id)
                                         setOpen(false)
                                     }}
-                                    disabled={article.stock === 0}
+                                    disabled={disableZeroStock && article.stock === 0}
                                 >
                                     <Check
                                         className={cn(

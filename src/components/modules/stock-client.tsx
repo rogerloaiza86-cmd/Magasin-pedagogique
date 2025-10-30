@@ -124,6 +124,7 @@ function ViewStock() {
                     articles={articlesInEnv}
                     value={selectedArticleId}
                     onSelect={setSelectedArticleId}
+                    disableZeroStock={false}
                 />
             </div>
         </div>
@@ -169,6 +170,7 @@ function ViewMovements() {
                     articles={articlesInEnv}
                     value={selectedArticleId}
                     onSelect={setSelectedArticleId}
+                    disableZeroStock={false}
                 />
             </div>
         </div>
@@ -271,6 +273,7 @@ function AdjustInventory() {
                             field.onChange(value);
                             setValue('physicalStock', '');
                         }}
+                        disableZeroStock={false}
                     />
                 )}
             />
