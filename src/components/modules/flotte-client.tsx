@@ -77,8 +77,15 @@ function VehicleForm({ onSave, onCancel }: { onSave: (data: VehicleFormData) => 
         }
     });
 
+    const onSubmit = (data: VehicleFormData) => {
+        onSave({
+            ...data,
+            capacitePalette: Number(data.capacitePalette)
+        });
+    }
+
     return (
-        <form onSubmit={handleSubmit(onSave)}>
+        <form onSubmit={handleSubmit(onSubmit)}>
             <DialogHeader>
                 <DialogTitle>Ajouter un nouveau véhicule</DialogTitle>
                 <DialogDescription>

@@ -50,25 +50,13 @@ type TierFormData = Omit<Tier, 'id' | 'createdAt' | 'createdBy' | 'environnement
 };
 
 function TiersTable({ tiers, type }: { tiers: Tier[], type: string }) {
-    const isVehicle = type.toLowerCase() === 'vehicule';
     return (
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[100px]">ID</TableHead>
-              {isVehicle ? (
-                <>
-                    <TableHead>Immatriculation</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Capacité</TableHead>
-                    <TableHead>Statut</TableHead>
-                </>
-              ) : (
-                <>
-                    <TableHead>Nom</TableHead>
-                    <TableHead>Adresse</TableHead>
-                </>
-              )}
+              <TableHead>Nom</TableHead>
+              <TableHead>Adresse</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -76,24 +64,13 @@ function TiersTable({ tiers, type }: { tiers: Tier[], type: string }) {
               tiers.map((tier) => (
                 <TableRow key={tier.id}>
                   <TableCell className="font-medium">{tier.id}</TableCell>
-                   {isVehicle ? (
-                    <>
-                        <TableCell>{tier.immatriculation}</TableCell>
-                        <TableCell>{tier.name}</TableCell> {/* Using name for vehicle type */}
-                        <TableCell>{tier.capacitePalette} palettes</TableCell>
-                        <TableCell>{tier.status}</TableCell>
-                    </>
-                   ) : (
-                    <>
-                        <TableCell>{tier.name}</TableCell>
-                        <TableCell>{tier.address}</TableCell>
-                    </>
-                   )}
+                  <TableCell>{tier.name}</TableCell>
+                  <TableCell>{tier.address}</TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={isVehicle ? 5 : 3} className="h-24 text-center">
+                <TableCell colSpan={3} className="h-24 text-center">
                   Aucun {type.toLowerCase()} trouvé.
                 </TableCell>
               </TableRow>
@@ -117,7 +94,7 @@ export function TiersClient() {
     watch,
     formState: { errors },
   } = useForm<TierFormData>({
-    defaultValues: { name: "", address: "", type: "Client", immatriculation: "", capacitePalette: 0, echeanceControleTechnique: new Date().toISOString().split('T')[0], echeanceAssurance: new Date().toISOString().split('T')[0] },
+    defaultValues: { name: "", address: "", type: "Client" },
   });
   
   const selectedType = watch("type");
@@ -126,7 +103,7 @@ export function TiersClient() {
     dispatch({ type: "ADD_TIER", payload: data });
     toast({
       title: "Tiers ajouté",
-      description: `Le tiers "${data.type === 'Vehicule' ? data.immatriculation : data.name}" a été ajouté avec succès.`,
+      description: `Le tiers "${data.name}" a été ajouté avec succès.`,
     });
     reset();
     setIsDialogOpen(false);
@@ -181,51 +158,21 @@ export function TiersClient() {
                                 <SelectItem value="Client">Client</SelectItem>
                                 <SelectItem value="Fournisseur">Fournisseur</SelectItem>
                                 <SelectItem value="Transporteur">Transporteur</SelectItem>
-                                {currentEnv?.type === 'TMS' && <SelectItem value="Vehicule">Véhicule</SelectItem>}
                             </SelectContent>
                             </Select>
                         )}
                         />
                     </div>
-                     {selectedType === 'Vehicule' ? (
-                        <>
-                           <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="immatriculation" className="text-right">Immat.</Label>
-                                <Controller name="immatriculation" control={control} rules={{ required: "Immatriculation requise" }} render={({ field }) => <Input id="immatriculation" {...field} className="col-span-3" />} />
-                                {errors.immatriculation && <p className="col-span-4 text-right text-xs text-destructive">{errors.immatriculation.message}</p>}
-                            </div>
-                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="name" className="text-right">Type Véhicule</Label>
-                                <Controller name="name" control={control} rules={{ required: "Type requis" }} render={({ field }) => <Input id="name" {...field} placeholder="ex: Porteur 19T" className="col-span-3" />} />
-                                {errors.name && <p className="col-span-4 text-right text-xs text-destructive">{errors.name.message}</p>}
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="capacitePalette" className="text-right">Capacité</Label>
-                                <Controller name="capacitePalette" control={control} rules={{ required: "Capacité requise", valueAsNumber: true }} render={({ field }) => <Input id="capacitePalette" type="number" {...field} className="col-span-3" />} />
-                            </div>
-                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="echeanceControleTechnique" className="text-right">Échéance CT</Label>
-                                <Controller name="echeanceControleTechnique" control={control} render={({ field }) => <Input id="echeanceControleTechnique" type="date" {...field} className="col-span-3" />} />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="echeanceAssurance" className="text-right">Échéance Assurance</Label>
-                                <Controller name="echeanceAssurance" control={control} render={({ field }) => <Input id="echeanceAssurance" type="date" {...field} className="col-span-3" />} />
-                            </div>
-                        </>
-                     ) : (
-                        <>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="name" className="text-right">Nom</Label>
-                                <Controller name="name" control={control} rules={{ required: "Le nom est requis" }} render={({ field }) => <Input id="name" {...field} className="col-span-3" />} />
-                                {errors.name && <p className="col-span-4 text-right text-xs text-destructive">{errors.name.message}</p>}
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="address" className="text-right">Adresse</Label>
-                                <Controller name="address" control={control} rules={{ required: "L'adresse est requise" }} render={({ field }) => <Input id="address" {...field} className="col-span-3" />} />
-                                {errors.address && <p className="col-span-4 text-right text-xs text-destructive">{errors.address.message}</p>}
-                            </div>
-                        </>
-                     )}
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="name" className="text-right">Nom</Label>
+                        <Controller name="name" control={control} rules={{ required: "Le nom est requis" }} render={({ field }) => <Input id="name" {...field} className="col-span-3" />} />
+                        {errors.name && <p className="col-span-4 text-right text-xs text-destructive">{errors.name.message}</p>}
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="address" className="text-right">Adresse</Label>
+                        <Controller name="address" control={control} rules={{ required: "L'adresse est requise" }} render={({ field }) => <Input id="address" {...field} className="col-span-3" />} />
+                        {errors.address && <p className="col-span-4 text-right text-xs text-destructive">{errors.address.message}</p>}
+                    </div>
                     </div>
                     <DialogFooter>
                         <DialogClose asChild><Button variant="ghost">Annuler</Button></DialogClose>
@@ -257,5 +204,3 @@ export function TiersClient() {
     </Card>
   );
 }
-
-    
