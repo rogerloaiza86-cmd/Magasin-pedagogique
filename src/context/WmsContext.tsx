@@ -256,7 +256,8 @@ type WmsAction =
   | { type: 'SAVE_SCENARIO_TEMPLATE'; payload: Omit<ScenarioTemplate, 'id' | 'createdBy' | 'environnementId'> & { id?: number } }
   | { type: 'DELETE_SCENARIO_TEMPLATE'; payload: { templateId: number } }
   | { type: 'LAUNCH_SCENARIO', payload: { templateId: number, classId: number } }
-  | { type: 'GENERATE_DATA'; payload: { environnementId: string, articles: number, clients: number, suppliers: number } }
+  | { type: 'GENERATE_ARTICLES_BATCH'; payload: { articles: Omit<Article, 'environnementId' | 'status'>[] } }
+  | { type: 'RESET_ARTICLES'; payload: { environnementId: string } }
   | { type: 'START_MAINTENANCE'; payload: { vehiculeId: number, notes: string } }
   | { type: 'FINISH_MAINTENANCE'; payload: { maintenanceId: number } }
   | { type: 'SET_STATE'; payload: WmsState }
@@ -879,73 +880,55 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         };
         break;
     }
-    case 'GENERATE_DATA': {
-        if (!state.currentUserPermissions?.isSuperAdmin || !state.currentUser) return state;
-        const { environnementId, articles, clients, suppliers } = action.payload;
-        const newArticles = new Map(state.articles);
-        const newTiers = new Map(state.tiers);
+    case 'GENERATE_ARTICLES_BATCH': {
+        if (!state.currentUserPermissions?.canManageStock || !state.currentUser) return state;
+        const newArticlesMap = new Map(state.articles);
         const newMovements = [...state.movements];
-        let movementIdCounter = state.movementIdCounter;
-        let tierIdCounter = state.tierIdCounter;
+        let newMovementIdCounter = state.movementIdCounter;
 
-        for (let i = 0; i < articles; i++) {
-            const newArticle: Article = {
-                id: `SKU-${environnementId.substring(0,4).toUpperCase()}-${faker.string.alphanumeric(6).toUpperCase()}`,
-                name: faker.commerce.productName(),
-                location: `${faker.string.alpha(1).toUpperCase()}.${faker.number.int({min:1, max:3})}.${faker.number.int({min:1, max:6})}.${faker.string.alpha(1).toUpperCase()}`,
-                packaging: 'PIEC',
-                price: parseFloat(faker.commerce.price()),
-                stock: faker.number.int({ min: 50, max: 1000 }),
-                environnementId,
-                status: 'Actif',
-            };
-            newArticles.set(newArticle.id, newArticle);
-            newMovements.push({
-                id: movementIdCounter++,
-                articleId: newArticle.id,
-                quantity: newArticle.stock,
-                stockAfter: newArticle.stock,
-                timestamp: new Date().toISOString(),
-                type: 'Génération',
-                user: 'Système',
-                environnementId,
-            })
-        }
-        
-        for (let i = 0; i < clients; i++) {
-             const newClient: Tier = {
-                id: tierIdCounter++,
-                name: faker.company.name(),
-                address: `${faker.location.streetAddress()}, ${faker.location.zipCode()} ${faker.location.city()}`,
-                type: 'Client',
-                createdBy: state.currentUser.username,
-                createdAt: new Date().toISOString(),
-                environnementId,
-             };
-             newTiers.set(newClient.id, newClient);
-        }
-        
-        for (let i = 0; i < suppliers; i++) {
-             const newSupplier: Tier = {
-                id: tierIdCounter++,
-                name: faker.company.name(),
-                address: `${faker.location.streetAddress()}, ${faker.location.zipCode()} ${faker.location.city()}`,
-                type: 'Fournisseur',
-                createdBy: state.currentUser.username,
-                createdAt: new Date().toISOString(),
-                environnementId,
-             };
-             newTiers.set(newSupplier.id, newSupplier);
-        }
+        action.payload.articles.forEach(articleData => {
+            if (!newArticlesMap.has(articleData.id)) {
+                const newArticle: Article = {
+                    ...articleData,
+                    status: 'Actif',
+                    environnementId: state.currentEnvironmentId,
+                };
+                newArticlesMap.set(articleData.id, newArticle);
 
-        newState = { 
-            ...state, 
-            articles: newArticles, 
-            tiers: newTiers, 
+                if (newArticle.stock > 0) {
+                    newMovements.push({
+                        id: newMovementIdCounter++,
+                        timestamp: new Date().toISOString(),
+                        articleId: newArticle.id,
+                        type: 'Génération',
+                        quantity: newArticle.stock,
+                        stockAfter: newArticle.stock,
+                        user: state.currentUser!.username,
+                        environnementId: state.currentEnvironmentId,
+                    });
+                }
+            }
+        });
+        newState = {
+            ...state,
+            articles: newArticlesMap,
             movements: newMovements,
-            movementIdCounter,
-            tierIdCounter,
+            movementIdCounter: newMovementIdCounter
         };
+        break;
+    }
+    case 'RESET_ARTICLES': {
+        if (!state.currentUserPermissions?.canManageStock) return state;
+        const { environnementId } = action.payload;
+        const newArticles = new Map(state.articles);
+        const newMovements = state.movements.filter(m => m.environnementId !== environnementId);
+        
+        state.articles.forEach((article, key) => {
+            if (article.environnementId === environnementId) {
+                newArticles.delete(key);
+            }
+        });
+        newState = { ...state, articles: newArticles, movements: newMovements };
         break;
     }
     case 'START_MAINTENANCE': {

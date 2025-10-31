@@ -25,11 +25,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import type { Article, Movement } from "@/lib/types";
+import type { Article } from "@/lib/types";
 import { Badge } from "../ui/badge";
-import { PlusCircle, Download } from "lucide-react";
-import { faker } from "@faker-js/faker/locale/fr";
+import { PlusCircle, Download, Wand2, Loader2, Trash2 } from "lucide-react";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { generateFictitiousArticles } from "@/ai/flows/generate-articles-flow";
 
 
 function CreateArticleForm() {
@@ -107,7 +118,7 @@ function CreateArticleForm() {
 }
 
 function ViewStock() {
-  const { state, getArticle } = useWms();
+  const { state } = useWms();
   const { currentEnvironmentId } = state;
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedArticleId, setSelectedArticleId] = useState<string>("");
@@ -119,13 +130,13 @@ function ViewStock() {
   
   const filteredArticles = useMemo(() =>
     allArticles.filter(article =>
-      article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      !searchTerm || article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       article.id.toLowerCase().includes(searchTerm.toLowerCase())
     ),
     [allArticles, searchTerm]
   );
   
-  const selectedArticle = selectedArticleId ? getArticle(selectedArticleId) : null;
+  const selectedArticle = selectedArticleId ? state.articles.get(selectedArticleId) : null;
 
   return (
     <Card>
@@ -191,8 +202,8 @@ function ViewMovements() {
   
   const filteredArticles = useMemo(() =>
     allArticles.filter(article =>
-      article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      article.id.toLowerCase().includes(searchTerm.toLowerCase())
+        !searchTerm || article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        article.id.toLowerCase().includes(searchTerm.toLowerCase())
     ),
     [allArticles, searchTerm]
   );
@@ -263,7 +274,7 @@ function ViewMovements() {
 }
 
 function AdjustInventory() {
-    const { state, dispatch, getArticle } = useWms();
+    const { state, dispatch } = useWms();
     const { toast } = useToast();
     const { currentEnvironmentId } = state;
     const [searchTerm, setSearchTerm] = useState("");
@@ -275,7 +286,7 @@ function AdjustInventory() {
 
     const filteredArticles = useMemo(() =>
         allArticles.filter(article =>
-        article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        !searchTerm || article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         article.id.toLowerCase().includes(searchTerm.toLowerCase())
         ),
         [allArticles, searchTerm]
@@ -287,10 +298,10 @@ function AdjustInventory() {
     
     const selectedArticleId = watch("articleId");
     const physicalStock = watch("physicalStock");
-    const article = selectedArticleId ? getArticle(selectedArticleId) : null;
+    const article = selectedArticleId ? state.articles.get(selectedArticleId) : null;
     
     const onSubmit = (data: {articleId: string, physicalStock: number | string}) => {
-        const articleToAdjust = getArticle(data.articleId);
+        const articleToAdjust = state.articles.get(data.articleId);
         if (articleToAdjust) {
             const countedStock = Number(data.physicalStock);
             if (isNaN(countedStock)) {
@@ -392,58 +403,112 @@ function AdjustInventory() {
 }
 
 function GenerateFictitiousData() {
+    const { dispatch, state } = useWms();
     const { toast } = useToast();
+    const [isLoading, setIsLoading] = useState(false);
+    const [sector, setSector] = useState("");
+    const { currentUserPermissions, currentEnvironmentId } = state;
 
-    const generateAndDownloadCsv = () => {
-        const headers = ["id", "name", "location", "stock", "price", "packaging", "status"];
-        let csvContent = headers.join(",") + "\n";
+    const sectors = [
+        "Mode, Habillement et Chaussures",
+        "Produits Électroniques et High-Tech",
+        "Maison, Mobilier et Décoration",
+        "Alimentation et Produits de Grande Consommation (PGC)",
+        "Santé, Hygiène et Beauté",
+        "Produits Culturels",
+    ];
 
-        for (let i = 0; i < 50; i++) {
-            const row = [
-                `SKU-FICTIF-${faker.string.alphanumeric(6).toUpperCase()}`,
-                `"${faker.commerce.productName().replace(/"/g, '""')}"`,
-                `${faker.string.alpha(1).toUpperCase()}.${faker.number.int({min:1, max:10})}.${faker.number.int({min:1, max:6})}.${faker.string.alpha(1).toUpperCase()}`,
-                faker.number.int({ min: 10, max: 2000 }),
-                parseFloat(faker.commerce.price()),
-                "PIEC",
-                "Actif"
-            ];
-            csvContent += row.join(",") + "\n";
+    const handleGenerate = async () => {
+        if (!sector) {
+            toast({
+                variant: "destructive",
+                title: "Aucun secteur sélectionné",
+                description: "Veuillez choisir un secteur d'activité."
+            });
+            return;
         }
-
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        if (link.download !== undefined) {
-            const url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", "stock-fictif.csv");
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+        setIsLoading(true);
+        try {
+            const result = await generateFictitiousArticles({ sector });
+            if (result.articles && result.articles.length > 0) {
+                dispatch({ type: 'GENERATE_ARTICLES_BATCH', payload: { articles: result.articles } });
+                toast({
+                    title: "Articles générés avec succès",
+                    description: `${result.articles.length} articles pour le secteur "${sector}" ont été ajoutés.`
+                });
+            }
+        } catch (error) {
+            console.error("AI data generation failed:", error);
+            toast({
+                variant: "destructive",
+                title: "Erreur de l'IA",
+                description: "La génération des articles a échoué. Veuillez réessayer."
+            });
+        } finally {
+            setIsLoading(false);
         }
-        
-        toast({
-            title: "Téléchargement lancé",
-            description: "Le fichier stock-fictif.csv a été généré."
-        })
     };
+    
+    const handleReset = () => {
+        dispatch({ type: 'RESET_ARTICLES', payload: { environnementId: currentEnvironmentId } });
+        toast({
+            variant: "destructive",
+            title: "Articles réinitialisés",
+            description: `Tous les articles de l'environnement actuel ont été supprimés.`
+        });
+    }
+
+    if (!currentUserPermissions?.isSuperAdmin && currentUserPermissions?.profile !== 'professeur') {
+        return null; // Only teachers and super admins can see this
+    }
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Génération de Données Fictives</CardTitle>
+                <CardTitle>Génération de Données par IA</CardTitle>
                 <CardDescription>
-                    Créez un fichier CSV avec 50 articles fictifs que vous pourrez ensuite importer ou utiliser
-                    pour vos scénarios dans cet entrepôt de simulation.
+                    Générez automatiquement un jeu de 20 articles réalistes pour un secteur d'activité afin de peupler l'entrepôt pour vos scénarios.
                 </CardDescription>
             </CardHeader>
-            <CardContent>
-                <Button onClick={generateAndDownloadCsv}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Générer et Télécharger le CSV
-                </Button>
+            <CardContent className="space-y-4">
+                 <div className="space-y-2">
+                    <Label htmlFor="sector-select">Choisissez un secteur d'activité</Label>
+                     <Select onValueChange={setSector} value={sector}>
+                        <SelectTrigger id="sector-select">
+                            <SelectValue placeholder="Sélectionner un secteur..."/>
+                        </SelectTrigger>
+                        <SelectContent>
+                            {sectors.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                 </div>
             </CardContent>
+            <CardFooter className="gap-4">
+                 <Button onClick={handleGenerate} disabled={isLoading || !sector}>
+                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Wand2 className="mr-2 h-4 w-4" />}
+                    Générer les 20 articles
+                </Button>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                         <Button variant="destructive">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Réinitialiser l'environnement
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Êtes-vous absolument sûr(e) ?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Cette action est irréversible. Tous les articles de l'environnement actuel seront définitivement supprimés.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleReset}>Oui, réinitialiser</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </CardFooter>
         </Card>
     )
 }
@@ -469,12 +534,11 @@ export function StockClient() {
   if(perms.canManageStock) {
     tabs.push({ value: "create", label: "Créer un Article" });
     tabs.push({ value: "adjust", label: "Inventaire / Ajustement" });
+    tabs.push({ value: "data", label: "Données de simulation" });
   }
 
   return (
     <div className="space-y-6">
-        {currentEnvironmentId === 'entrepot_fictif_ecommerce' && <GenerateFictitiousData />}
-
         <Tabs defaultValue="view" className="w-full">
         <TabsList className={`grid w-full grid-cols-${tabs.length}`}>
             {tabs.map(tab => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
@@ -487,6 +551,7 @@ export function StockClient() {
         </TabsContent>
         {perms.canManageStock && <TabsContent value="create"><CreateArticleForm /></TabsContent>}
         {perms.canManageStock && <TabsContent value="adjust"><AdjustInventory /></TabsContent>}
+        {perms.canManageStock && <TabsContent value="data"><GenerateFictitiousData /></TabsContent>}
         </Tabs>
     </div>
   );
