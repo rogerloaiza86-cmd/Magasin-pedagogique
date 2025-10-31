@@ -2,7 +2,7 @@
 "use client";
 
 import { useWms } from "@/context/WmsContext";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -29,7 +29,8 @@ import type { Article, Movement } from "@/lib/types";
 import { Badge } from "../ui/badge";
 import { PlusCircle, Download } from "lucide-react";
 import { faker } from "@faker-js/faker/locale/fr";
-import { ArticleCombobox } from "../shared/ArticleCombobox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+
 
 function CreateArticleForm() {
     const { dispatch } = useWms();
@@ -108,8 +109,22 @@ function CreateArticleForm() {
 function ViewStock() {
   const { state, getArticle } = useWms();
   const { currentEnvironmentId } = state;
-  const articlesInEnv = Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId);
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedArticleId, setSelectedArticleId] = useState<string>("");
+  
+  const allArticles = useMemo(() =>
+    Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId),
+    [state.articles, currentEnvironmentId]
+  );
+  
+  const filteredArticles = useMemo(() =>
+    allArticles.filter(article =>
+      article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      article.id.toLowerCase().includes(searchTerm.toLowerCase())
+    ),
+    [allArticles, searchTerm]
+  );
+  
   const selectedArticle = selectedArticleId ? getArticle(selectedArticleId) : null;
 
   return (
@@ -118,15 +133,28 @@ function ViewStock() {
         <CardTitle>Consulter le stock d'un article</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-end gap-2">
-            <div className="flex-grow">
-                <Label>Article</Label>
-                <ArticleCombobox
-                    articles={articlesInEnv}
-                    value={selectedArticleId}
-                    onChange={setSelectedArticleId}
-                />
-            </div>
+        <div className="space-y-2">
+            <Label>Rechercher un article</Label>
+             <Input
+                placeholder="Entrez un nom ou une référence..."
+                value={searchTerm}
+                onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setSelectedArticleId("");
+                }}
+            />
+            <Select onValueChange={setSelectedArticleId} value={selectedArticleId}>
+                <SelectTrigger>
+                    <SelectValue placeholder="Sélectionnez un article dans la liste filtrée..." />
+                </SelectTrigger>
+                <SelectContent>
+                    {filteredArticles.map(article => (
+                        <SelectItem key={article.id} value={article.id}>
+                            {article.name} ({article.id})
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
         </div>
 
         {selectedArticle && (
@@ -153,8 +181,22 @@ function ViewStock() {
 function ViewMovements() {
   const { state } = useWms();
   const { currentEnvironmentId } = state;
-  const articlesInEnv = Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId);
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedArticleId, setSelectedArticleId] = useState<string>("");
+
+  const allArticles = useMemo(() =>
+    Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId),
+    [state.articles, currentEnvironmentId]
+  );
+  
+  const filteredArticles = useMemo(() =>
+    allArticles.filter(article =>
+      article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      article.id.toLowerCase().includes(searchTerm.toLowerCase())
+    ),
+    [allArticles, searchTerm]
+  );
+
   const movements = state.movements.filter(m => m.articleId === selectedArticleId && m.environnementId === currentEnvironmentId).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   return (
@@ -163,15 +205,28 @@ function ViewMovements() {
         <CardTitle>Consulter les mouvements d'un article</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-end gap-2">
-            <div className="flex-grow">
-                 <Label>Article</Label>
-                 <ArticleCombobox
-                    articles={articlesInEnv}
-                    value={selectedArticleId}
-                    onChange={setSelectedArticleId}
-                 />
-            </div>
+        <div className="space-y-2">
+            <Label>Rechercher un article</Label>
+            <Input
+                placeholder="Entrez un nom ou une référence..."
+                value={searchTerm}
+                onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setSelectedArticleId("");
+                }}
+            />
+            <Select onValueChange={setSelectedArticleId} value={selectedArticleId}>
+                <SelectTrigger>
+                    <SelectValue placeholder="Sélectionnez un article pour voir ses mouvements..." />
+                </SelectTrigger>
+                <SelectContent>
+                    {filteredArticles.map(article => (
+                        <SelectItem key={article.id} value={article.id}>
+                            {article.name} ({article.id})
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
         </div>
 
         {selectedArticleId && (
@@ -211,10 +266,25 @@ function AdjustInventory() {
     const { state, dispatch, getArticle } = useWms();
     const { toast } = useToast();
     const { currentEnvironmentId } = state;
-    const articlesInEnv = Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId);
+    const [searchTerm, setSearchTerm] = useState("");
+
+    const allArticles = useMemo(() =>
+        Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId),
+        [state.articles, currentEnvironmentId]
+    );
+
+    const filteredArticles = useMemo(() =>
+        allArticles.filter(article =>
+        article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        article.id.toLowerCase().includes(searchTerm.toLowerCase())
+        ),
+        [allArticles, searchTerm]
+    );
+    
     const { control, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm<{articleId: string, physicalStock: number | string}>({
         defaultValues: { articleId: "", physicalStock: "" }
     });
+    
     const selectedArticleId = watch("articleId");
     const physicalStock = watch("physicalStock");
     const article = selectedArticleId ? getArticle(selectedArticleId) : null;
@@ -258,18 +328,34 @@ function AdjustInventory() {
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
       <CardContent className="space-y-4">
-        <div className="flex-grow">
-            <Label>Article</Label>
+        <div className="space-y-2">
+            <Label>Rechercher un article</Label>
+            <Input
+                placeholder="Entrez un nom ou une référence..."
+                value={searchTerm}
+                onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setValue("articleId", "");
+                    setValue("physicalStock", "");
+                }}
+            />
             <Controller
                 name="articleId"
                 control={control}
                 rules={{ required: "Veuillez sélectionner un article." }}
                 render={({ field }) => (
-                    <ArticleCombobox
-                        articles={articlesInEnv}
-                        value={field.value}
-                        onChange={(value) => { field.onChange(value); setValue('physicalStock', ''); }}
-                    />
+                    <Select onValueChange={(value) => { field.onChange(value); setValue('physicalStock', ''); }} value={field.value}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Sélectionnez un article dans la liste filtrée..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {filteredArticles.map(article => (
+                                <SelectItem key={article.id} value={article.id}>
+                                    {article.name} ({article.id})
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 )}
             />
             {errors.articleId && <p className="text-sm text-destructive mt-1">{errors.articleId.message}</p>}

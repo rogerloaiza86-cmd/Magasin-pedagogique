@@ -3,7 +3,7 @@
 
 import { useWms } from "@/context/WmsContext";
 import { optimizePickingRoute } from "@/ai/flows/optimize-picking-route";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import {
   Card,
@@ -46,7 +46,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Article, Document as WmsDocument } from "@/lib/types";
-import { ArticleCombobox } from "../shared/ArticleCombobox";
 
 
 type DeliveryNoteFormData = {
@@ -58,8 +57,22 @@ function CreateDeliveryNote() {
   const { state, dispatch, getArticle } = useWms();
   const { toast } = useToast();
   const { currentUser, currentEnvironmentId } = state;
+  const [searchTerm, setSearchTerm] = useState("");
+
   const clients = Array.from(state.tiers.values()).filter((t) => t.type === "Client" && t.createdBy === currentUser?.username && t.environnementId === currentEnvironmentId);
-  const articles = Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId);
+  
+  const allArticles = useMemo(() => 
+    Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId && a.stock > 0),
+    [state.articles, currentEnvironmentId]
+  );
+  
+  const filteredArticles = useMemo(() =>
+    allArticles.filter(article =>
+        article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        article.id.toLowerCase().includes(searchTerm.toLowerCase())
+    ),
+    [allArticles, searchTerm]
+  );
 
   const { control, handleSubmit, reset, watch, setError, clearErrors, formState: { errors } } =
     useForm<DeliveryNoteFormData>({
@@ -151,6 +164,12 @@ function CreateDeliveryNote() {
 
           <div className="space-y-4">
             <Label>Articles</Label>
+             <Input
+              placeholder="Rechercher un article par nom ou référence..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="mb-2"
+            />
             {fields.map((field, index) => {
               const article = getArticle(watchedLines[index]?.articleId);
               return (
@@ -158,11 +177,12 @@ function CreateDeliveryNote() {
                 <div className="flex-1">
                   <Controller name={`lines.${index}.articleId`} control={control} rules={{ required: "Article requis."}}
                     render={({ field }) => (
-                        <ArticleCombobox
-                            articles={articles.filter(a => a.stock > 0)}
-                            value={field.value}
-                            onChange={(value) => { field.onChange(value); clearErrors(`lines.${index}.quantity`); }}
-                        />
+                        <Select onValueChange={(value) => { field.onChange(value); clearErrors(`lines.${index}.quantity`); }} value={field.value}>
+                            <SelectTrigger><SelectValue placeholder="Sélectionner un article..."/></SelectTrigger>
+                            <SelectContent>
+                                {filteredArticles.map(a => <SelectItem key={a.id} value={a.id}>{a.name} (Stock: {a.stock})</SelectItem>)}
+                            </SelectContent>
+                        </Select>
                     )}
                   />
                   {errors.lines?.[index]?.articleId && <p className="text-sm text-destructive mt-1">{errors.lines[index]?.articleId?.message}</p>}

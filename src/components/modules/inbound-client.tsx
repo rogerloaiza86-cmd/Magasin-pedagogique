@@ -3,7 +3,7 @@
 
 import { useWms } from "@/context/WmsContext";
 import { Article, Document, DocumentLine, Tier, ReturnReason, ReturnDecision } from "@/lib/types";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import {
   Card,
@@ -56,7 +56,6 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
-import { ArticleCombobox } from "../shared/ArticleCombobox";
 
 
 type PurchaseOrderFormData = {
@@ -101,11 +100,25 @@ function CreatePurchaseOrder() {
   const { state, dispatch, getArticle } = useWms();
   const { toast } = useToast();
   const { currentUser, currentEnvironmentId } = state;
+  const [searchTerm, setSearchTerm] = useState("");
 
   const suppliers = Array.from(state.tiers.values()).filter(
     (t) => t.type === "Fournisseur" && t.createdBy === currentUser?.username && t.environnementId === currentEnvironmentId
   );
-  const articles = Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId);
+  
+  const allArticles = useMemo(() => 
+    Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId),
+    [state.articles, currentEnvironmentId]
+  );
+  
+  const filteredArticles = useMemo(() =>
+    allArticles.filter(article =>
+        article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        article.id.toLowerCase().includes(searchTerm.toLowerCase())
+    ),
+    [allArticles, searchTerm]
+  );
+
 
   const {
     control,
@@ -180,6 +193,12 @@ function CreatePurchaseOrder() {
 
           <div className="space-y-4">
             <Label>Articles</Label>
+            <Input
+              placeholder="Rechercher un article par nom ou référence..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="mb-2"
+            />
             {fields.map((field, index) => {
               const article = getArticle(watchedLines[index]?.articleId);
               return (
@@ -190,11 +209,18 @@ function CreatePurchaseOrder() {
                       control={control}
                       rules={{ required: "Article requis."}}
                       render={({ field }) => (
-                         <ArticleCombobox
-                            articles={articles}
-                            value={field.value}
-                            onChange={field.onChange}
-                         />
+                         <Select onValueChange={field.onChange} value={field.value}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Sélectionner un article..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {filteredArticles.map(article => (
+                                    <SelectItem key={article.id} value={article.id}>
+                                        {article.name} ({article.id})
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                         </Select>
                       )}
                     />
                   {errors.lines?.[index]?.articleId && <p className="text-sm text-destructive mt-1">{errors.lines[index]?.articleId?.message}</p>}
@@ -424,6 +450,7 @@ function CustomerReturns() {
     const [isProcessDialogOpen, setIsProcessDialogOpen] = useState<Document | null>(null);
     const returnReasons: ReturnReason[] = ["Erreur de commande", "Article défectueux", "Endommagé au transport", "Autre"];
     const returnDecisions: ReturnDecision[] = ["Réintégrer en stock", "Mettre au rebut"];
+    const [searchTerm, setSearchTerm] = useState("");
 
     const { control: createControl, handleSubmit: handleCreateSubmit, reset: resetCreate, formState: { errors: createErrors } } = useForm<ReturnFormData>({
         defaultValues: { clientId: "", lines: [{ articleId: "", quantity: 1, returnReason: "Autre" }] }
@@ -433,7 +460,20 @@ function CustomerReturns() {
     const { control: processControl, handleSubmit: handleProcessSubmit, reset: resetProcess, watch: watchProcess } = useForm<ProcessReturnFormData>();
 
     const clients = Array.from(state.tiers.values()).filter(t => t.type === 'Client' && t.environnementId === currentEnvironmentId);
-    const articles = Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId);
+    
+    const allArticles = useMemo(() => 
+        Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId),
+        [state.articles, currentEnvironmentId]
+    );
+
+    const filteredArticles = useMemo(() =>
+        allArticles.filter(article =>
+            article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            article.id.toLowerCase().includes(searchTerm.toLowerCase())
+        ),
+        [allArticles, searchTerm]
+    );
+
     const pendingReturns = Array.from(documents.values()).filter(d => d.type === 'Retour Client' && d.status === 'En attente de traitement' && d.environnementId === currentEnvironmentId);
 
     const onCreateSubmit = (data: ReturnFormData) => {
@@ -526,16 +566,23 @@ function CustomerReturns() {
                                 )}/>
                             </div>
                             <Label>Articles Retournés</Label>
+                            <Input
+                                placeholder="Rechercher un article..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="mb-2"
+                            />
                              {createFields.map((field, index) => (
                                 <div key={field.id} className="grid grid-cols-3 items-end gap-2 p-2 border rounded-lg">
                                     <div className="col-span-3 sm:col-span-2">
                                         <Label>Article</Label>
                                         <Controller name={`lines.${index}.articleId`} control={createControl} rules={{ required: true }} render={({ field }) => (
-                                            <ArticleCombobox
-                                                articles={articles}
-                                                value={field.value}
-                                                onChange={field.onChange}
-                                            />
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <SelectTrigger><SelectValue placeholder="Sélectionner..."/></SelectTrigger>
+                                                <SelectContent>
+                                                    {filteredArticles.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
                                         )}/>
                                     </div>
                                     <div className="col-span-2 sm:col-span-1">
