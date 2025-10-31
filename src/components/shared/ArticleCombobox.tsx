@@ -54,6 +54,9 @@ export function ArticleCombobox({ articles, value, onChange, disabled }: Article
         </Button>
       </DialogTrigger>
       <DialogContent className="p-0">
+        <DialogHeader>
+          <DialogTitle className="sr-only">Sélectionner un article</DialogTitle>
+        </DialogHeader>
         <Command>
           <CommandInput placeholder="Rechercher un article..." />
           <CommandList>
