@@ -56,6 +56,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
+import { ArticleCombobox } from "../shared/ArticleCombobox";
 
 
 type PurchaseOrderFormData = {
@@ -189,18 +190,11 @@ function CreatePurchaseOrder() {
                       control={control}
                       rules={{ required: "Article requis."}}
                       render={({ field }) => (
-                         <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Choisir un article..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {articles.map(article => (
-                                    <SelectItem key={article.id} value={article.id} disabled={article.stock <= 0}>
-                                        {article.name} ({article.id}) - Stock: {article.stock}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                         <ArticleCombobox
+                            articles={articles}
+                            value={field.value}
+                            onChange={field.onChange}
+                         />
                       )}
                     />
                   {errors.lines?.[index]?.articleId && <p className="text-sm text-destructive mt-1">{errors.lines[index]?.articleId?.message}</p>}
@@ -423,7 +417,7 @@ function ReceivePurchaseOrder() {
 }
 
 function CustomerReturns() {
-    const { state, dispatch, getTier } = useWms();
+    const { state, dispatch, getTier, getArticle } = useWms();
     const { toast } = useToast();
     const { currentUser, currentEnvironmentId, documents } = state;
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -537,18 +531,11 @@ function CustomerReturns() {
                                     <div className="col-span-3 sm:col-span-2">
                                         <Label>Article</Label>
                                         <Controller name={`lines.${index}.articleId`} control={createControl} rules={{ required: true }} render={({ field }) => (
-                                            <Select onValueChange={field.onChange} value={field.value}>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Choisir un article..." />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {articles.map(article => (
-                                                        <SelectItem key={article.id} value={article.id}>
-                                                            {article.name} ({article.id})
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
+                                            <ArticleCombobox
+                                                articles={articles}
+                                                value={field.value}
+                                                onChange={field.onChange}
+                                            />
                                         )}/>
                                     </div>
                                     <div className="col-span-2 sm:col-span-1">

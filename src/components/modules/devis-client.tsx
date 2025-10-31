@@ -135,7 +135,10 @@ function DevisForm({ onSave, onCancel }: { onSave: (data: Document) => void, onC
                  <div>
                     <Label htmlFor="tierId">Client</Label>
                     <Controller name="tierId" control={control} rules={{ required: "Client requis" }} render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue placeholder="Choisir un client..."/></SelectTrigger><SelectContent>{clients.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent></Select>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                            <SelectTrigger><SelectValue placeholder="Choisir un client..."/></SelectTrigger>
+                            <SelectContent>{clients.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent>
+                        </Select>
                     )} />
                      {errors.tierId && <p className="text-destructive text-sm mt-1">{errors.tierId.message}</p>}
                 </div>
@@ -278,3 +281,4 @@ export function DevisClient() {
     </>
   );
 }
+

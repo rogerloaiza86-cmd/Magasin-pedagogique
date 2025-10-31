@@ -29,7 +29,7 @@ import type { Article, Movement } from "@/lib/types";
 import { Badge } from "../ui/badge";
 import { PlusCircle, Download } from "lucide-react";
 import { faker } from "@faker-js/faker/locale/fr";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { ArticleCombobox } from "../shared/ArticleCombobox";
 
 function CreateArticleForm() {
     const { dispatch } = useWms();
@@ -121,18 +121,11 @@ function ViewStock() {
         <div className="flex items-end gap-2">
             <div className="flex-grow">
                 <Label>Article</Label>
-                <Select onValueChange={setSelectedArticleId} value={selectedArticleId}>
-                    <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner un article..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {articlesInEnv.map(article => (
-                            <SelectItem key={article.id} value={article.id}>
-                                {article.name} ({article.id})
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <ArticleCombobox
+                    articles={articlesInEnv}
+                    value={selectedArticleId}
+                    onChange={setSelectedArticleId}
+                />
             </div>
         </div>
 
@@ -173,18 +166,11 @@ function ViewMovements() {
         <div className="flex items-end gap-2">
             <div className="flex-grow">
                  <Label>Article</Label>
-                 <Select onValueChange={setSelectedArticleId} value={selectedArticleId}>
-                    <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner un article..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {articlesInEnv.map(article => (
-                            <SelectItem key={article.id} value={article.id}>
-                                {article.name} ({article.id})
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                 <ArticleCombobox
+                    articles={articlesInEnv}
+                    value={selectedArticleId}
+                    onChange={setSelectedArticleId}
+                 />
             </div>
         </div>
 
@@ -279,18 +265,11 @@ function AdjustInventory() {
                 control={control}
                 rules={{ required: "Veuillez sélectionner un article." }}
                 render={({ field }) => (
-                    <Select onValueChange={(value) => { field.onChange(value); setValue('physicalStock', ''); }} value={field.value}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner un article..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {articlesInEnv.map(article => (
-                                <SelectItem key={article.id} value={article.id}>
-                                    {article.name} ({article.id})
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <ArticleCombobox
+                        articles={articlesInEnv}
+                        value={field.value}
+                        onChange={(value) => { field.onChange(value); setValue('physicalStock', ''); }}
+                    />
                 )}
             />
             {errors.articleId && <p className="text-sm text-destructive mt-1">{errors.articleId.message}</p>}
