@@ -537,12 +537,10 @@ export function StockClient() {
     tabs.push({ value: "data", label: "Données de simulation" });
   }
 
-  const gridCols = `grid-cols-${tabs.length}`;
-
   return (
     <div className="space-y-6">
         <Tabs defaultValue="view" className="w-full">
-            <TabsList className={`grid w-full ${gridCols}`}>
+            <TabsList className="h-auto flex-wrap justify-start">
                 {tabs.map(tab => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
             </TabsList>
             <TabsContent value="view">
