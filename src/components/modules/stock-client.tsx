@@ -110,6 +110,7 @@ function ViewStock() {
   const { currentEnvironmentId } = state;
   const articlesInEnv = Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId);
   const [selectedArticleId, setSelectedArticleId] = useState<string>("");
+  const [comboboxOpen, setComboboxOpen] = useState(false);
   const selectedArticle = selectedArticleId ? getArticle(selectedArticleId) : null;
 
   return (
@@ -126,6 +127,8 @@ function ViewStock() {
                     value={selectedArticleId}
                     onSelect={setSelectedArticleId}
                     disableZeroStock={false}
+                    open={comboboxOpen}
+                    setOpen={setComboboxOpen}
                 />
             </div>
         </div>
@@ -156,6 +159,7 @@ function ViewMovements() {
   const { currentEnvironmentId } = state;
   const articlesInEnv = Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId);
   const [selectedArticleId, setSelectedArticleId] = useState<string>("");
+  const [comboboxOpen, setComboboxOpen] = useState(false);
   const movements = state.movements.filter(m => m.articleId === selectedArticleId && m.environnementId === currentEnvironmentId).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   return (
@@ -172,6 +176,8 @@ function ViewMovements() {
                     value={selectedArticleId}
                     onSelect={setSelectedArticleId}
                     disableZeroStock={false}
+                    open={comboboxOpen}
+                    setOpen={setComboboxOpen}
                 />
             </div>
         </div>
@@ -214,6 +220,7 @@ function AdjustInventory() {
     const { toast } = useToast();
     const { currentEnvironmentId } = state;
     const articlesInEnv = Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId);
+    const [comboboxOpen, setComboboxOpen] = useState(false);
     const { control, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm<{articleId: string, physicalStock: number | string}>({
         defaultValues: { articleId: "", physicalStock: "" }
     });
@@ -275,6 +282,8 @@ function AdjustInventory() {
                             setValue('physicalStock', '');
                         }}
                         disableZeroStock={false}
+                        open={comboboxOpen}
+                        setOpen={setComboboxOpen}
                     />
                 )}
             />

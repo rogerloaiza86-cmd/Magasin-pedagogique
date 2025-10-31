@@ -20,8 +20,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 
-export function ArticleCombobox({ articles, value, onSelect, placeholder, disabled = false, disableZeroStock = true }: { articles: Article[], value: string, onSelect: (value: string) => void, placeholder?: string, disabled?: boolean, disableZeroStock?: boolean }) {
-    const [open, setOpen] = React.useState(false)
+export function ArticleCombobox({ articles, value, onSelect, placeholder, disabled = false, disableZeroStock = true, open, setOpen }: { articles: Article[], value: string, onSelect: (value: string) => void, placeholder?: string, disabled?: boolean, disableZeroStock?: boolean, open: boolean, setOpen: (open: boolean) => void }) {
     const selectedArticle = articles.find(a => a.id === value);
 
     return (
@@ -51,8 +50,6 @@ export function ArticleCombobox({ articles, value, onSelect, placeholder, disabl
                                     key={article.id}
                                     value={`${article.id} ${article.name}`}
                                     onSelect={(currentValue) => {
-                                        // The value from onSelect is the command's value, which is "id name"
-                                        // We need to find the article that corresponds to it to get the pure ID
                                         const selected = articles.find(a => `${a.id} ${a.name}`.toLowerCase() === currentValue.toLowerCase());
                                         if (selected) {
                                             onSelect(selected.id === value ? "" : selected.id)
