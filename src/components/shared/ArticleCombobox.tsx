@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState } from "react"
+import * as React from "react"
 import { Check, ChevronsUpDown } from "lucide-react"
 import type { Article } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/popover"
 
 export function ArticleCombobox({ articles, value, onSelect, placeholder, disabled = false, disableZeroStock = true }: { articles: Article[], value: string, onSelect: (value: string) => void, placeholder?: string, disabled?: boolean, disableZeroStock?: boolean }) {
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = React.useState(false)
     const selectedArticle = articles.find(a => a.id === value);
 
     return (
@@ -50,11 +50,16 @@ export function ArticleCombobox({ articles, value, onSelect, placeholder, disabl
                                 <CommandItem
                                     key={article.id}
                                     value={`${article.id} ${article.name}`}
-                                    onSelect={() => {
-                                        onSelect(article.id)
+                                    onSelect={(currentValue) => {
+                                        // The value from onSelect is the command's value, which is "id name"
+                                        // We need to find the article that corresponds to it to get the pure ID
+                                        const selected = articles.find(a => `${a.id} ${a.name}`.toLowerCase() === currentValue.toLowerCase());
+                                        if (selected) {
+                                            onSelect(selected.id === value ? "" : selected.id)
+                                        }
                                         setOpen(false)
                                     }}
-                                    disabled={disableZeroStock && article.stock === 0}
+                                    disabled={disableZeroStock && article.stock <= 0}
                                 >
                                     <Check
                                         className={cn(
