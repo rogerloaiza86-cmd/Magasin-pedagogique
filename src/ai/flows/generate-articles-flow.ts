@@ -33,34 +33,17 @@ const GenerateFictitiousArticlesOutputSchema = z.object({
 export type GenerateFictitiousArticlesOutput = z.infer<typeof GenerateFictitiousArticlesOutputSchema>;
 
 export async function generateFictitiousArticles(input: GenerateFictitiousArticlesInput): Promise<GenerateFictitiousArticlesOutput> {
-  return generateArticlesFlow(input);
+  // Bypassing the AI call and generating data directly with faker
+  const articles = Array.from({ length: 20 }, () => {
+    const id = `${faker.lorem.word().substring(0,3).toUpperCase()}-${faker.number.int({ min: 1000, max: 9999 })}`;
+    const name = faker.commerce.productName();
+    const location = `${faker.helpers.arrayElement(['A','B','C','D','E','F'])}.${faker.number.int({min:1, max:3})}.${faker.number.int({min:1, max:6})}.${faker.helpers.arrayElement(['A','B','C','D','E','F','G','H'])}`;
+    const stock = faker.number.int({ min: 10, max: 500 });
+    const price = parseFloat(faker.commerce.price({ min: 5, max: 200 }));
+    const packaging = faker.helpers.arrayElement(['PIEC', 'CARTON', 'BOTE', 'PAL', 'KG']);
+    
+    return { id, name, location, stock, price, packaging };
+  });
+
+  return Promise.resolve({ articles });
 }
-
-const prompt = ai.definePrompt({
-  name: 'generateFictitiousArticlesPrompt',
-  input: {schema: GenerateFictitiousArticlesInputSchema},
-  output: {schema: GenerateFictitiousArticlesOutputSchema},
-  prompt: `You are a data generator for a Warehouse Management System (WMS) simulation. Your task is to create a realistic list of 20 fictitious articles for the following business sector: {{{sector}}}.
-
-Each article must have a unique ID (SKU), a name, a warehouse location, an initial stock level, a price, and a packaging type.
-
-Generate exactly 20 articles.
-For warehouse locations, use a format like "A.1.1.A".
-For stock, generate random integers between 10 and 500.
-For packaging, use common logistics terms like 'PIEC', 'CARTON', 'BOTE', 'PAL'.
-For the ID, generate a plausible but fictitious SKU.
-`,
-});
-
-
-const generateArticlesFlow = ai.defineFlow(
-  {
-    name: 'generateArticlesFlow',
-    inputSchema: GenerateFictitiousArticlesInputSchema,
-    outputSchema: GenerateFictitiousArticlesOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
-  }
-);
