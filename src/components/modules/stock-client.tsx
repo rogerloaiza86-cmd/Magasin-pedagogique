@@ -26,10 +26,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import type { Article, Movement } from "@/lib/types";
-import { ArticleCombobox } from "@/components/shared/ArticleCombobox";
 import { Badge } from "../ui/badge";
 import { PlusCircle, Download } from "lucide-react";
 import { faker } from "@faker-js/faker/locale/fr";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 function CreateArticleForm() {
     const { dispatch } = useWms();
@@ -121,12 +121,18 @@ function ViewStock() {
         <div className="flex items-end gap-2">
             <div className="flex-grow">
                 <Label>Article</Label>
-                <ArticleCombobox
-                    articles={articlesInEnv}
-                    value={selectedArticleId}
-                    onSelect={setSelectedArticleId}
-                    disableZeroStock={false}
-                />
+                <Select onValueChange={setSelectedArticleId} value={selectedArticleId}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner un article..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {articlesInEnv.map(article => (
+                            <SelectItem key={article.id} value={article.id}>
+                                {article.name} ({article.id})
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
             </div>
         </div>
 
@@ -167,12 +173,18 @@ function ViewMovements() {
         <div className="flex items-end gap-2">
             <div className="flex-grow">
                  <Label>Article</Label>
-                 <ArticleCombobox
-                    articles={articlesInEnv}
-                    value={selectedArticleId}
-                    onSelect={setSelectedArticleId}
-                    disableZeroStock={false}
-                />
+                 <Select onValueChange={setSelectedArticleId} value={selectedArticleId}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner un article..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {articlesInEnv.map(article => (
+                            <SelectItem key={article.id} value={article.id}>
+                                {article.name} ({article.id})
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
             </div>
         </div>
 
@@ -267,15 +279,18 @@ function AdjustInventory() {
                 control={control}
                 rules={{ required: "Veuillez sélectionner un article." }}
                 render={({ field }) => (
-                     <ArticleCombobox
-                        articles={articlesInEnv}
-                        value={field.value}
-                        onSelect={(value) => {
-                            field.onChange(value);
-                            setValue('physicalStock', '');
-                        }}
-                        disableZeroStock={false}
-                    />
+                    <Select onValueChange={(value) => { field.onChange(value); setValue('physicalStock', ''); }} value={field.value}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner un article..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {articlesInEnv.map(article => (
+                                <SelectItem key={article.id} value={article.id}>
+                                    {article.name} ({article.id})
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 )}
             />
             {errors.articleId && <p className="text-sm text-destructive mt-1">{errors.articleId.message}</p>}
@@ -411,3 +426,5 @@ export function StockClient() {
     </div>
   );
 }
+
+    

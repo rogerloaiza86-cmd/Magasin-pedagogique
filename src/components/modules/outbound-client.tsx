@@ -46,7 +46,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Article, Document as WmsDocument } from "@/lib/types";
-import { ArticleCombobox } from "@/components/shared/ArticleCombobox";
 
 
 type DeliveryNoteFormData = {
@@ -158,12 +157,18 @@ function CreateDeliveryNote() {
                 <div className="flex-1">
                   <Controller name={`lines.${index}.articleId`} control={control} rules={{ required: "Article requis."}}
                     render={({ field }) => (
-                        <ArticleCombobox
-                            articles={articles}
-                            value={field.value}
-                            onSelect={(value) => { field.onChange(value); clearErrors(`lines.${index}.quantity`); }}
-                            placeholder="Choisir un article..."
-                        />
+                        <Select onValueChange={(value) => { field.onChange(value); clearErrors(`lines.${index}.quantity`); }} value={field.value}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Choisir un article..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {articles.map(article => (
+                                    <SelectItem key={article.id} value={article.id} disabled={article.stock <= 0}>
+                                        {article.name} ({article.id}) - Stock: {article.stock}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     )}
                   />
                   {errors.lines?.[index]?.articleId && <p className="text-sm text-destructive mt-1">{errors.lines[index]?.articleId?.message}</p>}
@@ -488,3 +493,5 @@ export function OutboundClient() {
     </Tabs>
   );
 }
+
+    

@@ -55,7 +55,6 @@ import {
   DialogClose,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { ArticleCombobox } from "@/components/shared/ArticleCombobox";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 
 
@@ -185,19 +184,25 @@ function CreatePurchaseOrder() {
               return (
               <div key={field.id} className="flex items-end gap-2 p-2 border rounded-lg">
                 <div className="flex-1">
-                  <Controller
-                    name={`lines.${index}.articleId`}
-                    control={control}
-                    rules={{ required: "Article requis."}}
-                    render={({ field }) => (
-                       <ArticleCombobox
-                          articles={articles}
-                          value={field.value}
-                          onSelect={field.onChange}
-                          placeholder="Choisir un article..."
-                        />
-                    )}
-                  />
+                   <Controller
+                      name={`lines.${index}.articleId`}
+                      control={control}
+                      rules={{ required: "Article requis."}}
+                      render={({ field }) => (
+                         <Select onValueChange={field.onChange} value={field.value}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Choisir un article..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {articles.map(article => (
+                                    <SelectItem key={article.id} value={article.id} disabled={article.stock <= 0}>
+                                        {article.name} ({article.id}) - Stock: {article.stock}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                      )}
+                    />
                   {errors.lines?.[index]?.articleId && <p className="text-sm text-destructive mt-1">{errors.lines[index]?.articleId?.message}</p>}
                 </div>
                 <div className="w-40">
@@ -532,12 +537,18 @@ function CustomerReturns() {
                                     <div className="col-span-3 sm:col-span-2">
                                         <Label>Article</Label>
                                         <Controller name={`lines.${index}.articleId`} control={createControl} rules={{ required: true }} render={({ field }) => (
-                                            <ArticleCombobox
-                                                articles={articles}
-                                                value={field.value}
-                                                onSelect={field.onChange}
-                                                placeholder="Choisir un article..."
-                                            />
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Choisir un article..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {articles.map(article => (
+                                                        <SelectItem key={article.id} value={article.id}>
+                                                            {article.name} ({article.id})
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         )}/>
                                     </div>
                                     <div className="col-span-2 sm:col-span-1">
@@ -752,3 +763,5 @@ export function InboundClient() {
     </Tabs>
   );
 }
+
+    
