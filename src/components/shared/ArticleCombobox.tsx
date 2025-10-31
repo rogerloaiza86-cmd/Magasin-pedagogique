@@ -20,7 +20,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 
-export function ArticleCombobox({ articles, value, onSelect, placeholder, disabled = false, disableZeroStock = true, open, setOpen }: { articles: Article[], value: string, onSelect: (value: string) => void, placeholder?: string, disabled?: boolean, disableZeroStock?: boolean, open: boolean, setOpen: (open: boolean) => void }) {
+export function ArticleCombobox({ articles, value, onSelect, placeholder, disabled = false, disableZeroStock = true }: { articles: Article[], value: string, onSelect: (value: string) => void, placeholder?: string, disabled?: boolean, disableZeroStock?: boolean }) {
+    const [open, setOpen] = React.useState(false);
     const selectedArticle = articles.find(a => a.id === value);
 
     return (
@@ -49,11 +50,8 @@ export function ArticleCombobox({ articles, value, onSelect, placeholder, disabl
                                 <CommandItem
                                     key={article.id}
                                     value={`${article.id} ${article.name}`}
-                                    onSelect={(currentValue) => {
-                                        const selected = articles.find(a => `${a.id} ${a.name}`.toLowerCase() === currentValue.toLowerCase());
-                                        if (selected) {
-                                            onSelect(selected.id === value ? "" : selected.id)
-                                        }
+                                    onSelect={() => {
+                                        onSelect(article.id === value ? "" : article.id)
                                         setOpen(false)
                                     }}
                                     disabled={disableZeroStock && article.stock <= 0}
