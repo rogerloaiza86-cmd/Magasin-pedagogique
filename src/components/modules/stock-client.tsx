@@ -537,24 +537,24 @@ export function StockClient() {
     tabs.push({ value: "data", label: "Données de simulation" });
   }
 
+  const gridCols = `grid-cols-${tabs.length}`;
+
   return (
     <div className="space-y-6">
         <Tabs defaultValue="view" className="w-full">
-        <TabsList className={`grid w-full grid-cols-${tabs.length}`}>
-            {tabs.map(tab => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
-        </TabsList>
-        <TabsContent value="view">
-            <ViewStock />
-        </TabsContent>
-        <TabsContent value="movements">
-            <ViewMovements />
-        </TabsContent>
-        {perms.canManageStock && <TabsContent value="create"><CreateArticleForm /></TabsContent>}
-        {perms.canManageStock && <TabsContent value="adjust"><AdjustInventory /></TabsContent>}
-        {perms.canManageStock && <TabsContent value="data"><GenerateFictitiousData /></TabsContent>}
+            <TabsList className={`grid w-full ${gridCols}`}>
+                {tabs.map(tab => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
+            </TabsList>
+            <TabsContent value="view">
+                <ViewStock />
+            </TabsContent>
+            <TabsContent value="movements">
+                <ViewMovements />
+            </TabsContent>
+            {perms.canManageStock && <TabsContent value="create"><CreateArticleForm /></TabsContent>}
+            {perms.canManageStock && <TabsContent value="adjust"><AdjustInventory /></TabsContent>}
+            {perms.canManageStock && <TabsContent value="data"><GenerateFictitiousData /></TabsContent>}
         </Tabs>
     </div>
   );
 }
-
-    
