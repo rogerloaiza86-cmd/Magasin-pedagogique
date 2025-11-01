@@ -33,7 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useState } from "react";
-import { PlusCircle, Trash2, Swords, Rocket, Play } from "lucide-react";
+import { PlusCircle, Trash2, Swords, Rocket, Play, Globe } from "lucide-react";
 import type { ScenarioTemplate, TaskType } from "@/lib/types";
 import { Badge } from "../ui/badge";
 
@@ -227,7 +227,7 @@ export function ScenariosClient() {
     toast({ variant: 'destructive', title: "Modèle supprimé" });
   }
 
-  const templates = Array.from(scenarioTemplates.values()).filter(t => t.environnementId === currentEnvironmentId);
+  const templates = Array.from(scenarioTemplates.values());
   const teacherClasses = currentUser?.profile === 'Administrateur' 
     ? Array.from(classes.values())
     : Array.from(classes.values()).filter(c => c.teacherIds?.includes(currentUser?.username || ''));
@@ -240,7 +240,7 @@ export function ScenariosClient() {
           <div>
             <CardTitle>Bibliothèque de Scénarios</CardTitle>
             <CardDescription>
-              Créez, modifiez et lancez des scénarios. Les modèles affichés sont spécifiques à l'environnement actuel : <span className="font-bold">{currentEnv?.name}</span>.
+             Créez, modifiez et lancez des scénarios. Chaque modèle est associé à un environnement spécifique (WMS ou TMS).
             </CardDescription>
           </div>
           <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
@@ -263,14 +263,16 @@ export function ScenariosClient() {
           <div className="space-y-4">
             {templates.length > 0 ? templates.map(template => {
                 const runningInstance = Array.from(activeScenarios.values()).find(sc => sc.templateId === template.id && sc.status === 'running');
+                const templateEnv = environments.get(template.environnementId);
                 return (
                 <Card key={template.id} className="flex flex-col md:flex-row justify-between items-start p-4">
                     <div className="flex-1 mb-4 md:mb-0">
                         <h3 className="font-bold text-lg">{template.title}</h3>
                         <p className="text-sm text-muted-foreground mt-1">{template.description}</p>
-                        <div className="flex gap-2 flex-wrap mt-2">
+                        <div className="flex gap-2 flex-wrap mt-2 items-center">
                             {template.competences.map(c => <Badge key={c} variant="secondary">{c}</Badge>)}
                             {runningInstance && <Badge variant="default">Lancé (Classe: {classes.get(runningInstance.classId)?.name})</Badge>}
+                            {templateEnv && <Badge variant="outline" className="flex items-center gap-1"><Globe className="h-3 w-3"/>{templateEnv.name}</Badge>}
                         </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -286,10 +288,12 @@ export function ScenariosClient() {
                                 </DialogFooter>
                             </DialogContent>
                         </Dialog>
-                        <Button size="sm" onClick={() => setLaunchingTemplate(template)} disabled={!!runningInstance}><Rocket className="mr-2"/>Lancer</Button>
+                        <Button size="sm" onClick={() => setLaunchingTemplate(template)} disabled={!!runningInstance || template.environnementId !== currentEnvironmentId}>
+                          {template.environnementId !== currentEnvironmentId ? "Changer d'environnement pour lancer" : <><Rocket className="mr-2"/>Lancer</>}
+                        </Button>
                     </div>
                 </Card>
-            )}) : <p className="text-muted-foreground text-center py-8">Aucun modèle de scénario pour cet environnement. Créez-en un pour commencer ou changez d'environnement.</p>}
+            )}) : <p className="text-muted-foreground text-center py-8">Aucun modèle de scénario. Créez-en un pour commencer.</p>}
           </div>
         </CardContent>
       </Card>
