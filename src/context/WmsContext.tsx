@@ -1130,6 +1130,13 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
                  mergedArticles.set(key, value);
             }
         });
+        
+        const scenariosFromStorage = parsedState.scenarioTemplates ? new Map(parsedState.scenarioTemplates.map((st: ScenarioTemplate) => [st.id, st])) : new Map();
+        const mergedScenarios = new Map(initialState.scenarioTemplates);
+        scenariosFromStorage.forEach((value: ScenarioTemplate, key: number) => {
+            mergedScenarios.set(key, value);
+        });
+
 
         combinedState = {
             ...initialState,
@@ -1142,7 +1149,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
             classes: parsedState.classes ? new Map(parsedState.classes.map((c: Class) => [c.id, c])) : initialState.classes,
             emails: parsedState.emails ? new Map(parsedState.emails.map((e: Email) => [e.id, e])) : initialState.emails,
             maintenances: parsedState.maintenances ? new Map(parsedState.maintenances.map((m: Maintenance) => [m.id, m])) : initialState.maintenances,
-            scenarioTemplates: parsedState.scenarioTemplates ? new Map(parsedState.scenarioTemplates.map((st: ScenarioTemplate) => [st.id, st])) : initialState.scenarioTemplates,
+            scenarioTemplates: mergedScenarios,
             activeScenarios: parsedState.activeScenarios ? new Map(parsedState.activeScenarios.map((as: ActiveScenario) => [as.id, as])) : initialState.activeScenarios,
             tasks: parsedState.tasks ? new Map(parsedState.tasks.map((t: Task) => [t.id, t])) : initialState.tasks,
 
