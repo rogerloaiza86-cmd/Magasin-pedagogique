@@ -187,25 +187,115 @@ const getInitialState = (): WmsState => {
   initialUsers.set('affreteur', { username: 'affreteur', password: 'affreteur', profile: 'élève', createdAt: new Date().toISOString(), roleId: 'tms_affreteur', classId: demoClassId });
 
   const initialScenarioTemplates = new Map<number, ScenarioTemplate>();
-  const demoTemplateId = 1;
-  initialScenarioTemplates.set(demoTemplateId, {
-    id: demoTemplateId,
-    title: "Flux Logistique Complet (Transversal)",
-    description: "Un scénario complet qui couvre la création des tiers, la réception (WMS) et l'expédition (TMS).",
-    competences: ["Création Tiers", "Réception", "Expédition", "Planification Transport"],
-    rolesRequis: ["equipe_reception", "equipe_preparation", "tms_exploitation"],
+  let templateIdCounter = 1;
+
+  initialScenarioTemplates.set(templateIdCounter++, {
+    id: 1,
+    title: "Flux Logistique Complet (WMS)",
+    description: "Un scénario complet qui couvre la création des tiers, la réception de marchandises et l'expédition d'une commande client.",
+    competences: ["Création Tiers", "Réception", "Expédition"],
+    rolesRequis: ["equipe_reception", "equipe_preparation"],
     tasks: [
-        { taskOrder: 1, description: "Créez un nouveau fournisseur pour les pièces auto.", roleId: "equipe_reception", taskType: "CREATE_TIERS_FOURNISSEUR", environnementId: 'magasin_pedago' },
-        { taskOrder: 2, description: "Passez un Bon de Commande chez le fournisseur que vous venez de créer.", roleId: "equipe_reception", taskType: "CREATE_BC", prerequisite: 1, environnementId: 'magasin_pedago' },
-        { taskOrder: 3, description: "Réceptionnez la marchandise du Bon de Commande.", roleId: "equipe_reception", taskType: "RECEIVE_BC", prerequisite: 2, environnementId: 'magasin_pedago' },
-        { taskOrder: 4, description: "Créez un nouveau client.", roleId: "equipe_preparation", taskType: "CREATE_TIERS_CLIENT", environnementId: 'magasin_pedago'},
-        { taskOrder: 5, description: "Créez un Bon de Livraison pour le client que vous venez de créer.", roleId: "equipe_preparation", taskType: "CREATE_BL", prerequisite: 4, environnementId: 'magasin_pedago' },
-        { taskOrder: 6, description: "Basculez sur l'environnement 'Agence de Transport' (TMS). Votre BL est prêt, il faut maintenant l'expédier.", roleId: "tms_exploitation", taskType: "MANUAL_VALIDATION", prerequisite: 5, environnementId: 'agence_transport' },
-        { taskOrder: 7, description: "Créez un transporteur pour livrer la commande.", roleId: "tms_exploitation", taskType: "CREATE_TIERS_TRANSPORTEUR", prerequisite: 6, environnementId: 'agence_transport' },
-        { taskOrder: 8, description: "Expédiez la commande du client en utilisant le transporteur créé.", roleId: "tms_exploitation", taskType: "SHIP_BL", prerequisite: 7, environnementId: 'magasin_pedago' },
+        { taskOrder: 1, description: "Créez un nouveau fournisseur pour des pièces automobiles.", roleId: "equipe_reception", taskType: "CREATE_TIERS_FOURNISSEUR", environnementId: 'magasin_pedago' },
+        { taskOrder: 2, description: "Passez un Bon de Commande (BC) chez le fournisseur que vous venez de créer pour 5 unités de l'article '23371'.", roleId: "equipe_reception", taskType: "CREATE_BC", prerequisite: 1, environnementId: 'magasin_pedago' },
+        { taskOrder: 3, description: "Réceptionnez la marchandise du Bon de Commande. Déclarez 4 unités reçues conformes et 1 non-conforme.", roleId: "equipe_reception", taskType: "RECEIVE_BC", prerequisite: 2, environnementId: 'magasin_pedago' },
+        { taskOrder: 4, description: "Créez un nouveau client pour le garage 'Auto-Répar'.", roleId: "equipe_preparation", taskType: "CREATE_TIERS_CLIENT", environnementId: 'magasin_pedago'},
+        { taskOrder: 5, description: "Créez un Bon de Livraison (BL) pour le client 'Auto-Répar' avec 3 unités de l'article '23371'.", roleId: "equipe_preparation", taskType: "CREATE_BL", prerequisite: 4, environnementId: 'magasin_pedago' },
+        { taskOrder: 6, description: "Préparez la commande du BL que vous venez de créer.", roleId: "equipe_preparation", taskType: "PREPARE_BL", prerequisite: 5, environnementId: 'magasin_pedago' },
+        { taskOrder: 7, description: "Expédiez la commande et générez les documents finaux.", roleId: "equipe_preparation", taskType: "SHIP_BL", prerequisite: 6, environnementId: 'magasin_pedago' },
     ],
     createdBy: 'admin',
-    environnementId: 'magasin_pedago', // Default env for launching
+    environnementId: 'magasin_pedago',
+  });
+  
+  initialScenarioTemplates.set(templateIdCounter++, {
+    id: 2,
+    title: "Réception avec Litige Fournisseur",
+    description: "Un fournisseur livre une commande avec des quantités incorrectes et des articles endommagés. L'élève doit identifier et gérer les anomalies.",
+    competences: ["Réception", "Gestion des litiges", "Communication"],
+    rolesRequis: ["equipe_reception"],
+    tasks: [
+      { taskOrder: 1, description: "Un Bon de Commande (N°1) pour 10 'AMPOULE PHILIPS' est déjà créé. Allez dans 'Flux Entrant' pour le réceptionner.", roleId: "equipe_reception", taskType: "MANUAL_VALIDATION", environnementId: 'magasin_pedago' },
+      { taskOrder: 2, description: "Lors de la réception, déclarez seulement 8 articles reçus et 2 comme 'non-conformes'. Ajoutez une note sur le bon de livraison.", roleId: "equipe_reception", taskType: "RECEIVE_BC", prerequisite: 1, environnementId: 'magasin_pedago' },
+      { taskOrder: 3, description: "Utilisez la messagerie pour envoyer un e-mail au fournisseur (fictif) pour l'informer du litige.", roleId: "equipe_reception", taskType: "MANUAL_VALIDATION", prerequisite: 2, environnementId: 'magasin_pedago' },
+    ],
+    createdBy: 'admin',
+    environnementId: 'magasin_pedago'
+  });
+
+  initialScenarioTemplates.set(templateIdCounter++, {
+    id: 3,
+    title: "Inventaire Tournant Urgent",
+    description: "Suite à une alerte, un inventaire doit être réalisé sur une allée spécifique pour corriger un écart de stock majeur.",
+    competences: ["Inventaire", "Analyse d'écarts", "Correction de stock"],
+    rolesRequis: ["equipe_reception"],
+    tasks: [
+      { taskOrder: 1, description: "Une alerte de stock négatif a été signalée sur l'article 'COLLIER SERFLEX'. Allez dans 'Gestion des Stocks > Inventaire'.", roleId: "equipe_reception", taskType: "MANUAL_VALIDATION", environnementId: 'magasin_pedago' },
+      { taskOrder: 2, description: "Comptez physiquement l'article 'COLLIER SERFLEX' et ajustez le stock à la quantité réelle de 5 unités.", roleId: "equipe_reception", taskType: "MANUAL_VALIDATION", prerequisite: 1, environnementId: 'magasin_pedago' },
+    ],
+    createdBy: 'admin',
+    environnementId: 'magasin_pedago'
+  });
+  
+  initialScenarioTemplates.set(templateIdCounter++, {
+    id: 4,
+    title: "Préparation de Commande Express",
+    description: "Un client VIP passe une commande urgente. L'élève doit créer le BL, optimiser le picking et expédier la commande en priorité.",
+    competences: ["Préparation de commande", "Optimisation de picking", "Gestion des priorités"],
+    rolesRequis: ["equipe_preparation"],
+    tasks: [
+      { taskOrder: 1, description: "Créez un client 'Client Express'.", roleId: "equipe_preparation", taskType: "CREATE_TIERS_CLIENT", environnementId: 'magasin_pedago' },
+      { taskOrder: 2, description: "Créez un BL pour 'Client Express' avec les articles '67712' (2 unités) et 'A460' (3 unités).", roleId: "equipe_preparation", taskType: "CREATE_BL", prerequisite: 1, environnementId: 'magasin_pedago' },
+      { taskOrder: 3, description: "Générez le bon de préparation optimisé pour ce BL.", roleId: "equipe_preparation", taskType: "PREPARE_BL", prerequisite: 2, environnementId: 'magasin_pedago' },
+      { taskOrder: 4, description: "Expédiez la commande.", roleId: "equipe_preparation", taskType: "SHIP_BL", prerequisite: 3, environnementId: 'magasin_pedago' },
+    ],
+    createdBy: 'admin',
+    environnementId: 'magasin_pedago'
+  });
+
+  initialScenarioTemplates.set(templateIdCounter++, {
+    id: 5,
+    title: "Gestion d'un Retour Client",
+    description: "Un client retourne un article défectueux. L'élève doit enregistrer le retour, inspecter l'article et décider de sa réintégration ou de sa mise au rebut.",
+    competences: ["Gestion des retours", "Contrôle qualité"],
+    rolesRequis: ["equipe_reception"],
+    tasks: [
+        { taskOrder: 1, description: "Un client rapporte un 'FEU ARRIERE' (ID 2070649). Allez dans 'Flux Entrant > Gérer un Retour Client' pour l'enregistrer.", roleId: "equipe_reception", taskType: "MANUAL_VALIDATION", environnementId: 'magasin_pedago' },
+        { taskOrder: 2, description: "Traitez le retour : décidez de 'Mettre au rebut' l'article car il est cassé.", roleId: "equipe_reception", taskType: "MANUAL_VALIDATION", prerequisite: 1, environnementId: 'magasin_pedago' },
+    ],
+    createdBy: 'admin',
+    environnementId: 'magasin_pedago'
+  });
+  
+  initialScenarioTemplates.set(templateIdCounter++, {
+    id: 6,
+    title: "Création d'un Devis de Transport (TMS)",
+    description: "Un client demande un devis pour un transport. L'élève doit utiliser l'environnement TMS pour créer un devis basé sur la grille tarifaire.",
+    competences: ["Chiffrage transport", "Relation client"],
+    rolesRequis: ["tms_affreteur"],
+    tasks: [
+        { taskOrder: 1, description: "Basculez sur l'environnement 'Agence de Transport (TMS)'.", roleId: "tms_affreteur", taskType: "MANUAL_VALIDATION", environnementId: 'agence_transport' },
+        { taskOrder: 2, description: "Créez un nouveau client pour cette demande de devis.", roleId: "tms_affreteur", taskType: "CREATE_TIERS_CLIENT", prerequisite: 1, environnementId: 'agence_transport' },
+        { taskOrder: 3, description: "Créez un devis pour ce client pour un trajet de 150km avec un poids de 800kg.", roleId: "tms_affreteur", taskType: "MANUAL_VALIDATION", prerequisite: 2, environnementId: 'agence_transport' },
+    ],
+    createdBy: 'admin',
+    environnementId: 'agence_transport'
+  });
+  
+  initialScenarioTemplates.set(templateIdCounter++, {
+    id: 7,
+    title: "Gestion de la Flotte de Véhicules (TMS)",
+    description: "Un véhicule nécessite une maintenance. L'élève doit l'enregistrer, le mettre en maintenance, puis le remettre en service.",
+    competences: ["Gestion de flotte", "Maintenance"],
+    rolesRequis: ["tms_exploitation"],
+    tasks: [
+        { taskOrder: 1, description: "Basculez sur l'environnement 'Agence de Transport (TMS)'.", roleId: "tms_exploitation", taskType: "MANUAL_VALIDATION", environnementId: 'agence_transport' },
+        { taskOrder: 2, description: "Ajoutez un nouveau véhicule 'Camion 20m³' à la flotte.", roleId: "tms_exploitation", taskType: "CREATE_TIERS_TRANSPORTEUR", prerequisite: 1, environnementId: 'agence_transport' },
+        { taskOrder: 3, description: "Le nouveau camion a un pneu crevé. Mettez-le en maintenance pour 'Réparation pneu'.", roleId: "tms_exploitation", taskType: "MANUAL_VALIDATION", prerequisite: 2, environnementId: 'agence_transport' },
+        { taskOrder: 4, description: "La réparation est terminée. Clôturez l'intervention de maintenance pour rendre le véhicule de nouveau disponible.", roleId: "tms_exploitation", taskType: "MANUAL_VALIDATION", prerequisite: 3, environnementId: 'agence_transport' },
+    ],
+    createdBy: 'admin',
+    environnementId: 'agence_transport'
   });
 
   return {
@@ -229,7 +319,7 @@ const getInitialState = (): WmsState => {
     classIdCounter: 2,
     emailIdCounter: 1,
     maintenanceIdCounter: 1,
-    scenarioTemplateIdCounter: 2,
+    scenarioTemplateIdCounter: templateIdCounter,
     activeScenarioIdCounter: 1,
     taskIdCounter: 1,
     currentUser: null,
