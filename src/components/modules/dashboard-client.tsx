@@ -101,9 +101,11 @@ function ScenarioProgress() {
     const { state } = useWms();
     const { currentUser, tasks, activeScenarios, currentEnvironmentId, environments } = state;
     
-    if (!currentUser || !currentUser.classId) return null;
+    if (!currentUser || currentUser.profile !== 'élève' || !currentUser.classId) return null;
 
     const userActiveScenario = Array.from(activeScenarios.values()).find(sc => sc.classId === currentUser.classId && sc.status === 'running');
+    
+    // Always show the card if a scenario is running for the student's class
     if (!userActiveScenario) return null;
 
     const userTasks = Array.from(tasks.values()).filter(t => t.userId === currentUser.username && t.scenarioId === userActiveScenario.id);
@@ -136,13 +138,18 @@ function ScenarioProgress() {
                     </ul>
                 ) : (
                     <div className="text-center text-muted-foreground p-4">
-                        <p>Vous avez terminé toutes vos tâches dans cet environnement.</p>
-                        {nextEnv && <p className="font-semibold mt-2">Passez à l'environnement "{nextEnv.name}" pour continuer !</p>}
+                        {nextEnv ? (
+                             <p>Vous avez terminé vos tâches dans cet environnement. <br/><span className="font-semibold mt-2">Passez à l'environnement "{nextEnv.name}" pour continuer !</span></p>
+                        ) : (
+                            <p>Vous n'avez pas de tâches assignées dans cet environnement pour le moment.</p>
+                        )}
                     </div>
                 )}
-                 <div className="mt-4 text-sm text-muted-foreground">
-                    <p>Tâches complétées : {completedTasks} / {totalTasks}</p>
-                </div>
+                 {totalTasks > 0 && (
+                    <div className="mt-4 text-sm text-muted-foreground">
+                        <p>Tâches complétées : {completedTasks} / {totalTasks}</p>
+                    </div>
+                 )}
             </CardContent>
         </Card>
     )
@@ -240,6 +247,8 @@ export function DashboardClient() {
             <p className="text-muted-foreground">Bienvenue dans votre espace {currentEnv?.name}. Choisissez une application pour commencer.</p>
         </div>
 
+        <ScenarioProgress />
+
         {showSystemAlerts && <SystemAlerts />}
 
         {showKpis && (
@@ -251,8 +260,6 @@ export function DashboardClient() {
             </div>
         )}
 
-        {currentUser?.profile === 'élève' && <ScenarioProgress />}
-
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
             {visibleAppItems.map((item) => (
                 <AppCard key={item.href} item={item} />
@@ -261,5 +268,3 @@ export function DashboardClient() {
     </div>
   );
 }
-
-    
