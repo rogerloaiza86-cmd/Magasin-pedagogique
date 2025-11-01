@@ -22,7 +22,8 @@ import {
     RotateCcw,
     Siren,
     Info,
-    PackageX
+    PackageX,
+    ListTodo
 } from "lucide-react";
 import Link from "next/link";
 import type { Environment, Task } from "@/lib/types";
@@ -99,15 +100,26 @@ function KpiCard({ title, value, icon: Icon, color }: { title: string, value: nu
 
 function ScenarioProgress() {
     const { state } = useWms();
-    const { currentUser, tasks, activeScenarios, currentEnvironmentId, environments } = state;
+    const { currentUser, tasks, activeScenarios, currentEnvironmentId, environments, scenarioTemplates } = state;
     
     if (!currentUser || currentUser.profile !== 'élève' || !currentUser.classId) return null;
 
     const userActiveScenario = Array.from(activeScenarios.values()).find(sc => sc.classId === currentUser.classId && sc.status === 'running');
     
-    // Always show the card if a scenario is running for the student's class
-    if (!userActiveScenario) return null;
+    if (!userActiveScenario) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Scénario Pédagogique</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-muted-foreground">Aucun scénario n'est actuellement en cours pour votre classe. Attendez les instructions de votre professeur.</p>
+                </CardContent>
+            </Card>
+        )
+    }
 
+    const template = scenarioTemplates.get(userActiveScenario.templateId);
     const userTasks = Array.from(tasks.values()).filter(t => t.userId === currentUser.username && t.scenarioId === userActiveScenario.id);
     const tasksInCurrentEnv = userTasks.filter(t => t.environnementId === currentEnvironmentId && t.status === 'todo');
     const totalTasks = userTasks.length;
@@ -118,17 +130,22 @@ function ScenarioProgress() {
     const nextEnv = nextEnvId ? environments.get(nextEnvId) : null;
 
     return (
-        <Card>
+        <Card className="border-primary">
             <CardHeader>
-                <CardTitle>Progression du Scénario</CardTitle>
-                <CardDescription>Suivez les tâches qui vous sont assignées pour le scénario en cours.</CardDescription>
+                <CardTitle>Scénario en cours : {template?.title}</CardTitle>
+                <CardDescription>{template?.description}</CardDescription>
             </CardHeader>
             <CardContent>
+                <div className="flex items-center gap-2 mb-4">
+                     <ListTodo className="h-5 w-5 text-primary"/>
+                    <h3 className="font-semibold text-lg">Vos Tâches en cours</h3>
+                </div>
+
                 {tasksInCurrentEnv.length > 0 ? (
-                    <ul className="space-y-2">
+                    <ul className="space-y-3">
                         {tasksInCurrentEnv.map(task => (
-                             <li key={task.id} className="flex items-start gap-3">
-                                <CheckCircle2 className="h-5 w-5 mt-1 text-sky-500" />
+                             <li key={task.id} className="flex items-start gap-3 p-3 bg-background rounded-lg">
+                                <CheckCircle2 className="h-5 w-5 mt-1 text-sky-500 flex-shrink-0" />
                                 <div>
                                     <p className="font-semibold">{task.description}</p>
                                     <Badge variant="secondary" className="mt-1">{state.roles.get(currentUser.roleId)?.name}</Badge>
@@ -137,17 +154,17 @@ function ScenarioProgress() {
                         ))}
                     </ul>
                 ) : (
-                    <div className="text-center text-muted-foreground p-4">
+                    <div className="text-center text-muted-foreground p-4 border-dashed border-2 rounded-lg">
                         {nextEnv ? (
-                             <p>Vous avez terminé vos tâches dans cet environnement. <br/><span className="font-semibold mt-2">Passez à l'environnement "{nextEnv.name}" pour continuer !</span></p>
+                             <p>Vous avez terminé vos tâches dans cet environnement. <br/><span className="font-semibold mt-2 block">Passez à l'environnement "{nextEnv.name}" pour continuer !</span></p>
                         ) : (
-                            <p>Vous n'avez pas de tâches assignées dans cet environnement pour le moment.</p>
+                            <p>Vous n'avez pas de nouvelles tâches assignées dans cet environnement pour le moment. Vous avez peut-être terminé le scénario !</p>
                         )}
                     </div>
                 )}
                  {totalTasks > 0 && (
                     <div className="mt-4 text-sm text-muted-foreground">
-                        <p>Tâches complétées : {completedTasks} / {totalTasks}</p>
+                        <p>Progression totale : {completedTasks} / {totalTasks} tâches complétées.</p>
                     </div>
                  )}
             </CardContent>
@@ -213,6 +230,7 @@ export function DashboardClient() {
   const currentEnv = environments.get(currentEnvironmentId);
 
   const visibleAppItems = appItems.filter(item => {
+    if (!currentUserPermissions) return false;
     if (item.isSuperAdminOnly && !currentUserPermissions?.isSuperAdmin) {
         return false;
     }
@@ -238,7 +256,7 @@ export function DashboardClient() {
   const pendingReturns = Array.from(documents.values()).filter(d => d.environnementId === currentEnvironmentId && d.type === 'Retour Client' && d.status === 'En attente de traitement').length;
 
   const showKpis = currentEnv?.type === 'WMS';
-  const showSystemAlerts = currentEnv?.type === 'WMS';
+  const showSystemAlerts = currentEnv?.type === 'WMS' && currentUser?.profile === 'élève';
 
   return (
     <div className="space-y-6">
@@ -268,3 +286,5 @@ export function DashboardClient() {
     </div>
   );
 }
+
+    
