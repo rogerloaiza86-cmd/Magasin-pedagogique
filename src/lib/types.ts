@@ -1,5 +1,6 @@
 
 
+
 export type Environment = {
     id: string;
     name: string;
@@ -187,7 +188,7 @@ export type ScenarioTaskTemplate = {
     description: string;
     roleId: string;
     taskType: TaskType;
-    prerequisite?: number; // Refers to taskOrder
+    prerequisiteTaskId?: number; // Refers to taskOrder
     details?: Record<string, any>; // e.g., { tierName: 'PneuExpress', articleId: '123', quantity: 20 }
     environnementId?: string; // If undefined, uses the scenario's default environment
 };

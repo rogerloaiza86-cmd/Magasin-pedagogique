@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useWms } from "@/context/WmsContext";
@@ -102,7 +103,7 @@ function ScenarioProgress() {
     const { state } = useWms();
     const { currentUser, tasks, activeScenarios, currentEnvironmentId, environments, scenarioTemplates } = state;
     
-    if (!currentUser || currentUser.profile !== 'élève' || !currentUser.classId) return null;
+    if (!currentUser || currentUser.profile !== 'élève') return null;
 
     const userActiveScenario = Array.from(activeScenarios.values()).find(sc => sc.classId === currentUser.classId && sc.status === 'running');
     
@@ -116,7 +117,7 @@ function ScenarioProgress() {
                     <p className="text-muted-foreground">Aucun scénario n'est actuellement en cours pour votre classe. Attendez les instructions de votre professeur.</p>
                 </CardContent>
             </Card>
-        )
+        );
     }
 
     const template = scenarioTemplates.get(userActiveScenario.templateId);
