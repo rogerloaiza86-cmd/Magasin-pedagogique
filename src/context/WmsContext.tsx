@@ -887,81 +887,69 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         break;
     }
     case 'LAUNCH_SCENARIO': {
-      if (!state.currentUserPermissions?.canManageScenarios) return state;
-      const { templateId, classId } = action.payload;
-      const template = state.scenarioTemplates.get(templateId);
-      if (!template) return state;
+        if (!state.currentUserPermissions?.canManageScenarios) return state;
+        const { templateId, classId } = action.payload;
+        const template = state.scenarioTemplates.get(templateId);
+        if (!template) return state;
+    
+        const newActiveScenarioId = state.activeScenarioIdCounter;
+        const newActiveScenarios = new Map(state.activeScenarios);
+        const newActiveScenario: ActiveScenario = {
+            id: newActiveScenarioId,
+            templateId,
+            classId,
+            status: 'running',
+            createdAt: new Date().toISOString(),
+            environnementId: state.currentEnvironmentId,
+        };
+        newActiveScenarios.set(newActiveScenarioId, newActiveScenario);
+    
+        const studentsInClass = Array.from(state.users.values()).filter(u => u.classId === classId && u.profile === 'élève');
+        const rolesToAssign = template.rolesRequis;
+        const newUsers = new Map(state.users);
+        const newTasks = new Map(state.tasks);
+        let taskIdCounter = state.taskIdCounter;
+        
+        studentsInClass.forEach((student, index) => {
+            const roleId = rolesToAssign[index % rolesToAssign.length];
+            const updatedUser = { ...student, roleId };
+            newUsers.set(student.username, updatedUser);
+
+            // If the current user is the student being updated, also update the top-level current user.
+            if(state.currentUser && state.currentUser.username === student.username){
+                state.currentUser = updatedUser;
+                state.currentUserPermissions = state.roles.get(roleId)?.permissions || null;
+            }
+    
+            template.tasks.forEach(taskTemplate => {
+                if (taskTemplate.roleId === roleId) {
+                    const newTaskId = taskIdCounter++;
+                    const newTask: Task = {
+                        id: newTaskId,
+                        scenarioId: newActiveScenarioId,
+                        userId: student.username,
+                        description: taskTemplate.description,
+                        taskType: taskTemplate.taskType,
+                        status: taskTemplate.prerequisiteTaskId ? 'blocked' : 'todo',
+                        details: taskTemplate.details,
+                        taskOrder: taskTemplate.taskOrder,
+                        prerequisiteTaskId: taskTemplate.prerequisiteTaskId,
+                        environnementId: taskTemplate.environnementId || template.environnementId,
+                    };
+                    newTasks.set(newTaskId, newTask);
+                }
+            });
+        });
   
-      const newActiveScenarioId = state.activeScenarioIdCounter;
-      const newActiveScenario: ActiveScenario = {
-          id: newActiveScenarioId,
-          templateId,
-          classId,
-          status: 'running',
-          createdAt: new Date().toISOString(),
-          environnementId: state.currentEnvironmentId,
-      };
-      const newActiveScenarios = new Map(state.activeScenarios);
-      newActiveScenarios.set(newActiveScenarioId, newActiveScenario);
-  
-      const studentsInClass = Array.from(state.users.values()).filter(u => u.classId === classId && u.profile === 'élève');
-      const rolesToAssign = template.rolesRequis;
-      const newUsers = new Map(state.users);
-      const newTasks = new Map(state.tasks);
-      let taskIdCounter = state.taskIdCounter;
-      const taskCreationMap = new Map<number, number>(); // Maps taskOrder to new task ID
-  
-      studentsInClass.forEach((student, index) => {
-          const roleId = rolesToAssign[index % rolesToAssign.length];
-          newUsers.set(student.username, { ...student, roleId });
-  
-          template.tasks.forEach(taskTemplate => {
-              if (taskTemplate.roleId === roleId) {
-                  const newTaskId = taskIdCounter++;
-                  const newTask: Task = {
-                      id: newTaskId,
-                      scenarioId: newActiveScenarioId,
-                      userId: student.username,
-                      description: taskTemplate.description,
-                      taskType: taskTemplate.taskType,
-                      status: 'blocked',
-                      details: taskTemplate.details,
-                      taskOrder: taskTemplate.taskOrder,
-                      environnementId: taskTemplate.environnementId || template.environnementId,
-                  };
-                  newTasks.set(newTaskId, newTask);
-                  taskCreationMap.set(taskTemplate.taskOrder, newTaskId);
-              }
-          });
-      });
-  
-      // Second pass to link prerequisites and unlock initial tasks
-      newTasks.forEach(task => {
-          if (task.scenarioId === newActiveScenarioId) {
-              const originalTemplateTask = template.tasks.find(t => t.taskOrder === task.taskOrder && t.roleId === newUsers.get(task.userId)?.roleId);
-              if (originalTemplateTask) {
-                  if (originalTemplateTask.prerequisiteTaskId) {
-                      const prereqNewId = taskCreationMap.get(originalTemplateTask.prerequisiteTaskId);
-                      if (prereqNewId) {
-                         task.prerequisiteTaskId = prereqNewId;
-                      }
-                  }
-                  if (!task.prerequisiteTaskId) {
-                      task.status = 'todo';
-                  }
-              }
-          }
-      });
-  
-      newState = {
-          ...state,
-          activeScenarios: newActiveScenarios,
-          users: newUsers,
-          tasks: newTasks,
-          activeScenarioIdCounter: newActiveScenarioId + 1,
-          taskIdCounter,
-      };
-      break;
+        newState = {
+            ...state,
+            activeScenarios: newActiveScenarios,
+            users: newUsers,
+            tasks: newTasks,
+            activeScenarioIdCounter: newActiveScenarioId + 1,
+            taskIdCounter,
+        };
+        break;
     }
     case 'GENERATE_ARTICLES_BATCH': {
         if (!state.currentUserPermissions?.canManageStock || !state.currentUser) return state;
@@ -1128,10 +1116,9 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
             classes: reviveMap(savedState.classes),
             emails: reviveMap(savedState.emails),
             maintenances: reviveMap(savedState.maintenances),
-            scenarioTemplates: reviveMap(savedState.scenarioTemplates),
+            scenarioTemplates: new Map([...initialState.scenarioTemplates, ...reviveMap(savedState.scenarioTemplates)]),
             activeScenarios: reviveMap(savedState.activeScenarios),
             tasks: reviveMap(savedState.tasks),
-            // Keep static data from initial state
             roles: ROLES, 
             environments: ENVIRONMENTS,
             grillesTarifaires: GRILLES_TARIFAIRES,
@@ -1156,14 +1143,12 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
 
     } catch (e) {
       console.error("Could not load state from localStorage. Using initial state.", e);
-      // Fallback to initial state if parsing fails
       dispatch({ type: 'SET_STATE', payload: getInitialState() });
     }
   }, []);
 
   useEffect(() => {
     try {
-      // Function to serialize Maps to arrays for JSON
       const serializeMap = (map: Map<any, any>) => Array.from(map.entries());
 
       const stateToSave = {
@@ -1178,7 +1163,6 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
           scenarioTemplates: serializeMap(state.scenarioTemplates),
           activeScenarios: serializeMap(state.activeScenarios),
           tasks: serializeMap(state.tasks),
-          // Exclude static and non-serializable data
           roles: undefined, 
           environments: undefined,
           grillesTarifaires: undefined,
@@ -1224,4 +1208,5 @@ export const useWms = () => {
 };
 
     
+
 

@@ -231,12 +231,15 @@ export function DashboardClient() {
   const { currentUser, currentUserPermissions, environments, currentEnvironmentId, documents, articles } = state;
   const currentEnv = environments.get(currentEnvironmentId);
 
+  if (!currentUser || !currentUserPermissions) {
+    return null; // Or a loading spinner
+  }
+
   const visibleAppItems = appItems.filter(item => {
-    if (!currentUserPermissions) return false;
-    if (item.isSuperAdminOnly && !currentUserPermissions?.isSuperAdmin) {
+    if (item.isSuperAdminOnly && !currentUserPermissions.isSuperAdmin) {
         return false;
     }
-    if (item.permission && !currentUserPermissions?.[item.permission]) {
+    if (item.permission && !currentUserPermissions[item.permission]) {
         return false;
     }
     if (item.envType !== 'ALL' && item.envType !== currentEnv?.type) {
