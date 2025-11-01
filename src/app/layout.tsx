@@ -103,16 +103,13 @@ function MainLayout({
   const userInitials = currentUser?.username.substring(0, 2).toUpperCase() || '??';
 
   const visibleNavItems = navItems.filter(item => {
+    if (!currentUserPermissions) return false;
+
     // Hide for non-super-admin if required
-    if (item.isSuperAdminOnly && !currentUserPermissions?.isSuperAdmin) {
+    if (item.isSuperAdminOnly && !currentUserPermissions.isSuperAdmin) {
         return false;
     }
     
-    // Check for general permission if it exists
-    if (item.permission && !currentUserPermissions?.[item.permission]) {
-        return false;
-    }
-
     // Filter by environment type
     if (item.envType && item.envType !== 'ALL' && item.envType !== currentEnv?.type) {
         return false;
@@ -124,6 +121,15 @@ function MainLayout({
     }
     if (item.href === "/flux-sortant") {
       return currentUserPermissions.canCreateBL || currentUserPermissions.canPrepareBL || currentUserPermissions.canShipBL;
+    }
+    
+    if (item.href === "/scenarios") {
+        return currentUserPermissions.canManageScenarios;
+    }
+
+    // Check for general permission if it exists
+    if (item.permission && !currentUserPermissions[item.permission]) {
+        return false;
     }
 
     return true;
