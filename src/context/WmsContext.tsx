@@ -20,7 +20,7 @@ ROLES.set('super_admin', {
         canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true, canReceiveBC: true,
         canCreateBL: true, canPrepareBL: true, canShipBL: true, canManageStock: true, canViewStock: true,
         canManageClasses: true, canUseIaTools: true, canUseMessaging: true, canManageScenarios: true,
-        canManageFleet: true, canManageQuotes: true,
+        canManageStudents: true, canManageFleet: true, canManageQuotes: true,
     }
 });
 
@@ -30,11 +30,11 @@ ROLES.set('professeur', {
     description: "Gère les classes, les scénarios et supervise les élèves.",
     isStudentRole: false,
     permissions: {
-        isSuperAdmin: false, // Ne peut pas modifier la structure profonde, mais a des droits élevés
+        isSuperAdmin: false,
         canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true, canReceiveBC: true,
         canCreateBL: true, canPrepareBL: true, canShipBL: true, canManageStock: true, canViewStock: true,
         canManageClasses: true, canUseIaTools: true, canUseMessaging: true, canManageScenarios: true,
-        canManageFleet: true, canManageQuotes: true,
+        canManageStudents: true, canManageFleet: true, canManageQuotes: true,
     }
 });
 
@@ -47,7 +47,7 @@ ROLES.set('equipe_reception', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true,
         canReceiveBC: true, canCreateBL: false, canPrepareBL: false, canShipBL: false,
         canManageStock: true, canViewStock: true, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageFleet: false, canManageQuotes: false,
+        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: false,
     }
 });
 
@@ -60,7 +60,7 @@ ROLES.set('equipe_preparation', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: false,
         canReceiveBC: false, canCreateBL: true, canPrepareBL: true, canShipBL: true,
         canManageStock: false, canViewStock: true, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageFleet: false, canManageQuotes: false,
+        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: false,
     }
 });
 
@@ -73,7 +73,7 @@ ROLES.set('tms_affreteur', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: false,
         canReceiveBC: false, canCreateBL: false, canPrepareBL: false, canShipBL: false,
         canManageStock: false, canViewStock: false, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageFleet: false, canManageQuotes: false,
+        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: true,
     }
 });
 
@@ -86,7 +86,7 @@ permissions: {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: false, canViewTiers: true, canCreateBC: false,
         canReceiveBC: false, canCreateBL: false, canPrepareBL: false, canShipBL: false,
         canManageStock: false, canViewStock: false, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageFleet: true, canManageQuotes: false,
+        canManageScenarios: false, canManageStudents: false, canManageFleet: true, canManageQuotes: false,
     }
 });
 
@@ -351,6 +351,9 @@ type WmsAction =
   | { type: 'RESET_ARTICLES'; payload: { environnementId: string } }
   | { type: 'START_MAINTENANCE'; payload: { vehiculeId: number, notes: string } }
   | { type: 'FINISH_MAINTENANCE'; payload: { maintenanceId: number } }
+  | { type: 'UPDATE_STUDENT_ROLE', payload: { username: string, newRoleId: string } }
+  | { type: 'DELETE_USER', payload: { username: string } }
+  | { type: 'RESET_USER_PASSWORD', payload: { username: string, newPassword: string } }
   | { type: 'SET_STATE'; payload: WmsState }
   | { type: 'SET_ENVIRONMENT'; payload: { environmentId: string } };
 
@@ -1066,6 +1069,45 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         newState = { ...state, tiers: newTiers, maintenances: newMaintenances };
         break;
     }
+    case 'UPDATE_STUDENT_ROLE': {
+        if (!state.currentUserPermissions?.canManageStudents) return state;
+        const { username, newRoleId } = action.payload;
+        const newUsers = new Map(state.users);
+        const user = newUsers.get(username);
+        if (user && user.profile === 'élève') {
+            user.roleId = newRoleId;
+            newUsers.set(username, user);
+        }
+        newState = { ...state, users: newUsers };
+        break;
+    }
+    case 'DELETE_USER': {
+        if (!state.currentUserPermissions?.canManageStudents) return state;
+        const { username } = action.payload;
+        const newUsers = new Map(state.users);
+        newUsers.delete(username);
+        // Also delete associated tasks
+        const newTasks = new Map<number, Task>();
+        state.tasks.forEach((task, id) => {
+            if (task.userId !== username) {
+                newTasks.set(id, task);
+            }
+        });
+        newState = { ...state, users: newUsers, tasks: newTasks };
+        break;
+    }
+    case 'RESET_USER_PASSWORD': {
+        if (!state.currentUserPermissions?.canManageStudents) return state;
+        const { username, newPassword } = action.payload;
+        const newUsers = new Map(state.users);
+        const user = newUsers.get(username);
+        if (user) {
+            user.password = newPassword;
+            newUsers.set(username, user);
+        }
+        newState = { ...state, users: newUsers };
+        break;
+    }
     case 'SET_STATE': {
         const loadedState = action.payload;
         if(loadedState.currentUser) {
@@ -1114,7 +1156,6 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
       if (savedStateJSON) {
         const savedState = JSON.parse(savedStateJSON);
         
-        // Function to revive Maps from arrays
         const reviveMap = (arr: any) => arr ? new Map(arr) : new Map();
 
         finalState = {
@@ -1217,8 +1258,3 @@ export const useWms = () => {
   }
   return context;
 };
-
-    
-
-
-

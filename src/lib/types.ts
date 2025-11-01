@@ -1,6 +1,7 @@
 
 
 
+
 export type Environment = {
     id: string;
     name: string;
@@ -131,6 +132,7 @@ export type Permissions = {
     canUseIaTools: boolean;
     canUseMessaging: boolean;
     canManageScenarios: boolean;
+    canManageStudents: boolean;
     // TMS Permissions to be added
     canManageFleet: boolean;
     canManageQuotes: boolean;
