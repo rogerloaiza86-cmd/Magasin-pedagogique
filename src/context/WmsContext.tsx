@@ -338,7 +338,7 @@ type WmsAction =
   | { type: 'LOGIN'; payload: { username: string, password: string} }
   | { type: 'REAUTHENTICATE_USER'; payload: { username: string } }
   | { type: 'LOGOUT' }
-  | { type: 'REGISTER_USER', payload: Omit<User, 'password' | 'createdAt' | 'roleId'> & { password?: string, classId?: number } }
+  | { type: 'REGISTER_USER', payload: Omit<User, 'password' | 'createdAt'> & { password?: string, classId?: number } }
   | { type: 'ADD_CLASS', payload: { name: string } }
   | { type: 'DELETE_CLASS', payload: { classId: number } }
   | { type: 'TOGGLE_TEACHER_CLASS_ASSIGNMENT', payload: { classId: number, teacherId: string } }
@@ -459,31 +459,37 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       };
       break;
     case 'REGISTER_USER': {
-        const { username, password, profile, classId } = action.payload;
+        const { username, password, profile, classId, roleId } = action.payload;
         if (state.users.has(username)) {
             throw new Error("Cet identifiant existe déjà.");
         }
         if (!password) {
             throw new Error("Le mot de passe est requis.");
         }
+        
+        let finalRoleId = roleId;
+        if (profile === 'professeur') {
+            finalRoleId = 'professeur';
+        } else if (profile === 'Administrateur') {
+            finalRoleId = 'super_admin';
+        }
+
+        if (!finalRoleId) {
+            throw new Error("Le rôle est requis.");
+        }
+        
         if (profile === 'élève' && (state.classes.size === 0 || !classId)) {
              throw new Error("Aucune classe n'a été créée. Inscription impossible.");
         }
+
         const newUsers = new Map(state.users);
-        
-        let roleId = 'equipe_preparation'; // default for student
-        if (profile === 'professeur') {
-            roleId = 'professeur';
-        } else if (profile === 'Administrateur') {
-            roleId = 'super_admin';
-        }
 
         const newUser: User = { 
             username, 
             password, 
             profile, 
             createdAt: new Date().toISOString(),
-            roleId: roleId
+            roleId: finalRoleId,
         };
         if (profile === 'élève' && classId) {
             newUser.classId = classId;
@@ -910,6 +916,9 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         const newTasks = new Map(state.tasks);
         let taskIdCounter = state.taskIdCounter;
         
+        let localCurrentUser = state.currentUser;
+        let localCurrentUserPermissions = state.currentUserPermissions;
+
         studentsInClass.forEach((student, index) => {
             const roleId = rolesToAssign[index % rolesToAssign.length];
             const updatedUser = { ...student, roleId };
@@ -917,8 +926,8 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
 
             // If the current user is the student being updated, also update the top-level current user.
             if(state.currentUser && state.currentUser.username === student.username){
-                state.currentUser = updatedUser;
-                state.currentUserPermissions = state.roles.get(roleId)?.permissions || null;
+                localCurrentUser = updatedUser;
+                localCurrentUserPermissions = state.roles.get(roleId)?.permissions || null;
             }
     
             template.tasks.forEach(taskTemplate => {
@@ -948,6 +957,8 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
             tasks: newTasks,
             activeScenarioIdCounter: newActiveScenarioId + 1,
             taskIdCounter,
+            currentUser: localCurrentUser,
+            currentUserPermissions: localCurrentUserPermissions
         };
         break;
     }
@@ -1208,5 +1219,6 @@ export const useWms = () => {
 };
 
     
+
 
 

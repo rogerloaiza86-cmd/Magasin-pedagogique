@@ -32,6 +32,7 @@ type SignUpFormData = {
   confirmPassword: string;
   profile: UserProfile;
   classId: string;
+  roleId: string;
 };
 
 export default function SignUpPage() {
@@ -50,12 +51,14 @@ export default function SignUpPage() {
       confirmPassword: "",
       profile: "élève",
       classId: "",
+      roleId: "",
     },
   });
 
   const password = watch("password");
   const profile = watch("profile");
   const classes = Array.from(state.classes.values()).filter(Boolean).sort((a,b) => a.name.localeCompare(b.name));
+  const studentRoles = Array.from(state.roles.values()).filter(r => r.isStudentRole).sort((a,b) => a.name.localeCompare(b.name));
 
   const onSubmit = (data: SignUpFormData) => {
     try {
@@ -63,6 +66,7 @@ export default function SignUpPage() {
             username: data.username, 
             password: data.password, 
             profile: data.profile,
+            roleId: data.roleId,
       };
       if (data.profile === 'élève') {
         if (!data.classId) {
@@ -70,6 +74,14 @@ export default function SignUpPage() {
                 variant: "destructive",
                 title: "Classe manquante",
                 description: "Veuillez sélectionner une classe.",
+            });
+            return;
+        }
+         if (!data.roleId) {
+            toast({
+                variant: "destructive",
+                title: "Rôle manquant",
+                description: "Veuillez sélectionner un rôle pour l'élève.",
             });
             return;
         }
@@ -184,6 +196,7 @@ export default function SignUpPage() {
               </div>
 
               {profile === 'élève' && (
+                <>
                  <div>
                     <Label htmlFor="classId">Classe</Label>
                     {classes.length > 0 ? (
@@ -192,7 +205,7 @@ export default function SignUpPage() {
                             control={control}
                             rules={{ required: "La classe est requise pour un élève" }}
                             render={({ field }) => (
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} value={field.value}>
                                     <SelectTrigger id="classId">
                                         <SelectValue placeholder="Sélectionner une classe..." />
                                     </SelectTrigger>
@@ -212,7 +225,33 @@ export default function SignUpPage() {
                             {errors.classId.message}
                         </p>
                     )}
-                </div>
+                  </div>
+                  <div>
+                      <Label htmlFor="roleId">Rôle</Label>
+                       <Controller
+                            name="roleId"
+                            control={control}
+                            rules={{ required: "Le rôle est requis pour un élève" }}
+                            render={({ field }) => (
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                    <SelectTrigger id="roleId">
+                                        <SelectValue placeholder="Sélectionner un rôle..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {studentRoles.map(r => (
+                                            <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
+                        />
+                        {errors.roleId && (
+                            <p className="text-sm text-destructive mt-1">
+                                {errors.roleId.message}
+                            </p>
+                        )}
+                  </div>
+                </>
               )}
 
               <Button type="submit" className="w-full">
