@@ -887,92 +887,89 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         break;
     }
     case 'LAUNCH_SCENARIO': {
-        if (!state.currentUserPermissions?.canManageScenarios) return state;
-        const { templateId, classId } = action.payload;
-        const template = state.scenarioTemplates.get(templateId);
-        if (!template) return state;
-
-        const newActiveScenarioId = state.activeScenarioIdCounter;
-        const newActiveScenario: ActiveScenario = {
-            id: newActiveScenarioId,
-            templateId,
-            classId,
-            status: 'running',
-            createdAt: new Date().toISOString(),
-            environnementId: state.currentEnvironmentId,
-        };
-        const newActiveScenarios = new Map(state.activeScenarios);
-        newActiveScenarios.set(newActiveScenarioId, newActiveScenario);
-
-        const studentsInClass = Array.from(state.users.values()).filter(u => u.classId === classId && u.profile === 'élève');
-        const rolesToAssign = template.rolesRequis;
-        const newUsers = new Map(state.users);
-        const newTasks = new Map(state.tasks);
-        let taskIdCounter = state.taskIdCounter;
-
-        studentsInClass.forEach((student, index) => {
-            const roleId = rolesToAssign[index % rolesToAssign.length];
-            const updatedUser = {...student, roleId};
-            newUsers.set(student.username, updatedUser);
-
-            const studentTasks = template.tasks.filter(t => t.roleId === roleId);
-            const taskCreationMap = new Map<number, number>(); // template.taskOrder -> new taskId
-
-            studentTasks.forEach(taskTemplate => {
-                const newTask: Task = {
-                    id: taskIdCounter,
-                    scenarioId: newActiveScenarioId,
-                    userId: student.username,
-                    description: taskTemplate.description,
-                    taskType: taskTemplate.taskType,
-                    status: 'blocked',
-                    details: taskTemplate.details,
-                    taskOrder: taskTemplate.taskOrder,
-                    prerequisiteTaskId: undefined,
-                    environnementId: taskTemplate.environnementId || template.environnementId,
-                };
-                newTasks.set(taskIdCounter, newTask);
-                taskCreationMap.set(taskTemplate.taskOrder, taskIdCounter);
-                taskIdCounter++;
-            });
-            
-            newTasks.forEach(task => {
-                if (task.userId === student.username && task.scenarioId === newActiveScenarioId) {
-                    const originalTemplate = template.tasks.find(t => t.taskOrder === task.taskOrder && t.roleId === roleId);
-                    if (originalTemplate) {
-                       if (originalTemplate.prerequisiteTaskId) {
-                           const prereqNewId = taskCreationMap.get(originalTemplate.prerequisiteTaskId);
-                           task.prerequisiteTaskId = prereqNewId;
-                       }
-                       if (!task.prerequisiteTaskId) {
-                           task.status = 'todo';
-                       }
-                    }
-                }
-            });
+      if (!state.currentUserPermissions?.canManageScenarios) return state;
+      const { templateId, classId } = action.payload;
+      const template = state.scenarioTemplates.get(templateId);
+      if (!template) return state;
+  
+      const newActiveScenarioId = state.activeScenarioIdCounter;
+      const newActiveScenario: ActiveScenario = {
+        id: newActiveScenarioId,
+        templateId,
+        classId,
+        status: 'running',
+        createdAt: new Date().toISOString(),
+        environnementId: state.currentEnvironmentId,
+      };
+      const newActiveScenarios = new Map(state.activeScenarios);
+      newActiveScenarios.set(newActiveScenarioId, newActiveScenario);
+  
+      const studentsInClass = Array.from(state.users.values()).filter(u => u.classId === classId && u.profile === 'élève');
+      const rolesToAssign = template.rolesRequis;
+      const newUsers = new Map(state.users);
+      const newTasks = new Map(state.tasks);
+      let taskIdCounter = state.taskIdCounter;
+  
+      studentsInClass.forEach((student, index) => {
+        const roleId = rolesToAssign[index % rolesToAssign.length];
+        const updatedUser = { ...student, roleId };
+        newUsers.set(student.username, updatedUser);
+  
+        const studentTasks = template.tasks.filter(t => t.roleId === roleId);
+        const taskCreationMap = new Map<number, number>(); // template.taskOrder -> new taskId
+  
+        studentTasks.forEach(taskTemplate => {
+          const newTask: Task = {
+            id: taskIdCounter,
+            scenarioId: newActiveScenarioId,
+            userId: student.username,
+            description: taskTemplate.description,
+            taskType: taskTemplate.taskType,
+            status: 'blocked',
+            details: taskTemplate.details,
+            taskOrder: taskTemplate.taskOrder,
+            environnementId: taskTemplate.environnementId || template.environnementId,
+          };
+          newTasks.set(taskIdCounter, newTask);
+          taskCreationMap.set(taskTemplate.taskOrder, taskIdCounter);
+          taskIdCounter++;
         });
+  
+        // Second pass to link prerequisites using newly created task IDs
+        taskCreationMap.forEach((newTaskId, templateTaskOrder) => {
+            const taskToUpdate = newTasks.get(newTaskId)!;
+            const originalTemplateTask = studentTasks.find(t => t.taskOrder === templateTaskOrder)!;
+            
+            if (originalTemplateTask.prerequisiteTaskId) {
+                const newPrereqId = taskCreationMap.get(originalTemplateTask.prerequisiteTaskId);
+                taskToUpdate.prerequisiteTaskId = newPrereqId;
+            }
 
-        // This is the key fix: if the currently logged-in user is a student in the launched class,
-        // we must update their user object in the state *and* their permissions.
-        let updatedCurrentUser = state.currentUser;
-        let updatedPermissions = state.currentUserPermissions;
-        if (state.currentUser && studentsInClass.some(s => s.username === state.currentUser?.username)) {
-            updatedCurrentUser = newUsers.get(state.currentUser.username) || state.currentUser;
-            updatedPermissions = state.roles.get(updatedCurrentUser.roleId)?.permissions || null;
-        }
-
-
-        newState = {
-            ...state,
-            activeScenarios: newActiveScenarios,
-            users: newUsers,
-            tasks: newTasks,
-            activeScenarioIdCounter: newActiveScenarioId + 1,
-            taskIdCounter: taskIdCounter,
-            currentUser: updatedCurrentUser,
-            currentUserPermissions: updatedPermissions
-        };
-        break;
+             // Unlock tasks without prerequisites
+            if (!taskToUpdate.prerequisiteTaskId) {
+                taskToUpdate.status = 'todo';
+            }
+        });
+      });
+  
+      let updatedCurrentUser = state.currentUser;
+      let updatedPermissions = state.currentUserPermissions;
+      if (state.currentUser && studentsInClass.some(s => s.username === state.currentUser?.username)) {
+        updatedCurrentUser = newUsers.get(state.currentUser.username) || state.currentUser;
+        updatedPermissions = state.roles.get(updatedCurrentUser.roleId)?.permissions || null;
+      }
+  
+      newState = {
+        ...state,
+        activeScenarios: newActiveScenarios,
+        users: newUsers,
+        tasks: newTasks,
+        activeScenarioIdCounter: newActiveScenarioId + 1,
+        taskIdCounter: taskIdCounter,
+        currentUser: updatedCurrentUser,
+        currentUserPermissions: updatedPermissions,
+      };
+      break;
     }
     case 'GENERATE_ARTICLES_BATCH': {
         if (!state.currentUserPermissions?.canManageStock || !state.currentUser) return state;
@@ -1138,7 +1135,9 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
         const scenariosFromStorage = parsedState.scenarioTemplates ? new Map(parsedState.scenarioTemplates.map((st: ScenarioTemplate) => [st.id, st])) : new Map();
         const mergedScenarios = new Map(initialState.scenarioTemplates);
         scenariosFromStorage.forEach((value: ScenarioTemplate, key: number) => {
-            mergedScenarios.set(key, value);
+            if (!initialState.scenarioTemplates.has(key)) {
+                mergedScenarios.set(key, value);
+            }
         });
 
 
