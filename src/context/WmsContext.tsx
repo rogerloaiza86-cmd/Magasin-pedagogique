@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
@@ -72,7 +73,7 @@ ROLES.set('tms_affreteur', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: false,
         canReceiveBC: false, canCreateBL: false, canPrepareBL: false, canShipBL: false,
         canManageStock: false, canViewStock: false, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageFleet: false, canManageQuotes: true,
+        canManageScenarios: false, canManageFleet: false, canManageQuotes: false,
     }
 });
 
@@ -940,11 +941,8 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                     const originalTemplate = template.tasks.find(t => t.taskOrder === task.taskOrder && t.roleId === roleId);
                     if (originalTemplate) {
                        if (originalTemplate.prerequisite) {
-                           const prereqTemplateTask = template.tasks.find(t => t.roleId === roleId && t.taskOrder === originalTemplate.prerequisite);
-                           if(prereqTemplateTask) {
-                               const prereqNewId = taskCreationMap.get(prereqTemplateTask.taskOrder);
-                               task.prerequisiteTaskId = prereqNewId;
-                           }
+                           const prereqNewId = taskCreationMap.get(originalTemplate.prerequisite);
+                           task.prerequisiteTaskId = prereqNewId;
                        }
                        if (!task.prerequisiteTaskId) {
                            task.status = 'todo';
