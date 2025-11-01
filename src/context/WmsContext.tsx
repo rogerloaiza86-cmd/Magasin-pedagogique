@@ -73,7 +73,7 @@ ROLES.set('tms_affreteur', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: false,
         canReceiveBC: false, canCreateBL: false, canPrepareBL: false, canShipBL: false,
         canManageStock: false, canViewStock: false, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: true,
+        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: false,
     }
 });
 
@@ -899,36 +899,33 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         if (!state.currentUserPermissions?.canManageScenarios) return state;
         const { templateId, classId } = action.payload;
         const template = state.scenarioTemplates.get(templateId);
-        if (!template) return state;
+        if (!template || !template.rolesRequis.length) return state;
     
         const newActiveScenarioId = state.activeScenarioIdCounter;
         const newActiveScenarios = new Map(state.activeScenarios);
-        const newActiveScenario: ActiveScenario = {
+        newActiveScenarios.set(newActiveScenarioId, {
             id: newActiveScenarioId,
             templateId,
             classId,
             status: 'running',
             createdAt: new Date().toISOString(),
-            environnementId: state.currentEnvironmentId,
-        };
-        newActiveScenarios.set(newActiveScenarioId, newActiveScenario);
+            environnementId: template.environnementId,
+        });
     
         const studentsInClass = Array.from(state.users.values()).filter(u => u.classId === classId && u.profile === 'élève');
         const rolesToAssign = template.rolesRequis;
         const newUsers = new Map(state.users);
         const newTasks = new Map(state.tasks);
         let taskIdCounter = state.taskIdCounter;
-        
         let localCurrentUser = state.currentUser;
         let localCurrentUserPermissions = state.currentUserPermissions;
-
+    
         studentsInClass.forEach((student, index) => {
             const roleId = rolesToAssign[index % rolesToAssign.length];
             const updatedUser = { ...student, roleId };
             newUsers.set(student.username, updatedUser);
-
-            // If the current user is the student being updated, also update the top-level current user.
-            if(state.currentUser && state.currentUser.username === student.username){
+    
+            if (state.currentUser && state.currentUser.username === student.username) {
                 localCurrentUser = updatedUser;
                 localCurrentUserPermissions = state.roles.get(roleId)?.permissions || null;
             }
@@ -936,7 +933,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
             template.tasks.forEach(taskTemplate => {
                 if (taskTemplate.roleId === roleId) {
                     const newTaskId = taskIdCounter++;
-                    const newTask: Task = {
+                    newTasks.set(newTaskId, {
                         id: newTaskId,
                         scenarioId: newActiveScenarioId,
                         userId: student.username,
@@ -947,8 +944,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         taskOrder: taskTemplate.taskOrder,
                         prerequisiteTaskId: taskTemplate.prerequisiteTaskId,
                         environnementId: taskTemplate.environnementId || template.environnementId,
-                    };
-                    newTasks.set(newTaskId, newTask);
+                    });
                 }
             });
         });
