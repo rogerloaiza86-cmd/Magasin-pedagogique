@@ -119,12 +119,13 @@ function ScenarioProgress() {
             </Card>
         );
     }
-
+    
     const template = scenarioTemplates.get(userActiveScenario.templateId);
     const userTasks = Array.from(tasks.values()).filter(t => t.userId === currentUser.username && t.scenarioId === userActiveScenario.id);
-    const tasksInCurrentEnv = userTasks.filter(t => t.environnementId === currentEnvironmentId && t.status === 'todo');
-    const totalTasks = userTasks.length;
     const completedTasks = userTasks.filter(t => t.status === 'completed').length;
+    const totalTasks = userTasks.length;
+
+    const tasksInCurrentEnv = userTasks.filter(t => t.environnementId === currentEnvironmentId && t.status === 'todo');
     
     const otherEnvTasks = userTasks.filter(t => t.environnementId !== currentEnvironmentId && t.status === 'todo');
     const nextEnvId = otherEnvTasks.length > 0 ? otherEnvTasks[0].environnementId : null;
@@ -159,7 +160,7 @@ function ScenarioProgress() {
                         {nextEnv ? (
                              <p>Vous avez terminé vos tâches dans cet environnement. <br/><span className="font-semibold mt-2 block">Passez à l'environnement "{nextEnv.name}" pour continuer !</span></p>
                         ) : (
-                            <p>Vous n'avez pas de nouvelles tâches assignées dans cet environnement pour le moment. Vous avez peut-être terminé le scénario !</p>
+                             <p>Vous n'avez pas de nouvelles tâches assignées pour le moment. Vous avez peut-être terminé le scénario !</p>
                         )}
                     </div>
                 )}
@@ -287,5 +288,7 @@ export function DashboardClient() {
     </div>
   );
 }
+
+    
 
     
