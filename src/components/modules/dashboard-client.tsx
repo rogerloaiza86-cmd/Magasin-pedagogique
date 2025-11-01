@@ -19,11 +19,15 @@ import {
     CheckCircle2,
     Package,
     AlertTriangle,
-    RotateCcw
+    RotateCcw,
+    Siren,
+    Info,
+    PackageX
 } from "lucide-react";
 import Link from "next/link";
 import type { Environment, Task } from "@/lib/types";
 import { Badge } from "../ui/badge";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 type AppItem = {
   href: string;
@@ -144,6 +148,58 @@ function ScenarioProgress() {
     )
 }
 
+function SystemAlerts() {
+    const { state } = useWms();
+    const { articles, currentEnvironmentId } = state;
+    const articlesInEnv = Array.from(articles.values()).filter(a => a.environnementId === currentEnvironmentId);
+
+    const outOfStockArticles = articlesInEnv.filter(a => a.stock === 0).length;
+    const lowStockArticles = articlesInEnv.filter(a => a.stock > 0 && a.stock < 5).length;
+
+    if (outOfStockArticles === 0 && lowStockArticles === 0) {
+        return null;
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex items-center gap-2">
+                    <Siren className="h-5 w-5 text-destructive" />
+                    <CardTitle className="text-xl">Alertes Système</CardTitle>
+                </div>
+                <CardDescription>Informations importantes sur l'état de l'entrepôt.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+                {outOfStockArticles > 0 && (
+                    <Alert variant="destructive">
+                        <PackageX className="h-4 w-4" />
+                        <AlertTitle className="font-semibold">Rupture de Stock</AlertTitle>
+                        <AlertDescription>
+                            {outOfStockArticles} article(s) sont en rupture de stock.
+                        </AlertDescription>
+                    </Alert>
+                )}
+                {lowStockArticles > 0 && (
+                     <Alert>
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle className="font-semibold">Stock Faible</AlertTitle>
+                        <AlertDescription>
+                           {lowStockArticles} article(s) sont sous le seuil d'alerte (moins de 5 unités).
+                        </AlertDescription>
+                    </Alert>
+                )}
+                <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertTitle>Info</AlertTitle>
+                    <AlertDescription>
+                        Les données de stock sont synchronisées en temps réel.
+                    </AlertDescription>
+                </Alert>
+            </CardContent>
+        </Card>
+    );
+}
+
 export function DashboardClient() {
   const { state } = useWms();
   const { currentUser, currentUserPermissions, environments, currentEnvironmentId, documents, articles } = state;
@@ -175,6 +231,7 @@ export function DashboardClient() {
   const pendingReturns = Array.from(documents.values()).filter(d => d.environnementId === currentEnvironmentId && d.type === 'Retour Client' && d.status === 'En attente de traitement').length;
 
   const showKpis = currentEnv?.type === 'WMS';
+  const showSystemAlerts = currentEnv?.type === 'WMS';
 
   return (
     <div className="space-y-6">
@@ -182,6 +239,8 @@ export function DashboardClient() {
             <h1 className="text-3xl font-bold tracking-tight">Bonjour, {currentUser?.username} !</h1>
             <p className="text-muted-foreground">Bienvenue dans votre espace {currentEnv?.name}. Choisissez une application pour commencer.</p>
         </div>
+
+        {showSystemAlerts && <SystemAlerts />}
 
         {showKpis && (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -202,3 +261,5 @@ export function DashboardClient() {
     </div>
   );
 }
+
+    
