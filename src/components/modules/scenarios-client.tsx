@@ -182,7 +182,7 @@ function ScenarioTemplateForm({ template, onSave, onCancel }: { template?: Scena
 
 export function ScenariosClient() {
   const { state, dispatch } = useWms();
-  const { currentUser, currentUserPermissions, scenarioTemplates, classes, currentEnvironmentId, activeScenarios } = state;
+  const { currentUser, currentUserPermissions, scenarioTemplates, classes, currentEnvironmentId, activeScenarios, environments } = state;
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<ScenarioTemplate | undefined>(undefined);
@@ -231,6 +231,7 @@ export function ScenariosClient() {
   const teacherClasses = currentUser?.profile === 'Administrateur' 
     ? Array.from(classes.values())
     : Array.from(classes.values()).filter(c => c.teacherIds?.includes(currentUser?.username || ''));
+  const currentEnv = environments.get(currentEnvironmentId);
 
   return (
     <div className="space-y-6">
@@ -239,7 +240,7 @@ export function ScenariosClient() {
           <div>
             <CardTitle>Bibliothèque de Scénarios</CardTitle>
             <CardDescription>
-              Créez, modifiez et lancez des scénarios pour vos classes dans cet environnement.
+              Créez, modifiez et lancez des scénarios. Les modèles affichés sont spécifiques à l'environnement actuel : <span className="font-bold">{currentEnv?.name}</span>.
             </CardDescription>
           </div>
           <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
@@ -288,7 +289,7 @@ export function ScenariosClient() {
                         <Button size="sm" onClick={() => setLaunchingTemplate(template)} disabled={!!runningInstance}><Rocket className="mr-2"/>Lancer</Button>
                     </div>
                 </Card>
-            )}) : <p className="text-muted-foreground text-center py-8">Aucun modèle de scénario. Créez-en un pour commencer !</p>}
+            )}) : <p className="text-muted-foreground text-center py-8">Aucun modèle de scénario pour cet environnement. Créez-en un pour commencer ou changez d'environnement.</p>}
           </div>
         </CardContent>
       </Card>
@@ -321,5 +322,3 @@ export function ScenariosClient() {
     </div>
   );
 }
-
-    
