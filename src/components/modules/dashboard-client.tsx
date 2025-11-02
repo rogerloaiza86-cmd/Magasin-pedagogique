@@ -8,27 +8,19 @@ import {
     Warehouse,
     ArrowDownToLine,
     ArrowUpFromLine,
-    BrainCircuit,
     FileText,
     BookUser,
     Mail,
-    Swords,
-    Truck,
     Archive,
-    FileSignature,
     CheckCircle2,
     Package,
     AlertTriangle,
     RotateCcw,
     Siren,
-    Info,
-    PackageX,
-    ListTodo,
     Users2
 } from "lucide-react";
 import Link from "next/link";
-import type { Environment, Task } from "@/lib/types";
-import { Badge } from "../ui/badge";
+import type { Environment } from "@/lib/types";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useRouter } from "next/navigation";
 
@@ -47,30 +39,21 @@ type AppItem = {
     | 'canShipBL'
     | 'canViewStock'
     | 'canManageClasses'
-    | 'canUseIaTools'
     | 'canUseMessaging'
-    | 'canManageScenarios'
-    | 'canManageFleet'
-    | 'canManageQuotes'
     | 'canManageStudents';
-  envType: Environment['type'] | 'ALL';
   isSuperAdminOnly?: boolean;
 };
 
 const appItems: AppItem[] = [
-  { href: "/stock", label: "Inventaire", icon: Warehouse, color: "text-purple-500", permission: 'canViewStock', envType: 'WMS' },
-  { href: "/articles", label: "Articles", icon: Archive, color: "text-orange-500", permission: 'canViewStock', envType: 'WMS'},
-  { href: "/flux-entrant", label: "Achats", icon: ArrowDownToLine, color: "text-sky-500", permission: 'canCreateBC', envType: 'WMS' },
-  { href: "/flux-sortant", label: "Ventes", icon: ArrowUpFromLine, color: "text-red-500", permission: 'canCreateBL', envType: 'WMS' },
-  { href: "/tiers", label: "Tiers", icon: Users, color: "text-green-500", permission: 'canViewTiers', envType: 'ALL' },
-  { href: "/devis", label: "Devis", icon: FileSignature, color: "text-pink-500", permission: 'canManageQuotes', envType: 'TMS' },
-  { href: "/flotte", label: "Flotte", icon: Truck, color: "text-yellow-500", permission: 'canManageFleet', envType: 'TMS' },
-  { href: "/documents", label: "Documents", icon: FileText, color: "text-indigo-500", permission: 'canViewDashboard', envType: 'ALL' },
-  { href: "/messaging", label: "Messagerie", icon: Mail, color: "text-blue-500", permission: 'canUseMessaging', envType: 'ALL' },
-  { href: "/scenarios", label: "Scénarios", icon: Swords, color: "text-rose-500", permission: 'canManageScenarios', envType: 'ALL'},
-  { href: "/ia-tools", label: "Outils d'IA", icon: BrainCircuit, color: "text-cyan-500", permission: 'canUseIaTools', envType: 'ALL' },
-  { href: "/gestion-eleves", label: "Élèves", icon: Users2, permission: "canManageStudents", envType: 'ALL', isSuperAdminOnly: false },
-  { href: "/classes", label: "Classes", icon: BookUser, color: "text-amber-500", isSuperAdminOnly: true, envType: 'ALL', permission: 'canManageClasses' },
+  { href: "/stock", label: "Inventaire", icon: Warehouse, color: "text-purple-500", permission: 'canViewStock' },
+  { href: "/articles", label: "Articles", icon: Archive, color: "text-orange-500", permission: 'canViewStock'},
+  { href: "/flux-entrant", label: "Achats", icon: ArrowDownToLine, color: "text-sky-500", permission: 'canCreateBC' },
+  { href: "/flux-sortant", label: "Ventes", icon: ArrowUpFromLine, color: "text-red-500", permission: 'canCreateBL' },
+  { href: "/tiers", label: "Tiers", icon: Users, color: "text-green-500", permission: 'canViewTiers' },
+  { href: "/documents", label: "Documents", icon: FileText, color: "text-indigo-500", permission: 'canViewDashboard' },
+  { href: "/messaging", label: "Messagerie", icon: Mail, color: "text-blue-500", permission: 'canUseMessaging' },
+  { href: "/gestion-eleves", label: "Élèves", icon: Users2, permission: "canManageStudents", isSuperAdminOnly: false },
+  { href: "/classes", label: "Classes", icon: BookUser, color: "text-amber-500", isSuperAdminOnly: true, permission: 'canManageClasses' },
 ];
 
 function AppCard({ item }: { item: AppItem }) {
@@ -103,36 +86,6 @@ function KpiCard({ title, value, icon: Icon, color, onClick }: { title: string, 
     )
 }
 
-function ScenarioProgress() {
-    const { state } = useWms();
-    const { currentUser, tasks, activeScenarios, scenarioTemplates } = state;
-    
-    if (!currentUser || currentUser.profile !== 'élève') return null;
-
-    const userActiveScenario = Array.from(activeScenarios.values()).find(sc => sc.classId === currentUser.classId && sc.status === 'running');
-    
-    if (!userActiveScenario) {
-        return null;
-    }
-    
-    const template = scenarioTemplates.get(userActiveScenario.templateId);
-    
-    return (
-        <Card className="border-primary bg-primary/5">
-            <CardHeader>
-                <div className="flex items-center gap-3">
-                    <Swords className="h-6 w-6 text-primary"/>
-                    <CardTitle>Scénario en cours : {template?.title}</CardTitle>
-                </div>
-                <CardDescription>{template?.description}</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <p className="text-primary-foreground font-medium">Un scénario est en cours. Consultez votre <Link href="/messaging" className="underline font-bold">messagerie</Link> pour recevoir vos instructions et commencer à travailler.</p>
-            </CardContent>
-        </Card>
-    );
-}
-
 function SystemAlerts() {
     const { state } = useWms();
     const { articles, currentEnvironmentId, currentUserPermissions } = state;
@@ -163,7 +116,7 @@ function SystemAlerts() {
             <CardContent className="space-y-3">
                 {outOfStockArticles > 0 && (
                     <Alert variant="destructive">
-                        <PackageX className="h-4 w-4" />
+                        <Package className="h-4 w-4" />
                         <AlertTitle className="font-semibold">Rupture de Stock</AlertTitle>
                         <AlertDescription>
                             <Link href="/articles" className="underline">{outOfStockArticles} article(s)</Link> sont en rupture de stock.
@@ -202,9 +155,6 @@ export function DashboardClient() {
     if (item.permission && !currentUserPermissions[item.permission]) {
         return false;
     }
-    if (item.envType !== 'ALL' && item.envType !== currentEnv?.type) {
-        return false;
-    }
      if (item.href === "/flux-entrant") {
       return currentUserPermissions.canCreateBC || currentUserPermissions.canReceiveBC;
     }
@@ -220,15 +170,14 @@ export function DashboardClient() {
   const articlesInStock = Array.from(articles.values()).filter(a => a.environnementId === currentEnvironmentId).length;
   const pendingReturns = Array.from(documents.values()).filter(d => d.environnementId === currentEnvironmentId && d.type === 'Retour Client' && d.status === 'En attente de traitement').length;
 
-  const showWmsKpis = currentEnv?.type === 'WMS';
-  const showSystemAlerts = currentEnv?.type === 'WMS' && (currentUser?.profile === 'professeur' || currentUser?.profile === 'Administrateur' || currentUserPermissions.canCreateBC);
+  const showSystemAlerts = currentUser?.profile === 'professeur' || currentUser?.profile === 'Administrateur' || currentUserPermissions.canCreateBC;
 
   const kpiItems = [
     { title: "BC en attente de réception", value: pendingPOs, icon: ArrowDownToLine, color: "text-sky-500", show: currentUserPermissions.canReceiveBC, onClick: () => router.push('/flux-entrant?tab=receive') },
     { title: "BL en attente de préparation", value: pendingSOs, icon: ArrowUpFromLine, color: "text-red-500", show: currentUserPermissions.canPrepareBL, onClick: () => router.push('/flux-sortant?tab=prepare') },
     { title: "Articles en Stock", value: articlesInStock, icon: Package, color: "text-purple-500", show: currentUserPermissions.canViewStock, onClick: () => router.push('/articles') },
     { title: "Retours à traiter", value: pendingReturns, icon: RotateCcw, color: "text-orange-500", show: currentUserPermissions.canReceiveBC, onClick: () => router.push('/flux-entrant?tab=returns') },
-  ].filter(kpi => showWmsKpis && kpi.show);
+  ].filter(kpi => kpi.show);
 
 
   return (
@@ -237,8 +186,6 @@ export function DashboardClient() {
             <h1 className="text-3xl font-bold tracking-tight">Bonjour, {currentUser?.username} !</h1>
             <p className="text-muted-foreground">Bienvenue dans votre espace {currentEnv?.name}. Choisissez une application pour commencer.</p>
         </div>
-
-        <ScenarioProgress />
 
         {showSystemAlerts && <SystemAlerts />}
 

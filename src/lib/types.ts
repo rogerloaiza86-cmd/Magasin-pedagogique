@@ -132,13 +132,8 @@ export type Permissions = {
     canManageStock: boolean;
     canViewStock: boolean;
     canManageClasses: boolean;
-    canUseIaTools: boolean;
     canUseMessaging: boolean;
-    canManageScenarios: boolean;
     canManageStudents: boolean;
-    // TMS Permissions to be added
-    canManageFleet: boolean;
-    canManageQuotes: boolean;
     profile: UserProfile;
 }
 
@@ -178,29 +173,22 @@ export type Email = {
 // --- SCENARIO ENGINE TYPES ---
 
 export type TaskType = 
-    | 'ACTION' // A task requiring the student to perform an action in the WMS, usually triggered by an email.
-    | 'VALIDATION'; // Teacher validation step
+    | 'CREATE_TIERS_CLIENT' 
+    | 'CREATE_TIERS_FOURNISSEUR'
+    | 'CREATE_TIERS_TRANSPORTEUR'
+    | 'CREATE_BC'
+    | 'RECEIVE_BC'
+    | 'CREATE_BL'
+    | 'PREPARE_BL'
+    | 'SHIP_BL'
+    | 'MANUAL_VALIDATION';
 
 export type ScenarioTaskTemplate = {
     taskOrder: number;
     roleId: string;
+    description: string;
     taskType: TaskType;
-    prerequisiteTaskOrder?: number;
-    
-    // Details for the instruction email sent to the student.
-    emailDetails: {
-        sender: string; // e.g., "Client Alpha", "Service Achat", "SystemLogiSim"
-        subject: string;
-        body: string;
-    };
-    
-    // For automatic validation later
-    validationDetails?: {
-        actionToValidate: 'CREATE_BC' | 'RECEIVE_BC_ANOMALY' | 'CREATE_BL' | 'SHIP_BL' | 'CREATE_TIER';
-        // Add more criteria later, e.g., quantity checks
-    };
-
-    environnementId?: string; // If undefined, uses the scenario's default environment
+    prerequisite?: number;
 };
 
 export type ScenarioTemplate = {
@@ -231,21 +219,10 @@ export type Task = {
     id: number;
     scenarioId: number;
     userId: string;
-    description: string; // Comes from ScenarioTaskTemplate.emailDetails.body
+    description: string; 
     status: TaskStatus;
     taskType: TaskType;
     taskOrder: number;
     prerequisiteTaskOrder?: number;
     environnementId: string; // The specific environment where this task must be done
 };
-
-// --- TMS SPECIFIC TYPES ---
-export type GrilleTarifaire = {
-    id: string;
-    name: string;
-    tarifs: {
-        distance: { palier: number; prixKm: number }[];
-        poids: { palier: number; supplement: number }[];
-        base: number;
-    }
-}

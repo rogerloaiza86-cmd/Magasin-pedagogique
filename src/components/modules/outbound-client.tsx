@@ -2,7 +2,6 @@
 "use client";
 
 import { useWms } from "@/context/WmsContext";
-import { optimizePickingRoute } from "@/ai/flows/optimize-picking-route";
 import { useState, useMemo } from "react";
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import {
@@ -31,7 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Trash2, PlusCircle, Loader2, Wand2 } from "lucide-react";
+import { Trash2, PlusCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -45,7 +44,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import type { Article, Document as WmsDocument } from "@/lib/types";
+import type { WmsDocument } from "@/lib/types";
 import { useSearchParams } from "next/navigation";
 
 
@@ -221,12 +220,10 @@ function PrepareOrder() {
   const {currentUser, currentEnvironmentId} = state;
   const pendingDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "En préparation" && d.environnementId === currentEnvironmentId).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
   
-  const [isLoading, setIsLoading] = useState(false);
-  const [pickingList, setPickingList] = useState<Article[] | null>(null);
+  const [pickingList, setPickingList] = useState<any[] | null>(null);
   const [currentDoc, setCurrentDoc] = useState<WmsDocument | null>(null);
 
   const handleGeneratePickingList = async (doc: WmsDocument) => {
-    setIsLoading(true);
     setCurrentDoc(doc);
     const itemsToPick = doc.lines.map(line => {
         const article = getArticle(line.articleId);
@@ -238,28 +235,12 @@ function PrepareOrder() {
         }
     });
 
-    try {
-      const result = await optimizePickingRoute({ items: itemsToPick });
-      const optimizedArticles = result.optimizedRoute.map(item => ({
+    const standardList = itemsToPick.map(item => ({
         ...getArticle(item.ID_Article)!,
         stock: item.Quantite // Using stock field to show quantity to pick
-      }));
-      setPickingList(optimizedArticles);
-    } catch(error) {
-        console.error("AI Error:", error);
-        toast({
-            variant: "destructive",
-            title: "Erreur IA",
-            description: "La génération de la liste de picking optimisée a échoué. Utilisation d'une liste standard."
-        });
-        const standardList = doc.lines.map(line => ({
-          ...getArticle(line.articleId)!,
-          stock: line.quantity
-        })).sort((a,b) => a.location.localeCompare(b.location));
-        setPickingList(standardList);
-    } finally {
-        setIsLoading(false);
-    }
+      })).sort((a,b) => a.location.localeCompare(b.location));
+
+    setPickingList(standardList);
   }
 
   const handlePreparationFinished = () => {
@@ -279,7 +260,7 @@ function PrepareOrder() {
       <Card>
         <CardHeader>
           <CardTitle>Préparer une Commande (Picking)</CardTitle>
-          <CardDescription>Générez un bon de préparation optimisé pour un BL.</CardDescription>
+          <CardDescription>Générez un bon de préparation pour un BL.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -292,8 +273,7 @@ function PrepareOrder() {
                     <TableCell>{getTier(dn.tierId)?.name || 'N/A'}</TableCell>
                     <TableCell>{new Date(dn.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right">
-                      <Button onClick={() => handleGeneratePickingList(dn)} disabled={isLoading}>
-                        {isLoading && currentDoc?.id === dn.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Wand2 className="mr-2 h-4 w-4"/>}
+                      <Button onClick={() => handleGeneratePickingList(dn)}>
                         Générer Bon de Préparation
                       </Button>
                     </TableCell>
@@ -310,7 +290,7 @@ function PrepareOrder() {
       <Dialog open={!!pickingList} onOpenChange={() => { setPickingList(null); setCurrentDoc(null); }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Bon de Préparation Optimisé pour BL #{currentDoc?.id}</DialogTitle>
+            <DialogTitle>Bon de Préparation pour BL #{currentDoc?.id}</DialogTitle>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto">
           <Table>

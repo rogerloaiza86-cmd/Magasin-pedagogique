@@ -10,17 +10,12 @@ import {
   Warehouse,
   ArrowDownToLine,
   ArrowUpFromLine,
-  BrainCircuit,
   Boxes,
   LogOut,
   FileText,
   BookUser,
   Mail,
-  Swords,
-  Globe,
-  Truck,
   Archive,
-  FileSignature,
   Users2,
 } from "lucide-react";
 
@@ -37,8 +32,6 @@ import {
 } from "@/components/ui/sidebar";
 import { useWms } from "@/context/WmsContext";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { Environment } from "@/lib/types";
 import { WmsProvider } from '@/context/WmsContext';
 import { Toaster } from '@/components/ui/toaster';
 import { AppStateSync } from '@/components/AppStateSync';
@@ -58,31 +51,22 @@ type NavItem = {
     | 'canShipBL'
     | 'canViewStock'
     | 'canManageClasses'
-    | 'canUseIaTools'
     | 'canUseMessaging'
-    | 'canManageScenarios'
-    | 'canManageFleet'
-    | 'canManageQuotes'
     | 'canManageStudents';
-  envType: Environment['type'] | 'ALL';
   isSuperAdminOnly?: boolean;
 };
 
 const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: Home, permission: 'canViewDashboard', envType: 'ALL' },
-  { href: "/scenarios", label: "Scénarios", icon: Swords, permission: 'canManageScenarios', envType: 'ALL'},
-  { href: "/articles", label: "Fichier Articles", icon: Archive, permission: 'canViewStock', envType: 'WMS'},
-  { href: "/tiers", label: "Gestion des Tiers", icon: Users, permission: 'canViewTiers', envType: 'ALL' },
-  { href: "/devis", label: "Devis Transport", icon: FileSignature, permission: 'canManageQuotes', envType: 'TMS' },
-  { href: "/flotte", label: "Flotte", icon: Truck, permission: 'canManageFleet', envType: 'TMS' },
-  { href: "/flux-entrant", label: "Flux Entrant", icon: ArrowDownToLine, permission: 'canCreateBC', envType: 'WMS' },
-  { href: "/flux-sortant", label: "Flux Sortant", icon: ArrowUpFromLine, permission: 'canCreateBL', envType: 'WMS' },
-  { href: "/stock", label: "Gestion des Stocks", icon: Warehouse, permission: 'canViewStock', envType: 'WMS' },
-  { href: "/documents", label: "Documents", icon: FileText, permission: 'canViewDashboard', envType: 'ALL' },
-  { href: "/messaging", label: "Messagerie", icon: Mail, permission: 'canUseMessaging', envType: 'ALL' },
-  { href: "/classes", label: "Gestion des Classes", icon: BookUser, permission: 'canManageClasses', envType: 'ALL', isSuperAdminOnly: false },
-  { href: "/gestion-eleves", label: "Gestion des Élèves", icon: Users2, permission: 'canManageStudents', envType: 'ALL', isSuperAdminOnly: false },
-  { href: "/ia-tools", label: "Outils d'IA", icon: BrainCircuit, permission: 'canUseIaTools', envType: 'ALL' },
+  { href: "/dashboard", label: "Dashboard", icon: Home, permission: 'canViewDashboard' },
+  { href: "/articles", label: "Fichier Articles", icon: Archive, permission: 'canViewStock'},
+  { href: "/tiers", label: "Gestion des Tiers", icon: Users, permission: 'canViewTiers' },
+  { href: "/flux-entrant", label: "Flux Entrant", icon: ArrowDownToLine, permission: 'canCreateBC' },
+  { href: "/flux-sortant", label: "Flux Sortant", icon: ArrowUpFromLine, permission: 'canCreateBL' },
+  { href: "/stock", label: "Gestion des Stocks", icon: Warehouse, permission: 'canViewStock' },
+  { href: "/documents", label: "Documents", icon: FileText, permission: 'canViewDashboard' },
+  { href: "/messaging", label: "Messagerie", icon: Mail, permission: 'canUseMessaging' },
+  { href: "/classes", label: "Gestion des Classes", icon: BookUser, permission: 'canManageClasses', isSuperAdminOnly: false },
+  { href: "/gestion-eleves", label: "Gestion des Élèves", icon: Users2, permission: 'canManageStudents', isSuperAdminOnly: false },
 ];
 
 function MainLayout({
@@ -99,10 +83,6 @@ function MainLayout({
     dispatch({ type: "LOGOUT" });
   };
   
-  const handleEnvironmentChange = (envId: string) => {
-    dispatch({ type: 'SET_ENVIRONMENT', payload: { environmentId: envId }});
-  }
-
   const userInitials = currentUser?.username.substring(0, 2).toUpperCase() || '??';
 
   const visibleNavItems = navItems.filter(item => {
@@ -113,11 +93,6 @@ function MainLayout({
         return false;
     }
     
-    // Filter by environment type
-    if (item.envType && item.envType !== 'ALL' && item.envType !== currentEnv?.type) {
-        return false;
-    }
-
     // Special logic for grouped menus
     if (item.href === "/flux-entrant") {
       return currentUserPermissions.canCreateBC || currentUserPermissions.canReceiveBC;
@@ -126,10 +101,6 @@ function MainLayout({
       return currentUserPermissions.canCreateBL || currentUserPermissions.canPrepareBL || currentUserPermissions.canShipBL;
     }
     
-    if (item.href === "/scenarios") {
-        return currentUserPermissions.canManageScenarios;
-    }
-
     // Check for general permission if it exists
     if (item.permission && !currentUserPermissions[item.permission]) {
         return false;
@@ -150,23 +121,8 @@ function MainLayout({
               <Boxes className="h-8 w-8 text-primary" />
               <div>
                 <h1 className="text-lg font-bold">LogiSim Hub</h1>
-                <p className="text-xs text-muted-foreground">Lycée Gaspard Monge</p>
+                <p className="text-xs text-muted-foreground">{currentEnv?.name}</p>
               </div>
-            </div>
-            <div className="p-2">
-                <Select value={currentEnvironmentId} onValueChange={handleEnvironmentChange}>
-                    <SelectTrigger className="w-full">
-                        <div className="flex items-center gap-2">
-                           <Globe className="h-4 w-4" />
-                           <SelectValue placeholder="Changer d'environnement..." />
-                        </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                        {Array.from(environments.values()).map(env => (
-                            <SelectItem key={env.id} value={env.id}>{env.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
             </div>
           </SidebarHeader>
           <SidebarContent>
