@@ -44,51 +44,49 @@ type EmailFormData = {
 function ComposeEmail() {
   const { state, dispatch } = useWms();
   const { toast } = useToast();
-  const { currentUser, users, classes, tiers, currentEnvironmentId } = state;
+  const { currentUser, users, classes, tiers } = state;
 
   const { userRecipients, tierRecipients } = useMemo(() => {
     if (!currentUser) return { userRecipients: [], tierRecipients: [] };
 
     const allUsers = Array.from(users.values());
-    let userRecipients: User[] = [];
+    let potentialRecipients: User[] = [];
 
     if (currentUser.profile === 'Administrateur') {
-        userRecipients = allUsers.filter(u => u.username !== currentUser.username);
+        // Admins can see everyone
+        potentialRecipients = allUsers;
     } else if (currentUser.profile === 'professeur') {
+        // Teachers see their students, other teachers, and admins
         const managedClassIds = Array.from(classes.values())
             .filter(c => c.teacherIds?.includes(currentUser.username))
             .map(c => c.id);
         
-        userRecipients = allUsers.filter(u => {
-            if (u.username === currentUser.username) return false;
-            // Add students from managed classes
+        potentialRecipients = allUsers.filter(u => {
             if (u.profile === 'élève' && u.classId && managedClassIds.includes(u.classId)) return true;
-            // Add other teachers and admins
             if (u.profile === 'professeur' || u.profile === 'Administrateur') return true;
             return false;
         });
-
     } else if (currentUser.profile === 'élève') {
+        // Students see their classmates and their teachers
         const studentClass = classes.get(currentUser.classId || -1);
         if (studentClass) {
-             userRecipients = allUsers.filter(u => {
-                if (u.username === currentUser.username) return false;
-                // Add teachers of the class
-                if (u.profile === 'professeur' && studentClass.teacherIds?.includes(u.username)) return true;
-                // Add other students in the same class
+            potentialRecipients = allUsers.filter(u => {
                 if (u.profile === 'élève' && u.classId === currentUser.classId) return true;
+                if (u.profile === 'professeur' && studentClass.teacherIds?.includes(u.username)) return true;
                 return false;
             });
         }
     }
-    
-    // Tiers are available to everyone
-    const tierRecipients = Array.from(tiers.values());
 
-    const uniqueUserRecipients = Array.from(new Map(userRecipients.map(u => [u.username, u])).values())
-      .sort((a, b) => a.username.localeCompare(b.username));
+    // Remove self from recipients and sort
+    const finalUserRecipients = potentialRecipients
+        .filter(u => u.username !== currentUser.username)
+        .sort((a, b) => a.username.localeCompare(b.username));
 
-    return { userRecipients: uniqueUserRecipients, tierRecipients };
+    const finalTierRecipients = Array.from(tiers.values()).sort((a,b) => a.name.localeCompare(b.name));
+
+    return { userRecipients: finalUserRecipients, tierRecipients: finalTierRecipients };
+
   }, [currentUser, users, classes, tiers]);
 
 
@@ -272,5 +270,3 @@ export function MessagingClient() {
     </Tabs>
   );
 }
-
-    
