@@ -212,7 +212,7 @@ export const getInitialState = (): WmsState => {
     tasks: [
         { taskOrder: 1, description: "Créez un nouveau fournisseur pour des pièces automobiles.", roleId: "equipe_reception", taskType: "CREATE_TIERS_FOURNISSEUR", environnementId: 'magasin_pedago' },
         { taskOrder: 2, description: "Passez un Bon de Commande (BC) chez le fournisseur que vous venez de créer pour 5 unités de l'article '23371'.", roleId: "equipe_reception", taskType: "CREATE_BC", prerequisiteTaskId: 1, environnementId: 'magasin_pedago' },
-        { taskOrder: 3, description: "Vous avez reçu une notification. Consultez votre messagerie.", roleId: "equipe_reception", taskType: 'SEND_AUTOMATED_EMAIL', details: { sender: 'System', subject: 'BC en attente de réception', body: 'Le BC pour les pièces automobiles est prêt à être réceptionné.' }, prerequisiteTaskId: 2, environnementId: 'magasin_pedago' },
+        { taskOrder: 3, description: "Consultez votre messagerie, une notification importante vous attend.", roleId: "equipe_reception", taskType: 'SEND_AUTOMATED_EMAIL', details: { sender: 'SystemLogiSim', emailSubject: 'Info: BC en attente de réception', emailBody: 'Le bon de commande pour les pièces automobiles est prêt à être réceptionné dans le système.' }, prerequisiteTaskId: 2, environnementId: 'magasin_pedago' },
         { taskOrder: 4, description: "Réceptionnez la marchandise du Bon de Commande. Déclarez 4 unités reçues conformes et 1 non-conforme.", roleId: "equipe_reception", taskType: "RECEIVE_BC", prerequisiteTaskId: 3, environnementId: 'magasin_pedago' },
         { taskOrder: 5, description: "Créez un nouveau client pour le garage 'Auto-Répar'.", roleId: "equipe_preparation", taskType: "CREATE_TIERS_CLIENT", environnementId: 'magasin_pedago'},
         { taskOrder: 6, description: "Créez un Bon de Livraison (BL) pour le client 'Auto-Répar' avec 3 unités de l'article '23371'.", roleId: "equipe_preparation", taskType: "CREATE_BL", prerequisiteTaskId: 5, environnementId: 'magasin_pedago' },
@@ -970,13 +970,13 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         studentsInClass.forEach(student => {
             template.tasks.forEach(taskTemplate => {
                 if (taskTemplate.roleId === newUsers.get(student.username)?.roleId) {
-                    if (taskTemplate.taskType === 'SEND_AUTOMATED_EMAIL') {
+                    if (taskTemplate.taskType === 'SEND_AUTOMATED_EMAIL' && taskTemplate.details) {
                         const email: Email = {
                             id: emailIdCounter++,
-                            sender: taskTemplate.details?.sender || 'Système',
+                            sender: taskTemplate.details.sender || 'SystemLogiSim',
                             recipient: student.username,
-                            subject: taskTemplate.details?.emailSubject || 'Notification de Tâche',
-                            body: taskTemplate.details?.emailBody || taskTemplate.description,
+                            subject: taskTemplate.details.emailSubject || 'Notification de Tâche',
+                            body: taskTemplate.details.emailBody || taskTemplate.description,
                             timestamp: new Date().toISOString(),
                             isRead: false,
                         };
