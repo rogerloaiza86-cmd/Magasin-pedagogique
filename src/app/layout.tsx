@@ -10,7 +10,6 @@ import {
   Warehouse,
   ArrowDownToLine,
   ArrowUpFromLine,
-  Boxes,
   LogOut,
   FileText,
   BookUser,
@@ -34,6 +33,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { WmsProvider } from '@/context/WmsContext';
 import { Toaster } from '@/components/ui/toaster';
 import { AppStateSync } from '@/components/AppStateSync';
+import { Logo } from "@/components/Logo";
 
 
 type NavItem = {
@@ -63,7 +63,7 @@ const navItems: NavItem[] = [
   { href: "/stock", label: "Gestion des Stocks", icon: Warehouse, permission: 'canViewStock' },
   { href: "/documents", label: "Documents", icon: FileText, permission: 'canViewDashboard' },
   { href: "/messaging", label: "Messagerie", icon: Mail, permission: 'canUseMessaging' },
-  { href: "/classes", label: "Gestion des Classes", icon: BookUser, permission: 'canManageClasses', isSuperAdminOnly: false },
+  { href: "/classes", label: "Gestion des Classes", icon: BookUser, permission: 'canManageClasses' },
 ];
 
 function MainLayout({
@@ -115,10 +115,10 @@ function MainLayout({
         <Sidebar>
           <SidebarHeader>
             <div className="flex items-center gap-2 p-2">
-              <Boxes className="h-8 w-8 text-primary" />
+              <Logo className="h-10 w-10" />
               <div>
-                <h1 className="text-lg font-bold">Magasin Pédagogique</h1>
-                <p className="text-xs text-muted-foreground">Lycée Gaspard Monge</p>
+                <h1 className="text-sm font-bold">Lycée Polyvalent</h1>
+                <p className="text-xs text-muted-foreground">GASPARD MONGE</p>
               </div>
             </div>
           </SidebarHeader>

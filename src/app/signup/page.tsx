@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Boxes } from "lucide-react";
+import { Logo } from "@/components/Logo";
 import { useToast } from "@/hooks/use-toast";
 import { UserProfile } from "@/lib/types";
 
@@ -96,11 +96,11 @@ export default function SignUpPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
-         <div className="flex items-center justify-center gap-2 p-2 mb-4">
-              <Boxes className="h-10 w-10 text-primary" />
+         <div className="flex flex-col items-center justify-center gap-2 p-2 mb-4">
+              <Logo className="h-24 w-24" />
               <div>
-                <h1 className="text-xl font-bold">Magasin Pédagogique</h1>
-                <p className="text-sm text-muted-foreground">Lycée Gaspard Monge</p>
+                <h1 className="text-xl text-center font-bold">Lycée Polyvalent</h1>
+                <p className="text-sm text-center text-muted-foreground">GASPARD MONGE</p>
               </div>
             </div>
         <Card>
