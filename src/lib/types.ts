@@ -3,7 +3,6 @@
 export type Environment = {
     id: string;
     name: string;
-    type: 'WMS' | 'TMS';
     description: string;
 }
 
@@ -17,11 +16,10 @@ export type Article = {
   price: number;
   packaging: string;
   environnementId: string;
-  // New fields
   status: ArticleStatus;
   ean?: string;
-  weight?: number; // in kg
-  dimensions?: { length: number; width: number; height: number }; // in cm
+  weight?: number; 
+  dimensions?: { length: number; width: number; height: number }; 
   supplierIds?: number[];
 };
 
@@ -32,16 +30,15 @@ export type VehicleStatus = "Disponible" | "En Tournée" | "En Maintenance" | "H
 export type Tier = {
   id: number;
   type: TierType;
-  name: string; // For Client/Fournisseur/Transporteur/VehicleType
-  address: string; // For Client/Fournisseur/Transporteur
+  name: string; 
+  address: string; 
   createdAt: string;
   createdBy: string;
   environnementId: string;
   email?: string;
   
-  // -- VEHICLE SPECIFIC FIELDS --
-  immatriculation?: string; // For Vehicule
-  capacitePalette?: number; // For Vehicule
+  immatriculation?: string; 
+  capacitePalette?: number; 
   status?: VehicleStatus;
   chauffeurActuelId?: string | null;
   tourneeActuelleId?: string | null;
@@ -56,7 +53,7 @@ export type Maintenance = {
     environnementId: string;
     vehiculeId: number;
     vehiculeImmat: string;
-    typeMaintenance: string; // "Réparation", "Contrôle Technique", "Vidange", ...
+    typeMaintenance: string; 
     dateEcheance: string;
     status: "Planifiée" | "En cours" | "Terminée" | "Annulée";
     dateRealisation?: string | null;
@@ -70,21 +67,11 @@ export type ReturnDecision = "Réintégrer en stock" | "Mettre au rebut";
 
 export type DocumentLine = {
   articleId: string;
-  quantity: number; // Quantité commandée/livrée/retournée
+  quantity: number; 
   quantityReceived?: number;
   quantityNonConforming?: number;
   returnReason?: ReturnReason;
   returnDecision?: ReturnDecision;
-};
-
-export type DevisTransportDetails = {
-  departAddress: string;
-  arriveeAddress: string;
-  distance: number; // in km
-  poids: number; // in kg
-  nombrePalettes: number;
-  prixCalculeHT: number;
-  dateEnlevement: string;
 };
 
 export type DocumentStatus = 'En préparation' | 'Prêt pour expédition' | 'Validé' | 'Expédié' | 'Réceptionné' | 'Réceptionné avec anomalies' | 'En attente de traitement' | 'Traité' | 'Brouillon' | 'Envoyé' | 'Accepté' | 'Refusé';
@@ -92,17 +79,16 @@ export type DocumentStatus = 'En préparation' | 'Prêt pour expédition' | 'Val
 
 export type Document = {
   id: number;
-  type: 'Bon de Commande Fournisseur' | 'Bon de Livraison Client' | 'Lettre de Voiture' | 'Retour Client' | 'Devis Transport';
+  type: 'Bon de Commande Fournisseur' | 'Bon de Livraison Client' | 'Lettre de Voiture' | 'Retour Client';
   tierId: number;
   status: DocumentStatus;
   lines: DocumentLine[];
   createdAt: string;
   createdBy: string;
-  transporterId?: number; // For CMR
+  transporterId?: number; 
   environnementId: string;
-  receptionNotes?: string; // Réserves à la réception
-  originalDocumentId?: number; // For returns
-  devisDetails?: DevisTransportDetails;
+  receptionNotes?: string; 
+  originalDocumentId?: number; 
 };
 
 export type Movement = {
@@ -133,7 +119,6 @@ export type Permissions = {
     canViewStock: boolean;
     canManageClasses: boolean;
     canUseMessaging: boolean;
-    canManageStudents: boolean;
     profile: UserProfile;
 }
 
@@ -147,82 +132,25 @@ export type Role = {
 
 export type User = {
   username: string;
-  password: string; // In a real app, this should be a hash
+  password: string; 
   profile: UserProfile;
   classId?: number;
   createdAt: string;
-  roleId: string; // Link to a Role
+  roleId: string; 
 }
 
 export type Class = {
     id: number;
     name:string;
-    teacherIds?: string[]; // username of the teacher
+    teacherIds?: string[]; 
 }
 
 export type Email = {
   id: number;
-  sender: string; // username or system identifier or tier-id
-  recipient: string; // username or tier-id
+  sender: string; 
+  recipient: string; 
   subject: string;
   body: string;
   timestamp: string;
   isRead: boolean;
-};
-
-// --- SCENARIO ENGINE TYPES ---
-
-export type TaskType = 
-    | 'CREATE_TIERS_CLIENT' 
-    | 'CREATE_TIERS_FOURNISSEUR'
-    | 'CREATE_TIERS_TRANSPORTEUR'
-    | 'CREATE_BC'
-    | 'RECEIVE_BC'
-    | 'CREATE_BL'
-    | 'PREPARE_BL'
-    | 'SHIP_BL'
-    | 'MANUAL_VALIDATION';
-
-export type ScenarioTaskTemplate = {
-    taskOrder: number;
-    roleId: string;
-    description: string;
-    taskType: TaskType;
-    prerequisite?: number;
-};
-
-export type ScenarioTemplate = {
-    id: number;
-    title: string;
-    description: string;
-    competences: string[];
-    rolesRequis: string[];
-    tasks: ScenarioTaskTemplate[];
-    createdBy: string;
-    environnementId: string;
-};
-
-export type ScenarioStatus = 'preparing' | 'running' | 'completed';
-
-export type ActiveScenario = {
-    id: number;
-    templateId: number;
-    classId: number;
-    status: ScenarioStatus;
-    createdAt: string;
-    environnementId: string; // The environment where the scenario was launched
-};
-
-export type TaskStatus = 'blocked' | 'todo' | 'completed';
-
-export type Task = {
-    id: number;
-    scenarioId: number;
-    userId: string;
-    description: string; 
-    status: TaskStatus;
-    taskType: TaskType;
-    taskOrder: number;
-    prerequisiteTaskOrder?: number;
-    environnementId: string; // The specific environment where this task must be done
 };

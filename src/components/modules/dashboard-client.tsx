@@ -17,7 +17,6 @@ import {
     AlertTriangle,
     RotateCcw,
     Siren,
-    Users2
 } from "lucide-react";
 import Link from "next/link";
 import type { Environment } from "@/lib/types";
@@ -28,7 +27,7 @@ type AppItem = {
   href: string;
   label: string;
   icon: React.ElementType;
-  color: string;
+  color?: string;
   permission?: 
     | 'canViewDashboard' 
     | 'canViewTiers' 
@@ -39,8 +38,7 @@ type AppItem = {
     | 'canShipBL'
     | 'canViewStock'
     | 'canManageClasses'
-    | 'canUseMessaging'
-    | 'canManageStudents';
+    | 'canUseMessaging';
   isSuperAdminOnly?: boolean;
 };
 
@@ -52,7 +50,6 @@ const appItems: AppItem[] = [
   { href: "/tiers", label: "Tiers", icon: Users, color: "text-green-500", permission: 'canViewTiers' },
   { href: "/documents", label: "Documents", icon: FileText, color: "text-indigo-500", permission: 'canViewDashboard' },
   { href: "/messaging", label: "Messagerie", icon: Mail, color: "text-blue-500", permission: 'canUseMessaging' },
-  { href: "/gestion-eleves", label: "Élèves", icon: Users2, permission: "canManageStudents", isSuperAdminOnly: false },
   { href: "/classes", label: "Classes", icon: BookUser, color: "text-amber-500", isSuperAdminOnly: true, permission: 'canManageClasses' },
 ];
 
@@ -62,7 +59,7 @@ function AppCard({ item }: { item: AppItem }) {
       <Card className="h-full bg-white/50 dark:bg-black/50 backdrop-blur-sm border-white/30 dark:border-black/30 hover:bg-white/70 dark:hover:bg-black/70 transition-all duration-300 hover:scale-105 hover:shadow-xl">
         <CardContent className="flex flex-col items-center justify-center p-6 text-center gap-4 h-full">
           <div className="bg-primary/10 p-4 rounded-full">
-            <item.icon className={`h-8 w-8 ${item.color}`} />
+            <item.icon className={`h-8 w-8 ${item.color || 'text-primary'}`} />
           </div>
           <p className="font-semibold text-foreground">{item.label}</p>
         </CardContent>

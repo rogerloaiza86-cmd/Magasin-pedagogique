@@ -3,7 +3,7 @@
 "use client";
 
 import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
-import type { Article, Tier, Document, Movement, User, Class, Email, Role, Permissions, ScenarioTemplate, ActiveScenario, Task, Environment, Maintenance, DocumentLine, TierType } from '@/lib/types';
+import type { Article, Tier, Document, Movement, User, Class, Email, Role, Permissions, Environment, Maintenance, DocumentLine, TierType, UserProfile } from '@/lib/types';
 import { initialArticles } from '@/lib/articles-data';
 import { faker } from '@faker-js/faker/locale/fr';
 
@@ -19,7 +19,7 @@ ROLES.set('super_admin', {
         isSuperAdmin: true,
         canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true, canReceiveBC: true,
         canCreateBL: true, canPrepareBL: true, canShipBL: true, canManageStock: true, canViewStock: true,
-        canManageClasses: true, canUseMessaging: true, canManageStudents: true, profile: "Administrateur"
+        canManageClasses: true, canUseMessaging: true, profile: "Administrateur"
     }
 });
 
@@ -32,46 +32,21 @@ ROLES.set('professeur', {
         isSuperAdmin: false,
         canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true, canReceiveBC: true,
         canCreateBL: true, canPrepareBL: true, canShipBL: true, canManageStock: true, canViewStock: true,
-        canManageClasses: true, canUseMessaging: true, canManageStudents: true, profile: "professeur"
+        canManageClasses: true, canUseMessaging: true, profile: "professeur"
     }
 });
 
-ROLES.set('chef_equipe', {
-    id: 'chef_equipe',
-    name: "Chef d'Équipe",
-    description: "Supervise les opérations d'une équipe, a une vue d'ensemble.",
+ROLES.set('eleve', {
+    id: 'eleve',
+    name: "Élève",
+    description: "Accès de base pour les activités du magasin pédagogique.",
     isStudentRole: true,
     permissions: {
-        isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true,
+        isSuperAdmin: false,
+        canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true,
         canReceiveBC: true, canCreateBL: true, canPrepareBL: true, canShipBL: true,
         canManageStock: true, canViewStock: true, canManageClasses: false, canUseMessaging: true,
-        canManageStudents: false, profile: "élève"
-    }
-});
-
-ROLES.set('equipe_reception', {
-    id: 'equipe_reception',
-    name: "Équipe Réception & Achat",
-    description: "Gère les flux entrants (Fournisseurs, BC, Réceptions).",
-    isStudentRole: true,
-    permissions: {
-        isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true,
-        canReceiveBC: true, canCreateBL: false, canPrepareBL: false, canShipBL: false,
-        canManageStock: true, canViewStock: true, canManageClasses: false, canUseMessaging: true,
-        canManageStudents: false, profile: "élève"
-    }
-});
-
-ROLES.set('equipe_preparation', {
-    id: 'equipe_preparation',
-    name: "Équipe Préparation & Expé",
-    description: "Gère les flux sortants (Clients, BL, Expéditions).",
-    isStudentRole: true,
-    permissions: {
-        isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: false,
-        canReceiveBC: false, canCreateBL: true, canPrepareBL: true, canShipBL: true,
-        canManageStock: false, canViewStock: true, canManageClasses: false, canUseMessaging: true,
-        canManageStudents: false, profile: "élève"
+        profile: "élève"
     }
 });
 
@@ -79,7 +54,6 @@ const ENVIRONMENTS: Map<string, Environment> = new Map();
 ENVIRONMENTS.set('magasin_pedago', {
     id: 'magasin_pedago',
     name: 'Magasin Pédagogique (Réel)',
-    type: 'WMS',
     description: 'Stock physique du lycée. Lié au réel.'
 });
 
@@ -129,8 +103,7 @@ export const getInitialState = (): WmsState => {
   const demoClassId = 1;
   const initialClasses = new Map<number, Class>();
   initialClasses.set(demoClassId, { id: demoClassId, name: 'Classe Démo', teacherIds: ['prof']});
-  initialUsers.set('eleve1', { username: 'eleve1', password: 'eleve', profile: 'élève', createdAt: new Date().toISOString(), roleId: 'equipe_reception', classId: demoClassId });
-  initialUsers.set('eleve2', { username: 'eleve2', password: 'eleve2', profile: 'élève', createdAt: new Date().toISOString(), roleId: 'equipe_preparation', classId: demoClassId });
+  initialUsers.set('eleve', { username: 'eleve', password: 'eleve', profile: 'élève', createdAt: new Date().toISOString(), roleId: 'eleve', classId: demoClassId });
 
   const initialTiers = new Map<number, Tier>();
   
@@ -169,7 +142,7 @@ type WmsAction =
   | { type: 'LOGIN'; payload: { username: string, password: string} }
   | { type: 'REAUTHENTICATE_USER'; payload: { username: string } }
   | { type: 'LOGOUT' }
-  | { type: 'REGISTER_USER', payload: Omit<User, 'password' | 'createdAt'> & { password?: string, classId?: number } }
+  | { type: 'REGISTER_USER', payload: { username: string, password?: string, profile: UserProfile, classId?: number } }
   | { type: 'ADD_CLASS', payload: { name: string } }
   | { type: 'DELETE_CLASS', payload: { classId: number } }
   | { type: 'TOGGLE_TEACHER_CLASS_ASSIGNMENT', payload: { classId: number, teacherId: string } }
@@ -177,9 +150,6 @@ type WmsAction =
   | { type: 'MARK_EMAIL_AS_READ'; payload: { emailId: number } }
   | { type: 'START_MAINTENANCE'; payload: { vehiculeId: number, notes: string } }
   | { type: 'FINISH_MAINTENANCE'; payload: { maintenanceId: number } }
-  | { type: 'UPDATE_STUDENT_ROLE', payload: { username: string, newRoleId: string } }
-  | { type: 'DELETE_USER', payload: { username: string } }
-  | { type: 'RESET_USER_PASSWORD', payload: { username: string, newPassword: string } }
   | { type: 'SET_STATE'; payload: WmsState };
 
 
@@ -188,7 +158,6 @@ const updateUserPermissions = (state: WmsState): WmsState => {
         const permissions = state.roles.get(state.currentUser.roleId)?.permissions || null;
         return { ...state, currentUserPermissions: permissions };
     }
-    // If no user is logged in, permissions should be null.
     return { ...state, currentUserPermissions: null };
 };
 
@@ -225,7 +194,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       };
       break;
     case 'REGISTER_USER': {
-        const { username, password, profile, classId, roleId } = action.payload;
+        const { username, password, profile, classId } = action.payload;
         if (state.users.has(username)) {
             throw new Error("Cet identifiant existe déjà.");
         }
@@ -233,17 +202,21 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
             throw new Error("Le mot de passe est requis.");
         }
         
-        let finalRoleId = roleId;
-        if (profile === 'professeur') {
-            finalRoleId = 'professeur';
-        } else if (profile === 'Administrateur') {
-            finalRoleId = 'super_admin';
+        let roleId: string;
+        switch(profile) {
+            case 'élève':
+                roleId = 'eleve';
+                break;
+            case 'professeur':
+                roleId = 'professeur';
+                break;
+            case 'Administrateur':
+                roleId = 'super_admin';
+                break;
+            default:
+                throw new Error("Profil utilisateur invalide.");
         }
 
-        if (!finalRoleId) {
-            throw new Error("Le rôle est requis.");
-        }
-        
         if (profile === 'élève' && (state.classes.size === 0 || !classId)) {
              throw new Error("Aucune classe n'a été créée. Inscription impossible.");
         }
@@ -255,7 +228,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
             password, 
             profile, 
             createdAt: new Date().toISOString(),
-            roleId: finalRoleId,
+            roleId,
         };
         if (profile === 'élève' && classId) {
             newUser.classId = classId;
@@ -409,7 +382,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
     case 'CREATE_DOCUMENT': {
         const { type } = action.payload;
         const perms = state.currentUserPermissions;
-        if (!state.currentUser || (type === 'Bon de Commande Fournisseur' && !perms?.canCreateBC) || (type === 'Bon de Livraison Client' && !perms?.canCreateBL) || (type === 'Lettre de Voiture' && !perms?.canShipBL) || (type === 'Retour Client' && !perms?.canReceiveBC) || (type === 'Devis Transport' && false) ) {
+        if (!state.currentUser || (type === 'Bon de Commande Fournisseur' && !perms?.canCreateBC) || (type === 'Bon de Livraison Client' && !perms?.canCreateBL) || (type === 'Lettre de Voiture' && !perms?.canShipBL) || (type === 'Retour Client' && !perms?.canReceiveBC) ) {
             return state;
         }
         const newDoc: Document = { 
@@ -577,7 +550,6 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       break;
     }
     case 'START_MAINTENANCE': {
-        if (!state.currentUserPermissions?.canManageFleet) return state;
         const { vehiculeId, notes } = action.payload;
         const newTiers = new Map(state.tiers);
         const vehicle = newTiers.get(vehiculeId);
@@ -609,7 +581,6 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         break;
     }
      case 'FINISH_MAINTENANCE': {
-        if (!state.currentUserPermissions?.canManageFleet) return state;
         const { maintenanceId } = action.payload;
         const newMaintenances = new Map(state.maintenances);
         const maintenance = newMaintenances.get(maintenanceId);
@@ -629,38 +600,6 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         newState = { ...state, tiers: newTiers, maintenances: newMaintenances };
         break;
     }
-    case 'UPDATE_STUDENT_ROLE': {
-        if (!state.currentUserPermissions?.canManageStudents) return state;
-        const { username, newRoleId } = action.payload;
-        const newUsers = new Map(state.users);
-        const user = newUsers.get(username);
-        if (user && user.profile === 'élève') {
-            user.roleId = newRoleId;
-            newUsers.set(username, user);
-        }
-        newState = { ...state, users: newUsers };
-        break;
-    }
-    case 'DELETE_USER': {
-        if (!state.currentUserPermissions?.canManageStudents) return state;
-        const { username } = action.payload;
-        const newUsers = new Map(state.users);
-        newUsers.delete(username);
-        newState = { ...state, users: newUsers };
-        break;
-    }
-    case 'RESET_USER_PASSWORD': {
-        if (!state.currentUserPermissions?.canManageStudents) return state;
-        const { username, newPassword } = action.payload;
-        const newUsers = new Map(state.users);
-        const user = newUsers.get(username);
-        if (user) {
-            user.password = newPassword;
-            newUsers.set(username, user);
-        }
-        newState = { ...state, users: newUsers };
-        break;
-    }
     case 'SET_STATE': {
         newState = action.payload;
         break;
@@ -668,7 +607,6 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
     default:
       return state;
   }
-  // This is the critical part: After any action, recalculate permissions
   const stateWithUpdatedPerms = updateUserPermissions(newState);
   return stateWithUpdatedPerms;
 };
@@ -691,12 +629,12 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     try {
       const savedStateJSON = localStorage.getItem('wmsState');
-      let finalState = getInitialState();
+      const baseInitialState = getInitialState();
+      let finalState = baseInitialState;
 
       if (savedStateJSON) {
         const savedState = JSON.parse(savedStateJSON);
         const reviveMap = (arr: any) => arr ? new Map(arr) : new Map();
-        const baseInitialState = getInitialState();
 
         finalState = {
             ...baseInitialState,

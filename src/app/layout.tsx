@@ -16,7 +16,6 @@ import {
   BookUser,
   Mail,
   Archive,
-  Users2,
 } from "lucide-react";
 
 import {
@@ -51,8 +50,7 @@ type NavItem = {
     | 'canShipBL'
     | 'canViewStock'
     | 'canManageClasses'
-    | 'canUseMessaging'
-    | 'canManageStudents';
+    | 'canUseMessaging';
   isSuperAdminOnly?: boolean;
 };
 
@@ -66,7 +64,6 @@ const navItems: NavItem[] = [
   { href: "/documents", label: "Documents", icon: FileText, permission: 'canViewDashboard' },
   { href: "/messaging", label: "Messagerie", icon: Mail, permission: 'canUseMessaging' },
   { href: "/classes", label: "Gestion des Classes", icon: BookUser, permission: 'canManageClasses', isSuperAdminOnly: false },
-  { href: "/gestion-eleves", label: "Gestion des Élèves", icon: Users2, permission: 'canManageStudents', isSuperAdminOnly: false },
 ];
 
 function MainLayout({
