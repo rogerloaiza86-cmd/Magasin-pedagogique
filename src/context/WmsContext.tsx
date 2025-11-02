@@ -219,6 +219,36 @@ export const getInitialState = (): WmsState => {
   initialUsers.set('eleve2', { username: 'eleve2', password: 'eleve2', profile: 'élève', createdAt: new Date().toISOString(), roleId: 'equipe_preparation', classId: demoClassId });
   initialUsers.set('affreteur', { username: 'affreteur', password: 'affreteur', profile: 'élève', createdAt: new Date().toISOString(), roleId: 'tms_affreteur', classId: demoClassId });
 
+  const initialEmails = new Map<number, Email>();
+  let emailIdCounter = 1;
+  initialEmails.set(emailIdCounter++, {
+    id: 1,
+    sender: 'prof',
+    recipient: 'eleve1',
+    subject: 'Bienvenue dans LogiSim Hub',
+    body: 'Bonjour, ceci est un message de test pour vérifier que la messagerie fonctionne bien.',
+    timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // 5 minutes ago
+    isRead: false,
+  });
+  initialEmails.set(emailIdCounter++, {
+    id: 2,
+    sender: 'eleve1',
+    recipient: 'prof',
+    subject: 'Re: Bienvenue dans LogiSim Hub',
+    body: 'Bonjour Professeur, message bien reçu. Le système semble fonctionner.',
+    timestamp: new Date(Date.now() - 1000 * 60 * 2).toISOString(), // 2 minutes ago
+    isRead: true,
+  });
+   initialEmails.set(emailIdCounter++, {
+    id: 3,
+    sender: 'SystemLogiSim',
+    recipient: 'eleve1',
+    subject: 'Alerte: Tâche en retard',
+    body: 'Ceci est une notification automatique de test.',
+    timestamp: new Date(Date.now() - 1000 * 60 * 10).toISOString(), // 10 minutes ago
+    isRead: true,
+  });
+
   const initialScenarioTemplates = new Map<number, ScenarioTemplate>();
   let templateIdCounter = 1;
 
@@ -333,7 +363,7 @@ export const getInitialState = (): WmsState => {
     movements: initialMovements,
     users: initialUsers,
     classes: initialClasses,
-    emails: new Map(),
+    emails: initialEmails,
     roles: ROLES,
     environments: ENVIRONMENTS,
     grillesTarifaires: GRILLES_TARIFAIRES,
@@ -345,7 +375,7 @@ export const getInitialState = (): WmsState => {
     docIdCounter: 1,
     movementIdCounter: initialMovements.length + 1,
     classIdCounter: 2,
-    emailIdCounter: 1,
+    emailIdCounter: emailIdCounter,
     maintenanceIdCounter: 1,
     scenarioTemplateIdCounter: templateIdCounter,
     activeScenarioIdCounter: 1,
@@ -932,7 +962,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         id: newTaskId,
                         scenarioId: newActiveScenarioId,
                         userId: student.username,
-                        description: taskTemplate.emailDetails?.body || `Tâche ${taskTemplate.taskOrder}: ${taskTemplate.taskType}`,
+                        description: taskTemplate.emailDetails.body,
                         status: isPrerequisiteMet ? 'todo' : 'blocked',
                         taskType: taskTemplate.taskType,
                         taskOrder: taskTemplate.taskOrder,
