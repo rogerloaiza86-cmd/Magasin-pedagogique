@@ -7,6 +7,7 @@
 
 
 
+
 export type Environment = {
     id: string;
     name: string;
@@ -145,6 +146,7 @@ export type Permissions = {
     // TMS Permissions to be added
     canManageFleet: boolean;
     canManageQuotes: boolean;
+    profile: UserProfile;
 }
 
 export type Role = {

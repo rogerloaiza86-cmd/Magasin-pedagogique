@@ -18,7 +18,7 @@ const GenerateFictitiousArticlesInputSchema = z.object({
 export type GenerateFictitiousArticlesInput = z.infer<typeof GenerateFictitiousArticlesInputSchema>;
 
 const ArticleSchema = z.object({
-  id: z.string().describe("The unique article reference (SKU), must be unique. Example: `ABC-1234`."),
+  id: z.string().describe("The unique article reference (SKU), must be unique and short. Example: `ABC-1234`."),
   name: z.string().describe('The name or designation of the article. Example: "T-shirt Coton Bio"'),
   location: z.string().describe("The warehouse location in the format A.1.1.A"),
   stock: z.number().describe('The initial stock quantity.'),
@@ -32,18 +32,37 @@ const GenerateFictitiousArticlesOutputSchema = z.object({
 
 export type GenerateFictitiousArticlesOutput = z.infer<typeof GenerateFictitiousArticlesOutputSchema>;
 
-export async function generateFictitiousArticles(input: GenerateFictitiousArticlesInput): Promise<GenerateFictitiousArticlesOutput> {
-  // Bypassing the AI call and generating data directly with faker
-  const articles = Array.from({ length: 20 }, () => {
-    const id = `${faker.lorem.word().substring(0,3).toUpperCase()}-${faker.number.int({ min: 1000, max: 9999 })}`;
-    const name = faker.commerce.productName();
-    const location = `${faker.helpers.arrayElement(['A','B','C','D','E','F'])}.${faker.number.int({min:1, max:3})}.${faker.number.int({min:1, max:6})}.${faker.helpers.arrayElement(['A','B','C','D','E','F','G','H'])}`;
-    const stock = faker.number.int({ min: 10, max: 500 });
-    const price = parseFloat(faker.commerce.price({ min: 5, max: 200 }));
-    const packaging = faker.helpers.arrayElement(['PIEC', 'CARTON', 'BOTE', 'PAL', 'KG']);
-    
-    return { id, name, location, stock, price, packaging };
-  });
 
-  return Promise.resolve({ articles });
+export async function generateFictitiousArticles(input: GenerateFictitiousArticlesInput): Promise<GenerateFictitiousArticlesOutput> {
+  return generateFictitiousArticlesFlow(input);
 }
+
+
+const prompt = ai.definePrompt({
+  name: 'generateFictitiousArticlesPrompt',
+  input: {schema: GenerateFictitiousArticlesInputSchema},
+  output: {schema: GenerateFictitiousArticlesOutputSchema},
+  prompt: `You are a warehouse data generation expert. Your goal is to create a realistic and coherent set of 20 articles for a given business sector.
+
+For each article, you must generate:
+- A unique and realistic ID (SKU).
+- A plausible name.
+- A random but valid-looking warehouse location in the format A.1.1.A (A-F).(1-3).(1-6).(A-H).
+- A realistic initial stock level.
+- A logical unit price.
+- A packaging unit (e.g., PIEC, CARTON, BOTE, PAL, KG).
+
+Business sector: {{{sector}}}`,
+});
+
+const generateFictitiousArticlesFlow = ai.defineFlow(
+  {
+    name: 'generateFictitiousArticlesFlow',
+    inputSchema: GenerateFictitiousArticlesInputSchema,
+    outputSchema: GenerateFictitiousArticlesOutputSchema,
+  },
+  async input => {
+    const {output} = await prompt(input);
+    return output!;
+  }
+);

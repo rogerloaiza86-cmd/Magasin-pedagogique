@@ -20,7 +20,7 @@ ROLES.set('super_admin', {
         canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true, canReceiveBC: true,
         canCreateBL: true, canPrepareBL: true, canShipBL: true, canManageStock: true, canViewStock: true,
         canManageClasses: true, canUseIaTools: true, canUseMessaging: true, canManageScenarios: true,
-        canManageStudents: true, canManageFleet: true, canManageQuotes: true,
+        canManageStudents: true, canManageFleet: true, canManageQuotes: true, profile: "Administrateur"
     }
 });
 
@@ -34,7 +34,7 @@ ROLES.set('professeur', {
         canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true, canReceiveBC: true,
         canCreateBL: true, canPrepareBL: true, canShipBL: true, canManageStock: true, canViewStock: true,
         canManageClasses: true, canUseIaTools: true, canUseMessaging: true, canManageScenarios: true,
-        canManageStudents: true, canManageFleet: true, canManageQuotes: true,
+        canManageStudents: true, canManageFleet: true, canManageQuotes: true, profile: "professeur"
     }
 });
 
@@ -47,7 +47,7 @@ ROLES.set('chef_equipe', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true,
         canReceiveBC: true, canCreateBL: true, canPrepareBL: true, canShipBL: true,
         canManageStock: true, canViewStock: true, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: false,
+        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: false, profile: "élève"
     }
 });
 
@@ -60,7 +60,7 @@ ROLES.set('equipe_reception', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true,
         canReceiveBC: true, canCreateBL: false, canPrepareBL: false, canShipBL: false,
         canManageStock: true, canViewStock: true, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: false,
+        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: false, profile: "élève"
     }
 });
 
@@ -73,7 +73,7 @@ ROLES.set('equipe_preparation', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: false,
         canReceiveBC: false, canCreateBL: true, canPrepareBL: true, canShipBL: true,
         canManageStock: false, canViewStock: true, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: false,
+        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: false, profile: "élève"
     }
 });
 
@@ -86,7 +86,7 @@ ROLES.set('tms_affreteur', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: false,
         canReceiveBC: false, canCreateBL: false, canPrepareBL: false, canShipBL: false,
         canManageStock: false, canViewStock: false, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: false,
+        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: false, profile: "élève"
     }
 });
 
@@ -99,7 +99,7 @@ permissions: {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: false, canViewTiers: true, canCreateBC: false,
         canReceiveBC: false, canCreateBL: false, canPrepareBL: false, canShipBL: false,
         canManageStock: false, canViewStock: false, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageStudents: false, canManageFleet: true, canManageQuotes: false,
+        canManageScenarios: false, canManageStudents: false, canManageFleet: true, canManageQuotes: false, profile: "élève"
     }
 });
 

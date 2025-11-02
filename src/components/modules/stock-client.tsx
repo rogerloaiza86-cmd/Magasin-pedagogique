@@ -425,7 +425,9 @@ function GenerateFictitiousData() {
         "Maison, Mobilier et Décoration",
         "Alimentation et Produits de Grande Consommation (PGC)",
         "Santé, Hygiène et Beauté",
-        "Produits Culturels",
+        "Pièces détachées automobile",
+        "Fournitures de bureau",
+        "Articles de sport",
     ];
 
     const handleGenerate = async () => {
