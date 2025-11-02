@@ -5,6 +5,7 @@
 
 
 
+
 export type Environment = {
     id: string;
     name: string;
@@ -91,11 +92,14 @@ export type DevisTransportDetails = {
   dateEnlevement: string;
 };
 
+export type DocumentStatus = 'En préparation' | 'Prêt pour expédition' | 'Validé' | 'Expédié' | 'Réceptionné' | 'Réceptionné avec anomalies' | 'En attente de traitement' | 'Traité' | 'Brouillon' | 'Envoyé' | 'Accepté' | 'Refusé';
+
+
 export type Document = {
   id: number;
   type: 'Bon de Commande Fournisseur' | 'Bon de Livraison Client' | 'Lettre de Voiture' | 'Retour Client' | 'Devis Transport';
   tierId: number;
-  status: 'En préparation' | 'Validé' | 'Expédié' | 'Réceptionné' | 'Réceptionné avec anomalies' | 'En attente de traitement' | 'Traité' | 'Brouillon' | 'Envoyé' | 'Accepté' | 'Refusé';
+  status: DocumentStatus;
   lines: DocumentLine[];
   createdAt: string;
   createdBy: string;

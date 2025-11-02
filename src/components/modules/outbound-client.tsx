@@ -216,7 +216,7 @@ function CreateDeliveryNote() {
 }
 
 function PrepareOrder() {
-  const { state, getTier, getArticle } = useWms();
+  const { state, dispatch, getTier, getArticle } = useWms();
   const { toast } = useToast();
   const {currentUser, currentEnvironmentId} = state;
   const pendingDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "En préparation" && d.environnementId === currentEnvironmentId).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
@@ -264,6 +264,7 @@ function PrepareOrder() {
 
   const handlePreparationFinished = () => {
     if (currentDoc) {
+        dispatch({ type: 'UPDATE_DOCUMENT', payload: { ...currentDoc, status: 'Prêt pour expédition' } });
         setPickingList(null);
         setCurrentDoc(null);
         toast({
@@ -331,7 +332,7 @@ function PrepareOrder() {
             </AlertDialogTrigger>
             <AlertDialogContent>
                 <AlertDialogHeader><AlertDialogTitle>La préparation est-elle terminée ?</AlertDialogTitle></AlertDialogHeader>
-                <AlertDialogDescription>Confirmer la fin de la préparation pour le BL #{currentDoc?.id}.</AlertDialogDescription>
+                <AlertDialogDescription>Confirmer la fin de la préparation pour le BL #{currentDoc?.id}. Le statut passera à "Prêt pour expédition".</AlertDialogDescription>
                 <AlertDialogFooter>
                     <AlertDialogCancel>Non</AlertDialogCancel>
                     <AlertDialogAction onClick={handlePreparationFinished}>Oui, terminée</AlertDialogAction>
@@ -349,7 +350,7 @@ function ShipOrder() {
     const { toast } = useToast();
     const {currentUser, currentEnvironmentId, users, roles} = state;
     const transporters = Array.from(state.tiers.values()).filter(t => t.type === 'Transporteur' && t.environnementId === currentEnvironmentId).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
-    const shippableDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "En préparation" && d.environnementId === currentEnvironmentId).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
+    const shippableDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "Prêt pour expédition" && d.environnementId === currentEnvironmentId).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
 
     const [selectedTransporter, setSelectedTransporter] = useState<string>("");
     const [finalDoc, setFinalDoc] = useState<{bl: WmsDocument, cmr: WmsDocument} | null>(null);
@@ -512,5 +513,3 @@ export function OutboundClient() {
     </Tabs>
   );
 }
-
-    
