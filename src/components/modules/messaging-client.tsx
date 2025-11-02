@@ -66,10 +66,8 @@ function ComposeEmail() {
                });
             }
         }
-    } else if (currentUser.profile === 'professeur' || currentUser.profile === 'Administrateur') {
-        const teacherClasses = currentUser.profile === 'Administrateur' 
-          ? Array.from(classes.values())
-          : Array.from(classes.values()).filter(c => c.teacherIds?.includes(currentUser.username));
+    } else if (currentUser.profile === 'professeur') {
+        const teacherClasses = Array.from(classes.values()).filter(c => c.teacherIds?.includes(currentUser.username));
 
         const studentUsernames = new Set<string>();
         teacherClasses.forEach(c => {
@@ -81,14 +79,22 @@ function ComposeEmail() {
         });
         userRecipients = Array.from(studentUsernames).map(username => users.get(username)).filter(Boolean) as any[];
 
-        if(currentUser.profile === 'Administrateur') {
-             userRecipients.push(...Array.from(users.values()).filter(u => u.username !== currentUser.username && u.profile !== 'élève'));
-        }
+        // Add other teachers and admins
+        const staff = Array.from(users.values()).filter(u => (u.profile === 'professeur' || u.profile === 'Administrateur') && u.username !== currentUser.username);
+        userRecipients.push(...staff);
+
+    } else if (currentUser.profile === 'Administrateur') {
+        // Admins can message everyone
+        userRecipients = Array.from(users.values()).filter(u => u.username !== currentUser.username);
     }
     
     const tierRecipients = Array.from(tiers.values()).filter(t => t.environnementId === currentEnvironmentId);
 
-    return { users: userRecipients, tiers: tierRecipients };
+    // Remove duplicates and sort
+    const uniqueUserRecipients = Array.from(new Map(userRecipients.map(u => [u.username, u])).values())
+        .sort((a, b) => a.username.localeCompare(b.username));
+
+    return { users: uniqueUserRecipients, tiers: tierRecipients };
   };
 
   const { users: userRecipients, tiers: tierRecipients } = getPossibleRecipients();
