@@ -9,3 +9,4 @@ import '@/ai/genkit';
 import '@/ai/flows/optimize-picking-route.ts';
 import '@/ai/flows/document-generation-assistance.ts';
 import '@/ai/flows/generate-articles-flow.ts';
+import '@/ai/flows/generate-fictitious-tiers.ts';

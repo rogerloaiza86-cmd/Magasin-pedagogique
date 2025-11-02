@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
-import type { Article, Tier, Document, Movement, User, Class, Email, Role, Permissions, ScenarioTemplate, ActiveScenario, Task, Environment, Maintenance, DocumentLine, GrilleTarifaire } from '@/lib/types';
+import type { Article, Tier, Document, Movement, User, Class, Email, Role, Permissions, ScenarioTemplate, ActiveScenario, Task, Environment, Maintenance, DocumentLine, GrilleTarifaire, TierType } from '@/lib/types';
 import { initialArticles } from '@/lib/articles-data';
 import { faker } from '@faker-js/faker/locale/fr';
 
@@ -85,7 +85,7 @@ ROLES.set('tms_affreteur', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: false,
         canReceiveBC: false, canCreateBL: false, canPrepareBL: false, canShipBL: false,
         canManageStock: false, canViewStock: false, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: false, profile: "élève"
+        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: true, profile: "élève"
     }
 });
 
@@ -376,7 +376,8 @@ type WmsAction =
   | { type: 'DELETE_SCENARIO_TEMPLATE'; payload: { templateId: number } }
   | { type: 'LAUNCH_SCENARIO', payload: { templateId: number, classId: number } }
   | { type: 'GENERATE_ARTICLES_BATCH'; payload: { articles: Omit<Article, 'environnementId' | 'status'>[] } }
-  | { type: 'RESET_ARTICLES'; payload: { environnementId: string } }
+  | { type: 'GENERATE_TIERS_BATCH'; payload: { tiers: { name: string, address: string, email: string}[], type: TierType } }
+  | { type: 'RESET_ARTICLES_AND_TIERS'; payload: { environnementId: string } }
   | { type: 'START_MAINTENANCE'; payload: { vehiculeId: number, notes: string } }
   | { type: 'FINISH_MAINTENANCE'; payload: { maintenanceId: number } }
   | { type: 'UPDATE_STUDENT_ROLE', payload: { username: string, newRoleId: string } }
@@ -1006,18 +1007,49 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         };
         break;
     }
-    case 'RESET_ARTICLES': {
+    case 'GENERATE_TIERS_BATCH': {
+        if (!state.currentUser || !state.currentUserPermissions?.canManageTiers) return state;
+        const newTiers = new Map(state.tiers);
+        let tierIdCounter = state.tierIdCounter;
+
+        action.payload.tiers.forEach(tierData => {
+            const newTier: Tier = {
+                id: tierIdCounter++,
+                type: action.payload.type,
+                name: tierData.name,
+                address: tierData.address,
+                email: tierData.email,
+                createdAt: new Date().toISOString(),
+                createdBy: state.currentUser!.username,
+                environnementId: state.currentEnvironmentId,
+            };
+            newTiers.set(newTier.id, newTier);
+        });
+
+        newState = { ...state, tiers: newTiers, tierIdCounter };
+        break;
+    }
+    case 'RESET_ARTICLES_AND_TIERS': {
         if (!state.currentUserPermissions?.canManageStock) return state;
         const { environnementId } = action.payload;
         const newArticles = new Map(state.articles);
-        const newMovements = state.movements.filter(m => m.environnementId !== environnementId);
+        const newTiers = new Map(state.tiers);
         
         state.articles.forEach((article, key) => {
             if (article.environnementId === environnementId) {
                 newArticles.delete(key);
             }
         });
-        newState = { ...state, articles: newArticles, movements: newMovements };
+
+        state.tiers.forEach((tier, key) => {
+            if (tier.environnementId === environnementId) {
+                newTiers.delete(key);
+            }
+        });
+
+        const newMovements = state.movements.filter(m => m.environnementId !== environnementId);
+
+        newState = { ...state, articles: newArticles, tiers: newTiers, movements: newMovements };
         break;
     }
     case 'START_MAINTENANCE': {

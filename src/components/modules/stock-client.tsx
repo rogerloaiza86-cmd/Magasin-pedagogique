@@ -25,9 +25,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import type { Article } from "@/lib/types";
+import type { Article, TierType } from "@/lib/types";
 import { Badge } from "../ui/badge";
-import { PlusCircle, Download, Wand2, Loader2, Trash2 } from "lucide-react";
+import { PlusCircle, Download, Wand2, Loader2, Trash2, Building } from "lucide-react";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -41,6 +41,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { generateFictitiousArticles } from "@/ai/flows/generate-articles-flow";
+import { generateFictitiousTiers } from "@/ai/flows/generate-fictitious-tiers";
+import { Separator } from "../ui/separator";
 
 
 function CreateArticleForm() {
@@ -415,8 +417,11 @@ function AdjustInventory() {
 function GenerateFictitiousData() {
     const { dispatch, state } = useWms();
     const { toast } = useToast();
-    const [isLoading, setIsLoading] = useState(false);
-    const [sector, setSector] = useState("");
+    const [isLoadingArticles, setIsLoadingArticles] = useState(false);
+    const [isLoadingTiers, setIsLoadingTiers] = useState(false);
+    const [articleSector, setArticleSector] = useState("");
+    const [tierSector, setTierSector] = useState("");
+    const [tierType, setTierType] = useState<TierType>("Client");
     const { currentUserPermissions, currentEnvironmentId } = state;
 
     const sectors = [
@@ -430,88 +435,130 @@ function GenerateFictitiousData() {
         "Articles de sport",
     ];
 
-    const handleGenerate = async () => {
-        if (!sector) {
-            toast({
-                variant: "destructive",
-                title: "Aucun secteur sélectionné",
-                description: "Veuillez choisir un secteur d'activité."
-            });
+    const handleGenerateArticles = async () => {
+        if (!articleSector) {
+            toast({ variant: "destructive", title: "Aucun secteur sélectionné" });
             return;
         }
-        setIsLoading(true);
+        setIsLoadingArticles(true);
         try {
-            const result = await generateFictitiousArticles({ sector });
+            const result = await generateFictitiousArticles({ sector: articleSector });
             if (result.articles && result.articles.length > 0) {
                 dispatch({ type: 'GENERATE_ARTICLES_BATCH', payload: { articles: result.articles } });
-                toast({
-                    title: "Articles générés avec succès",
-                    description: `${result.articles.length} articles pour le secteur "${sector}" ont été ajoutés.`
-                });
+                toast({ title: "Articles générés", description: `${result.articles.length} articles pour "${articleSector}" ont été ajoutés.` });
             }
         } catch (error) {
             console.error("AI data generation failed:", error);
-            toast({
-                variant: "destructive",
-                title: "Erreur de l'IA",
-                description: "La génération des articles a échoué. Veuillez réessayer."
-            });
+            toast({ variant: "destructive", title: "Erreur de l'IA" });
         } finally {
-            setIsLoading(false);
+            setIsLoadingArticles(false);
         }
     };
     
+    const handleGenerateTiers = async () => {
+        if (!tierSector || !tierType) {
+            toast({ variant: "destructive", title: "Sélection manquante" });
+            return;
+        }
+        setIsLoadingTiers(true);
+        try {
+            const result = await generateFictitiousTiers({ sector: tierSector, type: tierType });
+            if (result.tiers && result.tiers.length > 0) {
+                dispatch({ type: 'GENERATE_TIERS_BATCH', payload: { tiers: result.tiers, type: tierType } });
+                toast({ title: "Tiers générés", description: `${result.tiers.length} ${tierType}s pour "${tierSector}" ont été ajoutés.`});
+            }
+        } catch (error) {
+            console.error("AI tier generation failed:", error);
+            toast({ variant: "destructive", title: "Erreur de l'IA" });
+        } finally {
+            setIsLoadingTiers(false);
+        }
+    }
+
     const handleReset = () => {
-        dispatch({ type: 'RESET_ARTICLES', payload: { environnementId: currentEnvironmentId } });
+        dispatch({ type: 'RESET_ARTICLES_AND_TIERS', payload: { environnementId: currentEnvironmentId } });
         toast({
             variant: "destructive",
-            title: "Articles réinitialisés",
-            description: `Tous les articles de l'environnement actuel ont été supprimés.`
+            title: "Données de l'environnement réinitialisées",
+            description: `Tous les articles et tiers de cet environnement ont été supprimés.`
         });
     }
 
     if (!currentUserPermissions?.isSuperAdmin && currentUserPermissions?.profile !== 'professeur') {
-        return null; // Only teachers and super admins can see this
+        return null;
     }
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Génération de Données par IA</CardTitle>
+                <CardTitle>Génération de Données de Simulation par IA</CardTitle>
                 <CardDescription>
-                    Générez automatiquement un jeu de 20 articles réalistes pour un secteur d'activité afin de peupler l'entrepôt pour vos scénarios.
+                    Peuplez rapidement cet environnement avec des données réalistes pour vos scénarios.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-                 <div className="space-y-2">
-                    <Label htmlFor="sector-select">Choisissez un secteur d'activité</Label>
-                     <Select onValueChange={setSector} value={sector}>
-                        <SelectTrigger id="sector-select">
-                            <SelectValue placeholder="Sélectionner un secteur..."/>
-                        </SelectTrigger>
-                        <SelectContent>
-                            {sectors.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
+            <CardContent className="space-y-8">
+                 <div className="space-y-4 p-4 border rounded-lg">
+                    <div className="flex items-center gap-2">
+                        <Wand2 className="h-5 w-5 text-primary"/>
+                        <h3 className="font-semibold">Générer des Articles</h3>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="sector-select">Secteur d'activité</Label>
+                        <Select onValueChange={setArticleSector} value={articleSector}>
+                            <SelectTrigger id="sector-select"><SelectValue placeholder="Sélectionner..."/></SelectTrigger>
+                            <SelectContent>{sectors.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                    <Button onClick={handleGenerateArticles} disabled={isLoadingArticles || !articleSector}>
+                        {isLoadingArticles ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Wand2 className="mr-2 h-4 w-4" />}
+                        Générer 20 articles
+                    </Button>
+                 </div>
+                 
+                 <div className="space-y-4 p-4 border rounded-lg">
+                    <div className="flex items-center gap-2">
+                         <Building className="h-5 w-5 text-primary"/>
+                        <h3 className="font-semibold">Générer des Tiers</h3>
+                    </div>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div className="space-y-2">
+                            <Label htmlFor="tier-type-select">Type de tiers</Label>
+                            <Select onValueChange={(v) => setTierType(v as TierType)} value={tierType}>
+                                <SelectTrigger id="tier-type-select"><SelectValue/></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Client">Client</SelectItem>
+                                    <SelectItem value="Fournisseur">Fournisseur</SelectItem>
+                                    <SelectItem value="Transporteur">Transporteur</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="tier-sector-select">Secteur d'activité</Label>
+                            <Select onValueChange={setTierSector} value={tierSector}>
+                                <SelectTrigger id="tier-sector-select"><SelectValue placeholder="Sélectionner..."/></SelectTrigger>
+                                <SelectContent>{sectors.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                     <Button onClick={handleGenerateTiers} disabled={isLoadingTiers || !tierSector || !tierType}>
+                        {isLoadingTiers ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Building className="mr-2 h-4 w-4" />}
+                        Générer 5 Tiers
+                    </Button>
                  </div>
             </CardContent>
-            <CardFooter className="gap-4">
-                 <Button onClick={handleGenerate} disabled={isLoading || !sector}>
-                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Wand2 className="mr-2 h-4 w-4" />}
-                    Générer les 20 articles
-                </Button>
+            <CardFooter className="border-t pt-6 mt-6">
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
                          <Button variant="destructive">
                             <Trash2 className="mr-2 h-4 w-4" />
-                            Réinitialiser l'environnement
+                            Réinitialiser les données de l'environnement
                         </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                         <AlertDialogHeader>
                             <AlertDialogTitle>Êtes-vous absolument sûr(e) ?</AlertDialogTitle>
                             <AlertDialogDescription>
-                                Cette action est irréversible. Tous les articles de l'environnement actuel seront définitivement supprimés.
+                                Cette action est irréversible. Tous les articles et tiers de l'environnement actuel seront définitivement supprimés.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
