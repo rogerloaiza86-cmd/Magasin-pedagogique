@@ -1221,7 +1221,8 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     try {
       const savedStateJSON = localStorage.getItem('wmsState');
-      let finalState = getInitialState();
+      const initialState = getInitialState();
+      let finalState = initialState;
 
       if (savedStateJSON) {
         const savedState = JSON.parse(savedStateJSON);
