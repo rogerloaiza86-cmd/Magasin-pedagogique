@@ -962,7 +962,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         id: newTaskId,
                         scenarioId: newActiveScenarioId,
                         userId: student.username,
-                        description: taskTemplate.emailDetails.body,
+                        description: taskTemplate.emailDetails?.body || '',
                         status: isPrerequisiteMet ? 'todo' : 'blocked',
                         taskType: taskTemplate.taskType,
                         taskOrder: taskTemplate.taskOrder,
