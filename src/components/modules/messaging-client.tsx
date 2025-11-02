@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useWms } from "@/context/WmsContext";
@@ -20,8 +21,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  SelectGroup,
-  SelectLabel,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -31,8 +30,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Inbox, Mail } from "lucide-react";
-import type { Email, Tier, User } from "@/lib/types";
+import { Send, Inbox, Mail, ArrowLeft } from "lucide-react";
+import type { Email, User } from "@/lib/types";
 
 type EmailFormData = {
   recipient: string;
@@ -40,55 +39,21 @@ type EmailFormData = {
   body: string;
 };
 
+// --- Formulaire de Composition ---
 function ComposeEmail() {
   const { state, dispatch } = useWms();
   const { toast } = useToast();
-  const { currentUser, users, tiers, currentUserPermissions } = state;
-
-  const { userRecipients, tierRecipients } = useMemo(() => {
-    if (!currentUser || !currentUserPermissions) return { userRecipients: [], tierRecipients: [] };
-
-    const allUsers = Array.from(users.values());
-    let visibleUsers: User[] = [];
-
-    if (currentUserPermissions.isSuperAdmin) {
-        visibleUsers = allUsers;
-    } else if (currentUser.profile === 'professeur') {
-        const managedClassIds = Array.from(state.classes.values())
-            .filter(c => c.teacherIds?.includes(currentUser.username))
-            .map(c => c.id);
-        
-        visibleUsers = allUsers.filter(u => 
-            u.profile === 'professeur' || 
-            u.profile === 'Administrateur' || 
-            (u.profile === 'élève' && u.classId && managedClassIds.includes(u.classId))
-        );
-    } else if (currentUser.profile === 'élève') {
-        const studentClass = state.classes.get(currentUser.classId || -1);
-        const teacherUsernames = studentClass?.teacherIds || [];
-        visibleUsers = allUsers.filter(u => 
-            (u.profile === 'élève' && u.classId === currentUser.classId) || 
-            teacherUsernames.includes(u.username)
-        );
-    }
-    
-    // Filter self and sort
-    const finalUserRecipients = visibleUsers
-      .filter(u => u.username !== currentUser.username)
-      .sort((a,b) => a.username.localeCompare(b.username));
-
-    const finalTierRecipients = Array.from(tiers.values())
-      .filter(t => t.type !== 'Vehicule')
-      .sort((a, b) => a.name.localeCompare(b.name));
-
-    return { userRecipients: finalUserRecipients, tierRecipients: finalTierRecipients };
-
-  }, [currentUser, currentUserPermissions, users, state.classes, tiers]);
-
+  const { currentUser, users } = state;
 
   const { control, handleSubmit, reset, formState: { errors } } = useForm<EmailFormData>({
     defaultValues: { recipient: "", subject: "", body: "" },
   });
+
+  const recipients = useMemo(() => {
+    return Array.from(users.values())
+      .filter(u => u.username !== currentUser?.username)
+      .sort((a, b) => a.username.localeCompare(b.username));
+  }, [users, currentUser]);
 
   const onSubmit = (data: EmailFormData) => {
     if (!currentUser) return;
@@ -103,11 +68,10 @@ function ComposeEmail() {
         }
     });
     
-    const recipientName = getParticipantName({users, tiers}, data.recipient)
-
+    const recipientUser = users.get(data.recipient);
     toast({
         title: "E-mail envoyé",
-        description: `Votre message à ${recipientName} a été envoyé.`
+        description: `Votre message à ${recipientUser?.username} a été envoyé.`
     });
     reset();
   }
@@ -122,20 +86,13 @@ function ComposeEmail() {
                 rules={{ required: "Le destinataire est requis" }}
                 render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger id="recipient"><SelectValue placeholder="Sélectionner..." /></SelectTrigger>
+                        <SelectTrigger id="recipient"><SelectValue placeholder="Sélectionner un utilisateur..." /></SelectTrigger>
                         <SelectContent>
-                          {userRecipients.length > 0 && (
-                            <SelectGroup>
-                              <SelectLabel>Utilisateurs</SelectLabel>
-                              {userRecipients.map(r => <SelectItem key={r.username} value={r.username}>{r.username} ({state.roles.get(r.roleId)?.name || r.profile})</SelectItem>)}
-                            </SelectGroup>
-                          )}
-                           {tierRecipients.length > 0 && (
-                            <SelectGroup>
-                              <SelectLabel>Tiers (Clients, Fournisseurs, Transporteurs)</SelectLabel>
-                              {tierRecipients.map(t => <SelectItem key={t.id} value={`tier-${t.id}`}>{t.name} ({t.type})</SelectItem>)}
-                            </SelectGroup>
-                          )}
+                          {recipients.map(r => (
+                            <SelectItem key={r.username} value={r.username}>
+                                {r.username} ({state.roles.get(r.roleId)?.name || r.profile})
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                     </Select>
                 )}
@@ -157,20 +114,13 @@ function ComposeEmail() {
   )
 }
 
-const getParticipantName = (state: { users: Map<string, User>, tiers: Map<number, Tier> }, participantId: string): string => {
-  if (participantId.startsWith('tier-')) {
-    const tierId = parseInt(participantId.replace('tier-', ''), 10);
-    return state.tiers.get(tierId)?.name || 'Tiers Inconnu';
-  }
-  return state.users.get(participantId)?.username || participantId;
-};
-
+// --- Affichage des e-mails ---
 function Mailbox({ boxType }: { boxType: 'inbox' | 'sent' }) {
     const { state, dispatch } = useWms();
-    const { currentUser, emails, tiers, users } = state;
+    const { currentUser, emails, users } = state;
     const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
 
-    if (!currentUser) return <p>Veuillez vous connecter.</p>
+    if (!currentUser) return <p>Veuillez vous connecter.</p>;
     
     const userEmails = Array.from(emails.values())
         .filter(e => boxType === 'inbox' ? e.recipient === currentUser.username : e.sender === currentUser.username)
@@ -182,17 +132,27 @@ function Mailbox({ boxType }: { boxType: 'inbox' | 'sent' }) {
             dispatch({ type: 'MARK_EMAIL_AS_READ', payload: { emailId: email.id } });
         }
     }
+    
+    const getParticipantName = (participantId: string): string => {
+        return users.get(participantId)?.username || participantId;
+    };
 
+    // --- Vue détaillée d'un e-mail ---
     if (selectedEmail) {
         return (
             <div>
-                <Button variant="outline" onClick={() => setSelectedEmail(null)} className="mb-4">Retour</Button>
+                <Button variant="ghost" onClick={() => setSelectedEmail(null)} className="mb-4">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Retour
+                </Button>
                 <Card>
                     <CardHeader>
-                        <CardTitle>{selectedEmail.subject.replace(/\[Copie de .*?\] |\[Pour correction -.*?\] /g, '')}</CardTitle>
-                        <CardDescription>
-                            {boxType === 'inbox' ? `De : ${getParticipantName({users, tiers}, selectedEmail.sender)}` : `À : ${getParticipantName({users, tiers}, selectedEmail.recipient)}`}
-                            <span className="float-right">{new Date(selectedEmail.timestamp).toLocaleString()}</span>
+                        <CardTitle>{selectedEmail.subject}</CardTitle>
+                        <CardDescription className="flex justify-between">
+                            <span>
+                                {boxType === 'inbox' ? `De : ${getParticipantName(selectedEmail.sender)}` : `À : ${getParticipantName(selectedEmail.recipient)}`}
+                            </span>
+                            <span>{new Date(selectedEmail.timestamp).toLocaleString()}</span>
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -203,6 +163,7 @@ function Mailbox({ boxType }: { boxType: 'inbox' | 'sent' }) {
         )
     }
 
+    // --- Liste des e-mails ---
     return (
         <Card>
           <CardContent className="p-0">
@@ -210,15 +171,15 @@ function Mailbox({ boxType }: { boxType: 'inbox' | 'sent' }) {
                 <TableBody>
                 {userEmails.length > 0 ? (
                     userEmails.map(email => (
-                    <TableRow key={email.id} onClick={() => handleEmailClick(email)} className={`cursor-pointer ${!email.isRead && boxType === 'inbox' ? 'font-bold' : ''}`}>
-                        <TableCell className="w-1/4">{getParticipantName({users, tiers}, boxType === 'inbox' ? email.sender : email.recipient)}</TableCell>
-                        <TableCell>{email.subject.replace(/\[Copie de .*?\] |\[Pour correction -.*?\] /g, '')}</TableCell>
+                    <TableRow key={email.id} onClick={() => handleEmailClick(email)} className={`cursor-pointer ${!email.isRead && boxType === 'inbox' ? 'font-bold bg-muted/50' : ''}`}>
+                        <TableCell className="w-1/4">{getParticipantName(boxType === 'inbox' ? email.sender : email.recipient)}</TableCell>
+                        <TableCell>{email.subject}</TableCell>
                         <TableCell className="text-right text-muted-foreground text-xs">{new Date(email.timestamp).toLocaleDateString()}</TableCell>
                     </TableRow>
                     ))
                 ) : (
                     <TableRow>
-                    <TableCell colSpan={3} className="h-24 text-center">
+                    <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
                         {boxType === 'inbox' ? "Votre boîte de réception est vide." : "Vous n'avez envoyé aucun message."}
                     </TableCell>
                     </TableRow>
@@ -230,6 +191,7 @@ function Mailbox({ boxType }: { boxType: 'inbox' | 'sent' }) {
     )
 }
 
+// --- Composant Principal ---
 export function MessagingClient() {
   const { state } = useWms();
   const { currentUser, currentUserPermissions, emails } = state;
@@ -249,7 +211,7 @@ export function MessagingClient() {
     <Tabs defaultValue="inbox" className="w-full">
       <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="inbox">
-            <Inbox className="mr-2" /> Boîte de réception {unreadCount > 0 && <span className="ml-2 bg-destructive text-destructive-foreground rounded-full px-2 text-xs">{unreadCount}</span>}
+            <Inbox className="mr-2" /> Boîte de réception {unreadCount > 0 && <span className="ml-2 bg-destructive text-destructive-foreground rounded-full h-5 w-5 flex items-center justify-center text-xs">{unreadCount}</span>}
         </TabsTrigger>
         <TabsTrigger value="sent"><Send className="mr-2" /> Messages envoyés</TabsTrigger>
         <TabsTrigger value="compose"><Mail className="mr-2" /> Nouveau Message</TabsTrigger>
@@ -258,7 +220,10 @@ export function MessagingClient() {
       <TabsContent value="sent"><Mailbox boxType="sent"/></TabsContent>
       <TabsContent value="compose">
         <Card>
-            <CardHeader><CardTitle>Écrire un nouveau message</CardTitle></CardHeader>
+            <CardHeader>
+                <CardTitle>Écrire un nouveau message</CardTitle>
+                <CardDescription>Envoyez un message à un autre utilisateur du système.</CardDescription>
+            </CardHeader>
             <CardContent><ComposeEmail /></CardContent>
         </Card>
       </TabsContent>

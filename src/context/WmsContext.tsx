@@ -3,7 +3,7 @@
 "use client";
 
 import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
-import type { Article, Tier, Document, Movement, User, Class, Email, Role, Permissions, Environment, Maintenance, DocumentLine, TierType, UserProfile } from '@/lib/types';
+import type { Article, Tier, Document, Movement, User, Class, Email, Role, Permissions, Environment, Maintenance, DocumentLine, TierType, UserProfile, WmsDocument } from '@/lib/types';
 import { initialArticles } from '@/lib/articles-data';
 import { faker } from '@faker-js/faker/locale/fr';
 
@@ -60,7 +60,7 @@ ENVIRONMENTS.set('magasin_pedago', {
 interface WmsState {
   articles: Map<string, Article>;
   tiers: Map<number, Tier>;
-  documents: Map<number, Document>;
+  documents: Map<number, WmsDocument>;
   movements: Movement[];
   users: Map<string, User>;
   classes: Map<number, Class>;
@@ -105,18 +105,14 @@ export const getInitialState = (): WmsState => {
   initialClasses.set(demoClassId, { id: demoClassId, name: 'Classe Démo', teacherIds: ['prof']});
   initialUsers.set('eleve', { username: 'eleve', password: 'eleve', profile: 'élève', createdAt: new Date().toISOString(), roleId: 'eleve', classId: demoClassId });
 
-  const initialTiers = new Map<number, Tier>();
-  
-  const initialEmails = new Map<number, Email>();
-
   return {
     articles: articlesMap,
-    tiers: initialTiers,
+    tiers: new Map(),
     documents: new Map(),
     movements: initialMovements,
     users: initialUsers,
     classes: initialClasses,
-    emails: initialEmails,
+    emails: new Map(),
     roles: ROLES,
     environments: ENVIRONMENTS,
     maintenances: new Map(),
@@ -136,11 +132,10 @@ type WmsAction =
   | { type: 'ADD_ARTICLE', payload: Omit<Article, 'environnementId' | 'status'> }
   | { type: 'UPDATE_ARTICLE_STATUS', payload: { articleId: string; status: Article['status']} }
   | { type: 'ADD_TIER'; payload: Omit<Tier, 'id' | 'createdAt' | 'createdBy' | 'environnementId'> }
-  | { type: 'CREATE_DOCUMENT'; payload: Omit<Document, 'id' | 'createdAt' | 'createdBy' | 'environnementId'> }
-  | { type: 'UPDATE_DOCUMENT'; payload: Document }
+  | { type: 'CREATE_DOCUMENT'; payload: Omit<WmsDocument, 'id' | 'createdAt' | 'createdBy' | 'environnementId'> }
+  | { type: 'UPDATE_DOCUMENT'; payload: WmsDocument }
   | { type: 'ADJUST_INVENTORY'; payload: { articleId: string; newStock: number; oldStock: number } }
   | { type: 'LOGIN'; payload: { username: string, password: string} }
-  | { type: 'REAUTHENTICATE_USER'; payload: { username: string } }
   | { type: 'LOGOUT' }
   | { type: 'REGISTER_USER', payload: { username: string, password?: string, profile: UserProfile, classId?: number } }
   | { type: 'ADD_CLASS', payload: { name: string } }
@@ -175,22 +170,17 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       }
       break;
     }
-     case 'REAUTHENTICATE_USER': {
-      const { username } = action.payload;
-      const user = state.users.get(username);
-      if (user) {
-        newState = { ...state, currentUser: user };
-      } else {
-        newState = { ...state, currentUser: null };
-      }
-      break;
-    }
     case 'LOGOUT':
       localStorage.removeItem('wmsLastUser');
       newState = { 
         ...getInitialState(), 
         users: state.users,
         classes: state.classes,
+        tiers: state.tiers,
+        articles: state.articles,
+        documents: state.documents,
+        movements: state.movements,
+        emails: state.emails,
       };
       break;
     case 'REGISTER_USER': {
@@ -385,7 +375,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         if (!state.currentUser || (type === 'Bon de Commande Fournisseur' && !perms?.canCreateBC) || (type === 'Bon de Livraison Client' && !perms?.canCreateBL) || (type === 'Lettre de Voiture' && !perms?.canShipBL) || (type === 'Retour Client' && !perms?.canReceiveBC) ) {
             return state;
         }
-        const newDoc: Document = { 
+        const newDoc: WmsDocument = { 
             ...action.payload, 
             id: state.docIdCounter, 
             createdAt: new Date().toISOString(),
@@ -616,7 +606,7 @@ interface WmsContextType {
   dispatch: React.Dispatch<WmsAction>;
   getArticle: (id: string) => Article | undefined;
   getTier: (id: number) => Tier | undefined;
-  getDocument: (id: number) => Document | undefined;
+  getDocument: (id: number) => WmsDocument | undefined;
   getClass: (id: number) => Class | undefined;
   getArticleWithComputedStock: (id: string) => (Article & { stockReserver: number; stockDisponible: number; }) | undefined;
 }
@@ -655,8 +645,11 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
       
       const lastUser = localStorage.getItem('wmsLastUser');
       if (lastUser && finalState.users.has(lastUser)) {
-         finalState.currentUser = finalState.users.get(lastUser) || null;
-         finalState = updateUserPermissions(finalState);
+         const user = finalState.users.get(lastUser) || null;
+         finalState.currentUser = user;
+         if (user) {
+            finalState.currentUserPermissions = finalState.roles.get(user.roleId)?.permissions || null;
+         }
       }
 
       dispatch({ type: 'SET_STATE', payload: finalState });
@@ -743,3 +736,5 @@ export const useWms = () => {
   }
   return context;
 };
+
+    
