@@ -162,7 +162,7 @@ interface WmsState {
 
 const getInitialState = (): WmsState => {
   const defaultEnvId = 'magasin_pedago';
-  const articlesWithEnv = initialArticles.map(a => [a.id, {...a, environnementId: defaultEnvId}]) as [string, Article][];
+  const articlesWithEnv = initialArticles.map(a => [a.id, {...a, environnementId: defaultEnvId, ean: faker.commerce.isbn().replace(/-/g, '') }]) as [string, Article][];
   const articlesMap = new Map(articlesWithEnv);
   
   const initialMovements: Movement[] = Array.from(articlesMap.values()).filter(a => a.environnementId === defaultEnvId).map((article, index) => ({
@@ -331,6 +331,7 @@ const getInitialState = (): WmsState => {
 
 type WmsAction =
   | { type: 'ADD_ARTICLE', payload: Omit<Article, 'environnementId' | 'status'> }
+  | { type: 'UPDATE_ARTICLE_STATUS', payload: { articleId: string; status: Article['status']} }
   | { type: 'ADD_TIER'; payload: Omit<Tier, 'id' | 'createdAt' | 'createdBy' | 'environnementId'> }
   | { type: 'CREATE_DOCUMENT'; payload: Omit<Document, 'id' | 'createdAt' | 'createdBy' | 'environnementId'> }
   | { type: 'UPDATE_DOCUMENT'; payload: Document }
@@ -503,7 +504,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
     }
      case 'ADD_ARTICLE': {
       if (!state.currentUserPermissions?.canManageStock || !state.currentUser) return state;
-      const { id, name, location, stock, price, packaging } = action.payload;
+      const { id, name, location, stock, price, packaging, ean } = action.payload;
       if (state.articles.has(id)) {
         // In a real app, you'd probably want to throw an error here or show a toast.
         // For now, we'll just log it and not add the article.
@@ -517,6 +518,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         stock,
         price,
         packaging,
+        ean,
         status: 'Actif',
         environnementId: state.currentEnvironmentId,
       };
@@ -540,6 +542,17 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
 
       newState = { ...state, articles: newArticles, movements: newMovements, movementIdCounter: newMovementIdCounter };
       break;
+    }
+    case 'UPDATE_ARTICLE_STATUS': {
+        if (!state.currentUserPermissions?.canManageStock) return state;
+        const { articleId, status } = action.payload;
+        const newArticles = new Map(state.articles);
+        const article = newArticles.get(articleId);
+        if (article) {
+            newArticles.set(articleId, { ...article, status });
+        }
+        newState = { ...state, articles: newArticles };
+        break;
     }
     case 'ADD_CLASS': {
         if (!state.currentUserPermissions?.canManageClasses) return state;
@@ -896,71 +909,71 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         break;
     }
     case 'LAUNCH_SCENARIO': {
-        if (!state.currentUserPermissions?.canManageScenarios) return state;
-        const { templateId, classId } = action.payload;
-        const template = state.scenarioTemplates.get(templateId);
-        if (!template || !template.rolesRequis.length) return state;
-    
-        const newActiveScenarioId = state.activeScenarioIdCounter;
-        const newActiveScenarios = new Map(state.activeScenarios);
-        newActiveScenarios.set(newActiveScenarioId, {
-            id: newActiveScenarioId,
-            templateId,
-            classId,
-            status: 'running',
-            createdAt: new Date().toISOString(),
-            environnementId: template.environnementId,
-        });
-    
-        const studentsInClass = Array.from(state.users.values()).filter(u => u.classId === classId && u.profile === 'élève');
-        const rolesToAssign = template.rolesRequis;
-        const newUsers = new Map(state.users);
-        const newTasks = new Map(state.tasks);
-        let taskIdCounter = state.taskIdCounter;
-        let localCurrentUser = state.currentUser;
-        let localCurrentUserPermissions = state.currentUserPermissions;
-    
-        studentsInClass.forEach((student, index) => {
-            const roleId = rolesToAssign[index % rolesToAssign.length];
-            const updatedUser = { ...student, roleId };
-            newUsers.set(student.username, updatedUser);
-    
-            if (state.currentUser && state.currentUser.username === student.username) {
-                localCurrentUser = updatedUser;
-                localCurrentUserPermissions = state.roles.get(roleId)?.permissions || null;
-            }
-    
-            template.tasks.forEach(taskTemplate => {
-                if (taskTemplate.roleId === roleId) {
-                    const newTaskId = taskIdCounter++;
-                    newTasks.set(newTaskId, {
-                        id: newTaskId,
-                        scenarioId: newActiveScenarioId,
-                        userId: student.username,
-                        description: taskTemplate.description,
-                        taskType: taskTemplate.taskType,
-                        status: taskTemplate.prerequisiteTaskId ? 'blocked' : 'todo',
-                        details: taskTemplate.details,
-                        taskOrder: taskTemplate.taskOrder,
-                        prerequisiteTaskId: taskTemplate.prerequisiteTaskId,
-                        environnementId: taskTemplate.environnementId || template.environnementId,
-                    });
-                }
-            });
-        });
+      if (!state.currentUserPermissions?.canManageScenarios) return state;
+      const { templateId, classId } = action.payload;
+      const template = state.scenarioTemplates.get(templateId);
+      if (!template || !template.rolesRequis.length) return state;
   
-        newState = {
-            ...state,
-            activeScenarios: newActiveScenarios,
-            users: newUsers,
-            tasks: newTasks,
-            activeScenarioIdCounter: newActiveScenarioId + 1,
-            taskIdCounter,
-            currentUser: localCurrentUser,
-            currentUserPermissions: localCurrentUserPermissions
-        };
-        break;
-    }
+      const newActiveScenarioId = state.activeScenarioIdCounter;
+      const newActiveScenarios = new Map(state.activeScenarios);
+      newActiveScenarios.set(newActiveScenarioId, {
+          id: newActiveScenarioId,
+          templateId,
+          classId,
+          status: 'running',
+          createdAt: new Date().toISOString(),
+          environnementId: template.environnementId,
+      });
+  
+      const studentsInClass = Array.from(state.users.values()).filter(u => u.classId === classId && u.profile === 'élève');
+      const rolesToAssign = template.rolesRequis;
+      const newUsers = new Map(state.users);
+      const newTasks = new Map(state.tasks);
+      let taskIdCounter = state.taskIdCounter;
+      let localCurrentUser = state.currentUser;
+      let localCurrentUserPermissions = state.currentUserPermissions;
+  
+      studentsInClass.forEach((student, index) => {
+          const roleId = rolesToAssign[index % rolesToAssign.length];
+          const updatedUser = { ...student, roleId };
+          newUsers.set(student.username, updatedUser);
+  
+          if (state.currentUser && state.currentUser.username === student.username) {
+              localCurrentUser = updatedUser;
+              localCurrentUserPermissions = state.roles.get(roleId)?.permissions || null;
+          }
+  
+          template.tasks.forEach(taskTemplate => {
+              if (taskTemplate.roleId === roleId) {
+                  const newTaskId = taskIdCounter++;
+                  newTasks.set(newTaskId, {
+                      id: newTaskId,
+                      scenarioId: newActiveScenarioId,
+                      userId: student.username,
+                      description: taskTemplate.description,
+                      taskType: taskTemplate.taskType,
+                      status: taskTemplate.prerequisiteTaskId ? 'blocked' : 'todo',
+                      details: taskTemplate.details,
+                      taskOrder: taskTemplate.taskOrder,
+                      prerequisiteTaskId: taskTemplate.prerequisiteTaskId,
+                      environnementId: taskTemplate.environnementId || template.environnementId,
+                  });
+              }
+          });
+      });
+
+      newState = {
+          ...state,
+          activeScenarios: newActiveScenarios,
+          users: newUsers,
+          tasks: newTasks,
+          activeScenarioIdCounter: newActiveScenarioId + 1,
+          taskIdCounter,
+          currentUser: localCurrentUser,
+          currentUserPermissions: localCurrentUserPermissions
+      };
+      break;
+  }
     case 'GENERATE_ARTICLES_BATCH': {
         if (!state.currentUserPermissions?.canManageStock || !state.currentUser) return state;
         const newArticlesMap = new Map(state.articles);
@@ -973,6 +986,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                     ...articleData,
                     status: 'Actif',
                     environnementId: state.currentEnvironmentId,
+                    ean: faker.commerce.isbn().replace(/-/g, ''),
                 };
                 newArticlesMap.set(articleData.id, newArticle);
 
@@ -1135,6 +1149,7 @@ interface WmsContextType {
   getTier: (id: number) => Tier | undefined;
   getDocument: (id: number) => Document | undefined;
   getClass: (id: number) => Class | undefined;
+  getArticleWithComputedStock: (id: string) => (Article & { stockReserver: number; stockDisponible: number; }) | undefined;
 }
 
 const WmsContext = createContext<WmsContextType | undefined>(undefined);
@@ -1157,11 +1172,11 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
         finalState = {
             ...initialState,
             ...savedState,
-            articles: reviveMap(savedState.articles),
-            tiers: reviveMap(savedState.tiers),
-            documents: reviveMap(savedState.documents),
-            users: reviveMap(savedState.users),
-            classes: reviveMap(savedState.classes),
+            articles: new Map([...initialState.articles, ...reviveMap(savedState.articles)]),
+            tiers: new Map([...initialState.tiers, ...reviveMap(savedState.tiers)]),
+            documents: new Map([...initialState.documents, ...reviveMap(savedState.documents)]),
+            users: new Map([...initialState.users, ...reviveMap(savedState.users)]),
+            classes: new Map([...initialState.classes, ...reviveMap(savedState.classes)]),
             emails: reviveMap(savedState.emails),
             maintenances: reviveMap(savedState.maintenances),
             scenarioTemplates: new Map([...initialState.scenarioTemplates, ...reviveMap(savedState.scenarioTemplates)]),
@@ -1235,6 +1250,25 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
   }, [state]);
 
 
+  const getArticleWithComputedStock = (articleId: string) => {
+    const article = state.articles.get(articleId);
+    if (!article) return undefined;
+
+    let stockReserver = 0;
+    for (const doc of state.documents.values()) {
+        if (doc.type === 'Bon de Livraison Client' && doc.status === 'En préparation') {
+            for (const line of doc.lines) {
+                if (line.articleId === articleId) {
+                    stockReserver += line.quantity;
+                }
+            }
+        }
+    }
+    const stockDisponible = article.stock - stockReserver;
+
+    return { ...article, stockReserver, stockDisponible };
+  }
+
   const contextValue = useMemo(() => ({
     state,
     dispatch,
@@ -1242,6 +1276,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
     getTier: (id: number) => state.tiers.get(id),
     getDocument: (id: number) => state.documents.get(id),
     getClass: (id: number) => state.classes.get(id),
+    getArticleWithComputedStock,
   }), [state]);
 
   return <WmsContext.Provider value={contextValue}>{children}</WmsContext.Provider>;

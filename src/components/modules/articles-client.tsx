@@ -22,15 +22,18 @@ import { Input } from "@/components/ui/input";
 import { Article, ArticleStatus } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye } from "lucide-react";
+import { Eye, Barcode } from "lucide-react";
 import Link from "next/link";
 
 export function ArticlesClient() {
-  const { state } = useWms();
+  const { state, getArticleWithComputedStock } = useWms();
   const { currentEnvironmentId } = state;
   const articlesInEnv = useMemo(() => 
-    Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId),
-    [state.articles, currentEnvironmentId]
+    Array.from(state.articles.values())
+      .filter(a => a.environnementId === currentEnvironmentId)
+      .map(a => getArticleWithComputedStock(a.id))
+      .filter(Boolean) as (Article & { stockReserver: number; stockDisponible: number; })[],
+    [state.articles, currentEnvironmentId, getArticleWithComputedStock]
   );
   
   const [searchTerm, setSearchTerm] = useState("");
@@ -39,10 +42,12 @@ export function ArticlesClient() {
     if (!searchTerm) {
       return articlesInEnv;
     }
+    const lowercasedTerm = searchTerm.toLowerCase();
     return articlesInEnv.filter(
       (article) =>
-        article.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        article.name.toLowerCase().includes(searchTerm.toLowerCase())
+        article.id.toLowerCase().includes(lowercasedTerm) ||
+        article.name.toLowerCase().includes(lowercasedTerm) ||
+        article.ean?.includes(lowercasedTerm)
     );
   }, [articlesInEnv, searchTerm]);
 
@@ -67,13 +72,14 @@ export function ArticlesClient() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="mb-4">
+        <div className="mb-4 relative max-w-sm">
           <Input
-            placeholder="Rechercher par référence ou désignation..."
+            placeholder="Rechercher par réf, désignation, EAN..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-sm"
+            className="pl-10"
           />
+          <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
         </div>
         <div className="overflow-x-auto">
             <Table>
@@ -82,22 +88,22 @@ export function ArticlesClient() {
                 <TableHead>Référence</TableHead>
                 <TableHead>Désignation</TableHead>
                 <TableHead>Statut</TableHead>
-                <TableHead>Stock</TableHead>
+                <TableHead>Stock Physique</TableHead>
+                <TableHead>Stock Disponible</TableHead>
                 <TableHead>Emplacement</TableHead>
-                <TableHead>Prix U. HT</TableHead>
                 <TableHead className="text-right">Détails</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
                 {filteredArticles.length > 0 ? (
-                filteredArticles.map((article: Article) => (
+                filteredArticles.map((article) => (
                     <TableRow key={article.id}>
                     <TableCell className="font-mono">{article.id}</TableCell>
                     <TableCell className="font-medium">{article.name}</TableCell>
                     <TableCell><Badge variant={getStatusVariant(article.status)}>{article.status}</Badge></TableCell>
-                    <TableCell>{article.stock}</TableCell>
+                    <TableCell className="font-bold">{article.stock}</TableCell>
+                    <TableCell>{article.stockDisponible}</TableCell>
                     <TableCell className="font-mono">{article.location}</TableCell>
-                    <TableCell>{article.price.toFixed(2)} €</TableCell>
                     <TableCell className="text-right">
                         <Link href={`/articles/${article.id}`}>
                             <Button variant="ghost" size="icon">

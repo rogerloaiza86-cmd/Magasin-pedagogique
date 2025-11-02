@@ -2,6 +2,7 @@
 
 
 
+
 export type Environment = {
     id: string;
     name: string;
@@ -112,6 +113,7 @@ export type Movement = {
   stockAfter: number;
   user: string;
   environnementId: string;
+  documentId?: number;
 };
 
 export type UserProfile = 'élève' | 'professeur' | 'Administrateur';

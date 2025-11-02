@@ -11,18 +11,25 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+
+
+const articleStatuses: ArticleStatus[] = ['Actif', 'Bloqué', 'En contrôle qualité', 'Obsolète', 'En attente de rangement'];
 
 export default function ArticleDetailPage() {
     const { id } = useParams();
-    const { state, getArticle } = useWms();
+    const { state, getArticleWithComputedStock, dispatch, getDocument } = useWms();
     const articleId = Array.isArray(id) ? id[0] : id;
+    const { toast } = useToast();
 
-    const article = getArticle(articleId);
+    const articleData = getArticleWithComputedStock(articleId);
+
     const articleMovements = state.movements
         .filter(m => m.articleId === articleId && m.environnementId === state.currentEnvironmentId)
         .sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-    if (!article) {
+    if (!articleData) {
         return (
             <div className="flex flex-col items-center justify-center h-full">
                 <Card className="w-full max-w-lg">
@@ -39,6 +46,8 @@ export default function ArticleDetailPage() {
             </div>
         )
     }
+    
+    const { stockReserver, stockDisponible, ...article } = articleData;
 
     const getStatusVariant = (status: ArticleStatus): "default" | "secondary" | "destructive" | "outline" => {
         switch (status) {
@@ -50,6 +59,22 @@ export default function ArticleDetailPage() {
                 return 'secondary';
             default: return 'outline';
         }
+    }
+
+    const handleStatusChange = (newStatus: ArticleStatus) => {
+        if (!state.currentUserPermissions?.canManageStock) {
+            toast({
+                variant: 'destructive',
+                title: 'Permission refusée',
+                description: "Vous n'avez pas les droits pour modifier le statut de l'article."
+            });
+            return;
+        }
+        dispatch({ type: 'UPDATE_ARTICLE_STATUS', payload: { articleId: article.id, status: newStatus }});
+        toast({
+            title: 'Statut mis à jour',
+            description: `Le statut de l'article ${article.name} est maintenant "${newStatus}".`
+        });
     }
 
     return (
@@ -66,18 +91,41 @@ export default function ArticleDetailPage() {
                             <CardTitle className="text-3xl">{article.name}</CardTitle>
                             <CardDescription>Référence: {article.id}</CardDescription>
                         </div>
-                        <Badge variant={getStatusVariant(article.status)} className="text-base">{article.status}</Badge>
+                         <div className="w-48">
+                            <Select onValueChange={handleStatusChange} defaultValue={article.status} disabled={!state.currentUserPermissions?.canManageStock}>
+                                <SelectTrigger className="w-full">
+                                    <SelectValue>
+                                        <Badge variant={getStatusVariant(article.status)}>{article.status}</Badge>
+                                    </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {articleStatuses.map(status => (
+                                        <SelectItem key={status} value={status}>
+                                            <Badge variant={getStatusVariant(status)}>{status}</Badge>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid md:grid-cols-3 gap-6">
-                        <div className="space-y-1">
+                    <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        <div className="space-y-1 p-4 rounded-lg bg-secondary">
+                            <p className="text-sm font-medium text-muted-foreground">Stock Physique</p>
+                            <p className="text-2xl font-bold">{article.stock}</p>
+                        </div>
+                        <div className="space-y-1 p-4 rounded-lg bg-secondary">
+                            <p className="text-sm font-medium text-muted-foreground">Stock Réservé</p>
+                            <p className="text-2xl font-bold text-red-500">{stockReserver}</p>
+                        </div>
+                        <div className="space-y-1 p-4 rounded-lg bg-secondary">
+                            <p className="text-sm font-medium text-muted-foreground">Stock Disponible</p>
+                            <p className="text-2xl font-bold text-green-600">{stockDisponible}</p>
+                        </div>
+                         <div className="space-y-1 p-4 rounded-lg bg-secondary">
                             <p className="text-sm font-medium text-muted-foreground">Emplacement</p>
                             <p className="font-mono text-lg">{article.location || 'N/A'}</p>
-                        </div>
-                         <div className="space-y-1">
-                            <p className="text-sm font-medium text-muted-foreground">Stock Actuel</p>
-                            <p className="text-2xl font-bold">{article.stock}</p>
                         </div>
                          <div className="space-y-1">
                             <p className="text-sm font-medium text-muted-foreground">Prix Unitaire HT</p>
@@ -113,6 +161,7 @@ export default function ArticleDetailPage() {
                                 <TableHead>Quantité</TableHead>
                                 <TableHead>Stock Après Mvt.</TableHead>
                                 <TableHead>Utilisateur</TableHead>
+                                <TableHead>Document #</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -125,9 +174,16 @@ export default function ArticleDetailPage() {
                                 </TableCell>
                                 <TableCell>{m.stockAfter}</TableCell>
                                 <TableCell>{m.user}</TableCell>
+                                <TableCell>
+                                    {m.documentId && (
+                                        <Link href={`/documents/${m.documentId}`} className="underline text-blue-600">
+                                            {getDocument(m.documentId)?.type.substring(0,3).toUpperCase()}-{m.documentId}
+                                        </Link>
+                                    )}
+                                </TableCell>
                                 </TableRow>
                             )) : (
-                                <TableRow><TableCell colSpan={5} className="h-24 text-center">Aucun mouvement pour cet article.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="h-24 text-center">Aucun mouvement pour cet article.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>

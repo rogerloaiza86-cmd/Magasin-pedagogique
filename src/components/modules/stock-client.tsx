@@ -53,7 +53,8 @@ function CreateArticleForm() {
             location: "",
             stock: 0,
             price: 0,
-            packaging: ""
+            packaging: "",
+            ean: "",
         }
     });
 
@@ -98,6 +99,10 @@ function CreateArticleForm() {
                              {errors.packaging && <p className="text-sm text-destructive mt-1">{errors.packaging.message}</p>}
                         </div>
                     </div>
+                    <div>
+                        <Label htmlFor="ean">Code EAN</Label>
+                        <Controller name="ean" control={control} render={({field}) => <Input id="ean" {...field} />} />
+                    </div>
                      <div className="grid md:grid-cols-2 gap-4">
                         <div>
                             <Label htmlFor="stock">Stock Initial</Label>
@@ -118,7 +123,7 @@ function CreateArticleForm() {
 }
 
 function ViewStock() {
-  const { state } = useWms();
+  const { state, getArticleWithComputedStock } = useWms();
   const { currentEnvironmentId } = state;
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedArticleId, setSelectedArticleId] = useState<string>("");
@@ -131,12 +136,13 @@ function ViewStock() {
   const filteredArticles = useMemo(() =>
     allArticles.filter(article =>
       !searchTerm || article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      article.id.toLowerCase().includes(searchTerm.toLowerCase())
+      article.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      article.ean?.toLowerCase().includes(searchTerm.toLowerCase())
     ),
     [allArticles, searchTerm]
   );
   
-  const selectedArticle = selectedArticleId ? state.articles.get(selectedArticleId) : null;
+  const selectedArticle = selectedArticleId ? getArticleWithComputedStock(selectedArticleId) : null;
 
   return (
     <Card>
@@ -147,7 +153,7 @@ function ViewStock() {
         <div className="space-y-2">
             <Label>Rechercher un article</Label>
              <Input
-                placeholder="Entrez un nom ou une référence..."
+                placeholder="Entrez un nom, une référence ou un code EAN..."
                 value={searchTerm}
                 onChange={(e) => {
                     setSearchTerm(e.target.value);
@@ -175,8 +181,12 @@ function ViewStock() {
               <CardDescription>Référence: {selectedArticle.id}</CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="p-2 border rounded-md"><Label>Stock Physique</Label><p className="font-bold text-xl">{selectedArticle.stock}</p></div>
+                <div className="p-2 border rounded-md"><Label>Stock Réservé</Label><p className="font-bold text-xl text-red-500">{selectedArticle.stockReserver}</p></div>
+                <div className="p-2 border rounded-md"><Label>Stock Disponible</Label><p className="font-bold text-xl text-green-600">{selectedArticle.stockDisponible}</p></div>
+              </div>
               <div className="grid grid-cols-2 gap-4">
-                <div><span className="font-semibold">Stock Actuel:</span> <span className="text-2xl font-bold">{selectedArticle.stock}</span></div>
                 <div><span className="font-semibold">Emplacement:</span> <span className="font-mono">{selectedArticle.location}</span></div>
                 <div><span className="font-semibold">Prix HT:</span> {selectedArticle.price.toFixed(2)} €</div>
                 <div><span className="font-semibold">Conditionnement:</span> {selectedArticle.packaging}</div>
