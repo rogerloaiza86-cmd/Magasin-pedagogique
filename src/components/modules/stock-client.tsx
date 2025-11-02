@@ -544,6 +544,8 @@ export function StockClient() {
   if(perms.canManageStock) {
     tabs.push({ value: "create", label: "Créer un Article" });
     tabs.push({ value: "adjust", label: "Inventaire / Ajustement" });
+  }
+   if (perms.isSuperAdmin || perms.profile === 'professeur') {
     tabs.push({ value: "data", label: "Données de simulation" });
   }
 
@@ -561,8 +563,10 @@ export function StockClient() {
             </TabsContent>
             {perms.canManageStock && <TabsContent value="create"><CreateArticleForm /></TabsContent>}
             {perms.canManageStock && <TabsContent value="adjust"><AdjustInventory /></TabsContent>}
-            {perms.canManageStock && <TabsContent value="data"><GenerateFictitiousData /></TabsContent>}
+            {(perms.isSuperAdmin || perms.profile === 'professeur') && <TabsContent value="data"><GenerateFictitiousData /></TabsContent>}
         </Tabs>
     </div>
   );
 }
+
+    

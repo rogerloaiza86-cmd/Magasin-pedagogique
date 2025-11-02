@@ -309,7 +309,6 @@ const getInitialState = (): WmsState => {
     emails: new Map(),
     roles: ROLES,
     environments: ENVIRONMENTS,
-    maintenances: new Map(),
     grillesTarifaires: GRILLES_TARIFAIRES,
     scenarioTemplates: initialScenarioTemplates,
     activeScenarios: new Map(),
@@ -1298,3 +1297,5 @@ export const useWms = () => {
   }
   return context;
 };
+
+    
