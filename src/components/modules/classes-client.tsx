@@ -45,11 +45,14 @@ type ClassFormData = {
 }
 
 function CreateClassForm() {
-    const { dispatch } = useWms();
+    const { state, dispatch } = useWms();
     const { toast } = useToast();
     const { control, handleSubmit, reset, formState: { errors } } = useForm<ClassFormData>({
         defaultValues: { name: "" }
     });
+     if (!state.currentUserPermissions?.isSuperAdmin) {
+        return null;
+    }
 
     const onSubmit = (data: ClassFormData) => {
         dispatch({ type: "ADD_CLASS", payload: { name: data.name } });
@@ -91,7 +94,7 @@ export function ClassesClient() {
   const { toast } = useToast();
   const [openClassId, setOpenClassId] = useState<number | null>(null);
 
-  if (!currentUserPermissions?.isSuperAdmin) {
+  if (!currentUserPermissions?.canManageClasses) {
     return (
         <Card>
             <CardHeader>
