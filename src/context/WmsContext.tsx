@@ -237,14 +237,14 @@ export const getInitialState = (): WmsState => {
     subject: 'Re: Bienvenue dans LogiSim Hub',
     body: 'Bonjour Professeur, message bien reçu. Le système semble fonctionner.',
     timestamp: new Date(Date.now() - 1000 * 60 * 2).toISOString(), // 2 minutes ago
-    isRead: true,
+    isRead: false,
   });
    initialEmails.set(emailIdCounter++, {
     id: 3,
     sender: 'SystemLogiSim',
-    recipient: 'eleve1',
-    subject: 'Alerte: Tâche en retard',
-    body: 'Ceci est une notification automatique de test.',
+    recipient: 'admin',
+    subject: 'Rapport Système',
+    body: 'Ceci est une notification automatique de test pour l\'administrateur.',
     timestamp: new Date(Date.now() - 1000 * 60 * 10).toISOString(), // 10 minutes ago
     isRead: true,
   });
@@ -339,22 +339,6 @@ export const getInitialState = (): WmsState => {
     createdBy: 'admin',
     environnementId: 'agence_transport'
   });
-
-  initialScenarioTemplates.set(templateIdCounter++, {
-    id: 7,
-    title: "TMS02 : Gestion de maintenance véhicule",
-    description: "Gérer le cycle de vie d'une maintenance sur un véhicule de la flotte.",
-    competences: ["C5.2"],
-    rolesRequis: ["tms_exploitation"],
-    tasks: [
-        { taskOrder: 1, roleId: "tms_exploitation", taskType: 'ACTION', emailDetails: { sender: 'Chauffeur', subject: 'Problème sur le camion', body: "Le véhicule immatriculé 'AB-123-CD' a un pneu crevé. Merci de l'enregistrer dans le système." } },
-        { taskOrder: 2, roleId: "tms_exploitation", taskType: 'ACTION', prerequisiteTaskOrder: 1, emailDetails: { sender: 'SystemLogiSim', subject: 'Mise en maintenance', body: "Le véhicule est maintenant enregistré. Mettez-le en maintenance pour 'Réparation pneu'." } },
-        { taskOrder: 3, roleId: "tms_exploitation", taskType: 'ACTION', prerequisiteTaskOrder: 2, emailDetails: { sender: 'Garage', subject: 'Réparation terminée', body: "La réparation du pneu est terminée. Vous pouvez clôturer l'intervention et remettre le véhicule en service." } },
-    ],
-    createdBy: 'admin',
-    environnementId: 'agence_transport'
-  });
-
 
   return {
     articles: articlesMap,
@@ -675,8 +659,9 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
     case 'SEND_EMAIL': {
       if (!state.currentUser) return state;
       const newEmails = new Map(state.emails);
-      newEmails.set(state.emailIdCounter, { ...action.payload, id: state.emailIdCounter, timestamp: new Date().toISOString(), isRead: false });
-      newState = { ...state, emails: newEmails, emailIdCounter: state.emailIdCounter + 1 };
+      const newId = state.emailIdCounter;
+      newEmails.set(newId, { ...action.payload, id: newId, timestamp: new Date().toISOString(), isRead: false });
+      newState = { ...state, emails: newEmails, emailIdCounter: newId + 1 };
       break;
     }
     case 'MARK_EMAIL_AS_READ': {
@@ -1233,11 +1218,11 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
             documents: new Map([...initialState.documents, ...reviveMap(savedState.documents)]),
             users: new Map([...initialState.users, ...reviveMap(savedState.users)]),
             classes: new Map([...initialState.classes, ...reviveMap(savedState.classes)]),
-            emails: reviveMap(savedState.emails),
-            maintenances: reviveMap(savedState.maintenances),
+            emails: reviveMap(savedState.emails) || new Map(),
+            maintenances: reviveMap(savedState.maintenances) || new Map(),
             scenarioTemplates: new Map([...initialState.scenarioTemplates, ...reviveMap(savedState.scenarioTemplates)]),
-            activeScenarios: reviveMap(savedState.activeScenarios),
-            tasks: reviveMap(savedState.tasks),
+            activeScenarios: reviveMap(savedState.activeScenarios) || new Map(),
+            tasks: reviveMap(savedState.tasks) || new Map(),
             roles: ROLES, 
             environments: ENVIRONMENTS,
             grillesTarifaires: GRILLES_TARIFAIRES,
@@ -1345,3 +1330,5 @@ export const useWms = () => {
   }
   return context;
 };
+
+    

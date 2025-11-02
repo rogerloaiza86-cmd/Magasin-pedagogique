@@ -2,7 +2,7 @@
 "use client";
 
 import { useWms } from "@/context/WmsContext";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,65 +46,51 @@ function ComposeEmail() {
   const { toast } = useToast();
   const { currentUser, users, classes, tiers, currentEnvironmentId } = state;
 
-  const getPossibleRecipients = () => {
-    if (!currentUser) return { users: [], tiers: [] };
+  const { userRecipients, tierRecipients } = useMemo(() => {
+    if (!currentUser) return { userRecipients: [], tierRecipients: [] };
 
+    const allUsers = Array.from(users.values());
     let userRecipients: User[] = [];
-    const currentUserUsername = currentUser.username;
 
-    if (currentUser.profile === 'élève') {
+    if (currentUser.profile === 'Administrateur') {
+        userRecipients = allUsers.filter(u => u.username !== currentUser.username);
+    } else if (currentUser.profile === 'professeur') {
+        const managedClassIds = Array.from(classes.values())
+            .filter(c => c.teacherIds?.includes(currentUser.username))
+            .map(c => c.id);
+        
+        userRecipients = allUsers.filter(u => {
+            if (u.username === currentUser.username) return false;
+            // Add students from managed classes
+            if (u.profile === 'élève' && u.classId && managedClassIds.includes(u.classId)) return true;
+            // Add other teachers and admins
+            if (u.profile === 'professeur' || u.profile === 'Administrateur') return true;
+            return false;
+        });
+
+    } else if (currentUser.profile === 'élève') {
         const studentClass = classes.get(currentUser.classId || -1);
         if (studentClass) {
-            // Add teachers of the class
-            studentClass.teacherIds?.forEach(teacherId => {
-                const teacher = users.get(teacherId);
-                if (teacher) userRecipients.push(teacher);
-            });
-            // Add other students in the same class
-            Array.from(users.values()).forEach(user => {
-                if (user.profile === 'élève' && user.classId === currentUser.classId && user.username !== currentUserUsername) {
-                    userRecipients.push(user);
-                }
+             userRecipients = allUsers.filter(u => {
+                if (u.username === currentUser.username) return false;
+                // Add teachers of the class
+                if (u.profile === 'professeur' && studentClass.teacherIds?.includes(u.username)) return true;
+                // Add other students in the same class
+                if (u.profile === 'élève' && u.classId === currentUser.classId) return true;
+                return false;
             });
         }
-    } else if (currentUser.profile === 'professeur') {
-        // Add all students from the classes they teach
-        const teacherClasses = Array.from(classes.values()).filter(c => c.teacherIds?.includes(currentUserUsername));
-        const studentUsernames = new Set<string>();
-        teacherClasses.forEach(c => {
-             Array.from(users.values()).forEach(u => {
-                if (u.profile === 'élève' && u.classId === c.id) {
-                    studentUsernames.add(u.username);
-                }
-             });
-        });
-        studentUsernames.forEach(username => {
-            const student = users.get(username);
-            if (student) userRecipients.push(student);
-        });
-        
-        // Add other teachers and admins
-        Array.from(users.values()).forEach(user => {
-            if ((user.profile === 'professeur' || user.profile === 'Administrateur') && user.username !== currentUserUsername) {
-                userRecipients.push(user);
-            }
-        });
-    } else if (currentUser.profile === 'Administrateur') {
-        // Admins can message everyone
-        userRecipients = Array.from(users.values()).filter(u => u.username !== currentUserUsername);
     }
     
-    // Tiers should be from the current environment, but let's show all for simplicity of communication across scenarios
+    // Tiers are available to everyone
     const tierRecipients = Array.from(tiers.values());
 
-    // Remove duplicates and sort
     const uniqueUserRecipients = Array.from(new Map(userRecipients.map(u => [u.username, u])).values())
-        .sort((a, b) => a.username.localeCompare(b.username));
+      .sort((a, b) => a.username.localeCompare(b.username));
 
-    return { users: uniqueUserRecipients, tiers: tierRecipients };
-  };
+    return { userRecipients: uniqueUserRecipients, tierRecipients };
+  }, [currentUser, users, classes, tiers]);
 
-  const { users: userRecipients, tiers: tierRecipients } = getPossibleRecipients();
 
   const { control, handleSubmit, reset, formState: { errors } } = useForm<EmailFormData>({
     defaultValues: { recipient: "", subject: "", body: "" },
@@ -123,9 +109,8 @@ function ComposeEmail() {
         }
     });
     
-    const recipientName = data.recipient.startsWith('tier-') 
-      ? state.tiers.get(parseInt(data.recipient.split('-')[1]))?.name
-      : data.recipient;
+    const recipientObject = users.get(data.recipient) || tiers.get(parseInt(data.recipient.replace('tier-', '')));
+    const recipientName = recipientObject?.name || data.recipient;
 
     toast({
         title: "E-mail envoyé",
@@ -181,7 +166,7 @@ function ComposeEmail() {
 
 function Mailbox({ boxType }: { boxType: 'inbox' | 'sent' }) {
     const { state, dispatch } = useWms();
-    const { currentUser, emails, tiers } = state;
+    const { currentUser, emails, tiers, users } = state;
     const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
 
     if (!currentUser) return <p>Veuillez vous connecter.</p>
@@ -202,7 +187,7 @@ function Mailbox({ boxType }: { boxType: 'inbox' | 'sent' }) {
         const tierId = parseInt(participantIdentifier.split('-')[1]);
         return tiers.get(tierId)?.name || 'Tiers Inconnu';
       }
-      return participantIdentifier;
+      return users.get(participantIdentifier)?.username || participantIdentifier;
     }
 
     if (selectedEmail) {
@@ -287,3 +272,5 @@ export function MessagingClient() {
     </Tabs>
   );
 }
+
+    
