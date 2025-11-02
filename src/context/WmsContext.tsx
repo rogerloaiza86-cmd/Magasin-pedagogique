@@ -38,6 +38,19 @@ ROLES.set('professeur', {
     }
 });
 
+ROLES.set('chef_equipe', {
+    id: 'chef_equipe',
+    name: "Chef d'Équipe",
+    description: "Supervise les opérations d'une équipe, a une vue d'ensemble.",
+    isStudentRole: true,
+    permissions: {
+        isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: true,
+        canReceiveBC: true, canCreateBL: true, canPrepareBL: true, canShipBL: true,
+        canManageStock: true, canViewStock: true, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
+        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: false,
+    }
+});
+
 ROLES.set('equipe_reception', {
     id: 'equipe_reception',
     name: "Équipe Réception & Achat",
@@ -1282,7 +1295,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
 
     let stockReserver = 0;
     for (const doc of state.documents.values()) {
-        if (doc.type === 'Bon de Livraison Client' && doc.status === 'En préparation' && doc.environnementId === state.currentEnvironmentId) {
+        if ((doc.type === 'Bon de Livraison Client' && (doc.status === 'En préparation' || doc.status === 'Prêt pour expédition')) && doc.environnementId === state.currentEnvironmentId) {
             for (const line of doc.lines) {
                 if (line.articleId === articleId) {
                     stockReserver += line.quantity;
