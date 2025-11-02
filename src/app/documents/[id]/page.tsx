@@ -48,6 +48,7 @@ export default function DocumentDetailPage() {
             case 'Expédié':
             case 'Accepté':
             case 'Traité':
+            case 'Prêt pour expédition':
                 return 'default';
             case 'Réceptionné avec anomalies':
             case 'Refusé':

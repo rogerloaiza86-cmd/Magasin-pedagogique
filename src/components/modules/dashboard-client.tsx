@@ -23,7 +23,8 @@ import {
     Siren,
     Info,
     PackageX,
-    ListTodo
+    ListTodo,
+    Users2
 } from "lucide-react";
 import Link from "next/link";
 import type { Environment, Task } from "@/lib/types";
@@ -50,7 +51,8 @@ type AppItem = {
     | 'canUseMessaging'
     | 'canManageScenarios'
     | 'canManageFleet'
-    | 'canManageQuotes';
+    | 'canManageQuotes'
+    | 'canManageStudents';
   envType: Environment['type'] | 'ALL';
   isSuperAdminOnly?: boolean;
 };
@@ -67,7 +69,7 @@ const appItems: AppItem[] = [
   { href: "/messaging", label: "Messagerie", icon: Mail, color: "text-blue-500", permission: 'canUseMessaging', envType: 'ALL' },
   { href: "/scenarios", label: "Scénarios", icon: Swords, color: "text-rose-500", permission: 'canManageScenarios', envType: 'ALL'},
   { href: "/ia-tools", label: "Outils d'IA", icon: BrainCircuit, color: "text-cyan-500", permission: 'canUseIaTools', envType: 'ALL' },
-  { href: "/gestion-eleves", label: "Gestion des Élèves", icon: Users, color: "text-teal-500", permission: "canManageStudents", envType: 'ALL', isSuperAdminOnly: false },
+  { href: "/gestion-eleves", label: "Élèves", icon: Users2, permission: "canManageStudents", envType: 'ALL', isSuperAdminOnly: false },
   { href: "/classes", label: "Classes", icon: BookUser, color: "text-amber-500", isSuperAdminOnly: true, envType: 'ALL', permission: 'canManageClasses' },
 ];
 

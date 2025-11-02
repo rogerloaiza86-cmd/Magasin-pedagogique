@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -10,7 +11,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import {faker} from '@faker-js/faker/locale/fr';
 
 const GenerateFictitiousArticlesInputSchema = z.object({
   sector: z.string().describe('The business sector for which to generate articles (e.g., "Mode, Habillement et Chaussures").'),

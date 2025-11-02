@@ -55,7 +55,7 @@ type DeliveryNoteFormData = {
 };
 
 function CreateDeliveryNote() {
-  const { state, dispatch, getArticle } = useWms();
+  const { state, dispatch, getArticleWithComputedStock } = useWms();
   const { toast } = useToast();
   const { currentUser, currentEnvironmentId } = state;
   const [searchTerm, setSearchTerm] = useState("");
@@ -87,11 +87,11 @@ function CreateDeliveryNote() {
     // Final stock check before submission
     let hasError = false;
     data.lines.forEach((line, index) => {
-      const article = getArticle(line.articleId);
-      if (article && Number(line.quantity) > article.stock) {
+      const article = getArticleWithComputedStock(line.articleId);
+      if (article && Number(line.quantity) > article.stockDisponible) {
         setError(`lines.${index}.quantity`, {
           type: "manual",
-          message: `Stock insuffisant (${article.stock} dispo.)`,
+          message: `Stock dispo. insuffisant (${article.stockDisponible} dispo.)`,
         });
         hasError = true;
       }
@@ -101,7 +101,7 @@ function CreateDeliveryNote() {
         toast({
             variant: "destructive",
             title: "Erreur de stock",
-            description: "Impossible de créer le BL car le stock est insuffisant pour un ou plusieurs articles."
+            description: "Impossible de créer le BL car le stock disponible est insuffisant pour un ou plusieurs articles."
         })
         return;
     }
@@ -125,11 +125,11 @@ function CreateDeliveryNote() {
   const handleQuantityChange = (index: number, value: string) => {
     const articleId = watchedLines[index]?.articleId;
     if (!articleId) return;
-    const article = getArticle(articleId);
-    if (article && Number(value) > article.stock) {
+    const article = getArticleWithComputedStock(articleId);
+    if (article && Number(value) > article.stockDisponible) {
       setError(`lines.${index}.quantity`, {
         type: 'manual',
-        message: `Stock insuffisant (${article.stock} dispo.)`,
+        message: `Stock dispo. insuffisant (${article.stockDisponible} dispo.)`,
       });
     } else {
       clearErrors(`lines.${index}.quantity`);
@@ -140,7 +140,7 @@ function CreateDeliveryNote() {
     <Card>
       <CardHeader>
         <CardTitle>Créer un Bon de Livraison (BL)</CardTitle>
-        <CardDescription>Créez une commande pour un client que vous avez créé. Le stock sera vérifié.</CardDescription>
+        <CardDescription>Créez une commande pour un client que vous avez créé. Le stock disponible sera vérifié.</CardDescription>
       </CardHeader>
       <CardContent>
         {clients.length === 0 ? (
@@ -172,7 +172,7 @@ function CreateDeliveryNote() {
               className="mb-2"
             />
             {fields.map((field, index) => {
-              const article = getArticle(watchedLines[index]?.articleId);
+              const article = getArticleWithComputedStock(watchedLines[index]?.articleId);
               return (
               <div key={field.id} className="flex items-end gap-2 p-2 border rounded-lg bg-background">
                 <div className="flex-1">
@@ -181,7 +181,7 @@ function CreateDeliveryNote() {
                         <Select onValueChange={(value) => { field.onChange(value); clearErrors(`lines.${index}.quantity`); }} value={field.value}>
                             <SelectTrigger><SelectValue placeholder="Sélectionner un article..."/></SelectTrigger>
                             <SelectContent>
-                                {filteredArticles.map(a => <SelectItem key={a.id} value={a.id}>{a.name} (Stock: {a.stock})</SelectItem>)}
+                                {filteredArticles.map(a => <SelectItem key={a.id} value={a.id}>{a.name} (Stock dispo: {getArticleWithComputedStock(a.id)?.stockDisponible || 0})</SelectItem>)}
                             </SelectContent>
                         </Select>
                     )}
