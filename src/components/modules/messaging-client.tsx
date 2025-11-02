@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useWms } from "@/context/WmsContext";
@@ -49,7 +48,7 @@ function ComposeEmail() {
   const { userRecipients, tierRecipients } = useMemo(() => {
     if (!currentUser || !currentUserPermissions) return { userRecipients: [], tierRecipients: [] };
 
-    let allUsers = Array.from(users.values());
+    const allUsers = Array.from(users.values());
     let visibleUsers: User[] = [];
 
     if (currentUserPermissions.isSuperAdmin) {
@@ -266,3 +265,5 @@ export function MessagingClient() {
     </Tabs>
   );
 }
+
+    
