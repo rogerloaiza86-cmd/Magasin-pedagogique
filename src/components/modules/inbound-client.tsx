@@ -765,11 +765,11 @@ export function InboundClient() {
   const perms = state.currentUserPermissions;
   
   const tabs = [];
-  if (perms?.canCreateBC) tabs.push({ value: "create", label: "1. Créer un BC" });
+  if (perms?.canCreateBC) tabs.push({ value: "create", label: "Créer un BC" });
   if (perms?.canReceiveBC) {
-    tabs.push({ value: "receive", label: "2. Réceptionner un BC" });
-    tabs.push({ value: "returns", label: "3. Gérer un Retour Client" });
-    tabs.push({ value: "analysis", label: "4. Analyse des Retours" });
+    tabs.push({ value: "receive", label: "Réceptionner un BC" });
+    tabs.push({ value: "returns", label: "Gérer un Retour Client" });
+    tabs.push({ value: "analysis", label: "Analyse des Retours" });
   }
   
   if (tabs.length === 0) {
@@ -798,4 +798,5 @@ export function InboundClient() {
   );
 }
 
+    
     
