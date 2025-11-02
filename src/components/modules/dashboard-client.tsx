@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useWms } from "@/context/WmsContext";
@@ -30,6 +29,7 @@ import Link from "next/link";
 import type { Environment, Task } from "@/lib/types";
 import { Badge } from "../ui/badge";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { useRouter } from "next/navigation";
 
 type AppItem = {
   href: string;
@@ -67,6 +67,7 @@ const appItems: AppItem[] = [
   { href: "/messaging", label: "Messagerie", icon: Mail, color: "text-blue-500", permission: 'canUseMessaging', envType: 'ALL' },
   { href: "/scenarios", label: "Scénarios", icon: Swords, color: "text-rose-500", permission: 'canManageScenarios', envType: 'ALL'},
   { href: "/ia-tools", label: "Outils d'IA", icon: BrainCircuit, color: "text-cyan-500", permission: 'canUseIaTools', envType: 'ALL' },
+  { href: "/gestion-eleves", label: "Gestion des Élèves", icon: Users, color: "text-teal-500", permission: "canManageStudents", envType: 'ALL', isSuperAdminOnly: false },
   { href: "/classes", label: "Classes", icon: BookUser, color: "text-amber-500", isSuperAdminOnly: true, envType: 'ALL', permission: 'canManageClasses' },
 ];
 
@@ -85,9 +86,10 @@ function AppCard({ item }: { item: AppItem }) {
   );
 }
 
-function KpiCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: React.ElementType, color: string }) {
+function KpiCard({ title, value, icon: Icon, color, onClick }: { title: string, value: number, icon: React.ElementType, color: string, onClick?: () => void }) {
+    const isClickable = !!onClick;
     return (
-        <Card>
+        <Card onClick={onClick} className={isClickable ? "cursor-pointer hover:bg-muted" : ""}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{title}</CardTitle>
                 <Icon className={`h-4 w-4 text-muted-foreground ${color}`} />
@@ -109,12 +111,15 @@ function ScenarioProgress() {
     
     if (!userActiveScenario) {
         return (
-            <Card>
+             <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
                 <CardHeader>
-                    <CardTitle>Scénario Pédagogique</CardTitle>
+                    <div className="flex items-center gap-3">
+                         <Swords className="h-6 w-6 text-blue-600"/>
+                        <CardTitle className="text-blue-900 dark:text-blue-200">Scénario Pédagogique</CardTitle>
+                    </div>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-muted-foreground">Aucun scénario n'est actuellement en cours pour votre classe. Attendez les instructions de votre professeur.</p>
+                    <p className="text-blue-800 dark:text-blue-300">Aucun scénario n'est actuellement en cours pour votre classe. Attendez les instructions de votre professeur.</p>
                 </CardContent>
             </Card>
         );
@@ -157,10 +162,12 @@ function ScenarioProgress() {
                     </ul>
                 ) : (
                     <div className="text-center text-muted-foreground p-4 border-dashed border-2 rounded-lg">
-                        {nextEnv ? (
+                        {totalTasks === completedTasks ? (
+                             <p className="font-semibold text-green-600">Félicitations, vous avez terminé toutes les tâches de ce scénario !</p>
+                        ) : nextEnv ? (
                              <p>Vous avez terminé vos tâches dans cet environnement. <br/><span className="font-semibold mt-2 block">Passez à l'environnement "{nextEnv.name}" pour continuer !</span></p>
                         ) : (
-                             <p>Vous n'avez pas de nouvelles tâches assignées pour le moment. Vous avez peut-être terminé le scénario !</p>
+                             <p>Vous n'avez pas de nouvelles tâches assignées pour le moment.</p>
                         )}
                     </div>
                 )}
@@ -176,7 +183,13 @@ function ScenarioProgress() {
 
 function SystemAlerts() {
     const { state } = useWms();
-    const { articles, currentEnvironmentId } = state;
+    const { articles, currentEnvironmentId, currentUserPermissions } = state;
+
+    // Only show for relevant roles
+    if (!currentUserPermissions?.canCreateBC && !currentUserPermissions?.canViewStock) {
+        return null;
+    }
+
     const articlesInEnv = Array.from(articles.values()).filter(a => a.environnementId === currentEnvironmentId);
 
     const outOfStockArticles = articlesInEnv.filter(a => a.stock === 0).length;
@@ -201,7 +214,7 @@ function SystemAlerts() {
                         <PackageX className="h-4 w-4" />
                         <AlertTitle className="font-semibold">Rupture de Stock</AlertTitle>
                         <AlertDescription>
-                            {outOfStockArticles} article(s) sont en rupture de stock.
+                            <Link href="/articles" className="underline">{outOfStockArticles} article(s)</Link> sont en rupture de stock.
                         </AlertDescription>
                     </Alert>
                 )}
@@ -210,17 +223,10 @@ function SystemAlerts() {
                         <AlertTriangle className="h-4 w-4" />
                         <AlertTitle className="font-semibold">Stock Faible</AlertTitle>
                         <AlertDescription>
-                           {lowStockArticles} article(s) sont sous le seuil d'alerte (moins de 5 unités).
+                           <Link href="/articles" className="underline">{lowStockArticles} article(s)</Link> sont sous le seuil d'alerte (moins de 5 unités).
                         </AlertDescription>
                     </Alert>
                 )}
-                <Alert>
-                    <Info className="h-4 w-4" />
-                    <AlertTitle>Info</AlertTitle>
-                    <AlertDescription>
-                        Les données de stock sont synchronisées en temps réel.
-                    </AlertDescription>
-                </Alert>
             </CardContent>
         </Card>
     );
@@ -228,12 +234,14 @@ function SystemAlerts() {
 
 export function DashboardClient() {
   const { state } = useWms();
+  const router = useRouter();
   const { currentUser, currentUserPermissions, environments, currentEnvironmentId, documents, articles } = state;
-  const currentEnv = environments.get(currentEnvironmentId);
 
   if (!currentUser || !currentUserPermissions) {
     return null; // Or a loading spinner
   }
+
+  const currentEnv = environments.get(currentEnvironmentId);
 
   const visibleAppItems = appItems.filter(item => {
     if (item.isSuperAdminOnly && !currentUserPermissions.isSuperAdmin) {
@@ -260,8 +268,16 @@ export function DashboardClient() {
   const articlesInStock = Array.from(articles.values()).filter(a => a.environnementId === currentEnvironmentId).length;
   const pendingReturns = Array.from(documents.values()).filter(d => d.environnementId === currentEnvironmentId && d.type === 'Retour Client' && d.status === 'En attente de traitement').length;
 
-  const showKpis = currentEnv?.type === 'WMS';
-  const showSystemAlerts = currentEnv?.type === 'WMS' && currentUser?.profile === 'élève';
+  const showWmsKpis = currentEnv?.type === 'WMS';
+  const showSystemAlerts = currentEnv?.type === 'WMS' && (currentUser?.profile === 'professeur' || currentUser?.profile === 'Administrateur' || currentUserPermissions.canCreateBC);
+
+  const kpiItems = [
+    { title: "BC en attente de réception", value: pendingPOs, icon: ArrowDownToLine, color: "text-sky-500", show: currentUserPermissions.canReceiveBC, onClick: () => router.push('/flux-entrant?tab=receive') },
+    { title: "BL en attente de préparation", value: pendingSOs, icon: ArrowUpFromLine, color: "text-red-500", show: currentUserPermissions.canPrepareBL, onClick: () => router.push('/flux-sortant?tab=prepare') },
+    { title: "Articles en Stock", value: articlesInStock, icon: Package, color: "text-purple-500", show: currentUserPermissions.canViewStock, onClick: () => router.push('/articles') },
+    { title: "Retours à traiter", value: pendingReturns, icon: RotateCcw, color: "text-orange-500", show: currentUserPermissions.canReceiveBC, onClick: () => router.push('/flux-entrant?tab=returns') },
+  ].filter(kpi => showWmsKpis && kpi.show);
+
 
   return (
     <div className="space-y-6">
@@ -274,12 +290,9 @@ export function DashboardClient() {
 
         {showSystemAlerts && <SystemAlerts />}
 
-        {showKpis && (
+        {kpiItems.length > 0 && (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <KpiCard title="BC en attente de réception" value={pendingPOs} icon={ArrowDownToLine} color="text-sky-500" />
-                <KpiCard title="BL en attente de préparation" value={pendingSOs} icon={ArrowUpFromLine} color="text-red-500" />
-                <KpiCard title="Articles en Stock" value={articlesInStock} icon={Package} color="text-purple-500" />
-                <KpiCard title="Retours à traiter" value={pendingReturns} icon={RotateCcw} color="text-orange-500" />
+                {kpiItems.map(kpi => <KpiCard key={kpi.title} {...kpi} />)}
             </div>
         )}
 
@@ -291,7 +304,5 @@ export function DashboardClient() {
     </div>
   );
 }
-
-    
 
     

@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Article, Document as WmsDocument } from "@/lib/types";
+import { useSearchParams } from "next/navigation";
 
 
 type DeliveryNoteFormData = {
@@ -477,6 +478,8 @@ function ShipOrder() {
 export function OutboundClient() {
   const { state } = useWms();
   const perms = state.currentUserPermissions;
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
 
   const tabs = [];
   if (perms?.canCreateBL) tabs.push({ value: "create", label: "1. Créer un BL" });
@@ -496,8 +499,10 @@ export function OutboundClient() {
     )
   }
 
+  const defaultTab = tabParam && tabs.some(t => t.value === tabParam) ? tabParam : tabs[0].value;
+
   return (
-    <Tabs defaultValue={tabs[0].value} className="w-full">
+    <Tabs defaultValue={defaultTab} className="w-full">
       <TabsList className={`grid w-full grid-cols-${tabs.length}`}>
         {tabs.map(tab => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
       </TabsList>

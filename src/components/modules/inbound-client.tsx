@@ -3,7 +3,7 @@
 
 import { useWms } from "@/context/WmsContext";
 import { Article, Document, DocumentLine, Tier, ReturnReason, ReturnDecision } from "@/lib/types";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import {
   Card,
@@ -56,6 +56,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
+import { useSearchParams } from "next/navigation";
 
 
 type PurchaseOrderFormData = {
@@ -763,6 +764,8 @@ function ReturnsAnalysis() {
 export function InboundClient() {
   const { state } = useWms();
   const perms = state.currentUserPermissions;
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
   
   const tabs = [];
   if (perms?.canCreateBC) tabs.push({ value: "create", label: "Créer un BC" });
@@ -785,8 +788,10 @@ export function InboundClient() {
     )
   }
   
+  const defaultTab = tabParam && tabs.some(t => t.value === tabParam) ? tabParam : tabs[0].value;
+
   return (
-    <Tabs defaultValue={tabs[0].value} className="w-full">
+    <Tabs defaultValue={defaultTab} className="w-full">
       <TabsList className={`grid w-full grid-cols-${tabs.length}`}>
         {tabs.map(tab => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
       </TabsList>
@@ -798,5 +803,4 @@ export function InboundClient() {
   );
 }
 
-    
     
