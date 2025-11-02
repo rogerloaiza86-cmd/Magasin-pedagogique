@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
@@ -175,10 +174,29 @@ interface WmsState {
 
 export const getInitialState = (): WmsState => {
   const defaultEnvId = 'magasin_pedago';
+
   const articlesWithEnv = initialArticles.map(a => [a.id, {...a, environnementId: defaultEnvId, ean: faker.commerce.isbn().replace(/-/g, '') }]) as [string, Article][];
   const articlesMap = new Map(articlesWithEnv);
   
-  const initialMovements: Movement[] = Array.from(articlesMap.values()).filter(a => a.environnementId === defaultEnvId).map((article, index) => ({
+  const ecommerceArticles = Array.from({ length: 50 }, (_, i) => {
+    const name = faker.commerce.productName();
+    const id = `${name.substring(0,3).toUpperCase()}-${faker.string.numeric(4)}`;
+    return [id, {
+        id,
+        name,
+        location: `${faker.string.alpha(1).toUpperCase()}.${faker.number.int({min:1, max:5})}.${faker.number.int({min:1, max:10})}.${faker.string.alpha(1).toUpperCase()}`,
+        stock: faker.number.int({ min: 10, max: 200 }),
+        price: parseFloat(faker.commerce.price()),
+        packaging: 'PIEC',
+        status: 'Actif' as const,
+        environnementId: 'entrepot_fictif_ecommerce',
+        ean: faker.commerce.isbn().replace(/-/g, '')
+    }] as [string, Article];
+  });
+  ecommerceArticles.forEach(([id, article]) => articlesMap.set(id, article));
+
+
+  const initialMovements: Movement[] = Array.from(articlesMap.values()).map((article, index) => ({
     id: index + 1,
     timestamp: new Date().toISOString(),
     articleId: article.id,
@@ -186,7 +204,7 @@ export const getInitialState = (): WmsState => {
     quantity: article.stock,
     stockAfter: article.stock,
     user: 'Système',
-    environnementId: defaultEnvId,
+    environnementId: article.environnementId,
   }));
 
   const initialUsers = new Map<string, User>();
@@ -203,21 +221,20 @@ export const getInitialState = (): WmsState => {
   const initialScenarioTemplates = new Map<number, ScenarioTemplate>();
   let templateIdCounter = 1;
 
+  // --- WMS SCENARIOS (REAL) ---
   initialScenarioTemplates.set(templateIdCounter++, {
     id: 1,
-    title: "Flux Logistique Complet (WMS)",
-    description: "Un scénario complet qui couvre la création des tiers, la réception de marchandises et l'expédition d'une commande client.",
-    competences: ["Création Tiers", "Réception", "Expédition"],
+    title: "WMS-R01 : Flux de base",
+    description: "Un scénario simple pour maîtriser la réception et l'expédition d'un produit.",
+    competences: ["C1.6", "C3.2"],
     rolesRequis: ["equipe_reception", "equipe_preparation"],
     tasks: [
-        { taskOrder: 1, description: "Créez un nouveau fournisseur pour des pièces automobiles.", roleId: "equipe_reception", taskType: "CREATE_TIERS_FOURNISSEUR", environnementId: 'magasin_pedago' },
-        { taskOrder: 2, description: "Passez un Bon de Commande (BC) chez le fournisseur que vous venez de créer pour 5 unités de l'article '23371'.", roleId: "equipe_reception", taskType: "CREATE_BC", prerequisiteTaskId: 1, environnementId: 'magasin_pedago' },
-        { taskOrder: 3, description: "Consultez votre messagerie, une notification importante vous attend.", roleId: "equipe_reception", taskType: 'SEND_AUTOMATED_EMAIL', details: { sender: 'SystemLogiSim', emailSubject: 'Info: BC en attente de réception', emailBody: 'Le bon de commande pour les pièces automobiles est prêt à être réceptionné dans le système.' }, prerequisiteTaskId: 2, environnementId: 'magasin_pedago' },
-        { taskOrder: 4, description: "Réceptionnez la marchandise du Bon de Commande. Déclarez 4 unités reçues conformes et 1 non-conforme.", roleId: "equipe_reception", taskType: "RECEIVE_BC", prerequisiteTaskId: 3, environnementId: 'magasin_pedago' },
-        { taskOrder: 5, description: "Créez un nouveau client pour le garage 'Auto-Répar'.", roleId: "equipe_preparation", taskType: "CREATE_TIERS_CLIENT", environnementId: 'magasin_pedago'},
-        { taskOrder: 6, description: "Créez un Bon de Livraison (BL) pour le client 'Auto-Répar' avec 3 unités de l'article '23371'.", roleId: "equipe_preparation", taskType: "CREATE_BL", prerequisiteTaskId: 5, environnementId: 'magasin_pedago' },
-        { taskOrder: 7, description: "Préparez la commande du BL que vous venez de créer.", roleId: "equipe_preparation", taskType: "PREPARE_BL", prerequisiteTaskId: 6, environnementId: 'magasin_pedago' },
-        { taskOrder: 8, description: "Expédiez la commande et générez les documents finaux.", roleId: "equipe_preparation", taskType: "SHIP_BL", prerequisiteTaskId: 7, environnementId: 'magasin_pedago' },
+      { taskOrder: 1, roleId: "equipe_reception", taskType: 'ACTION', emailDetails: { sender: 'SystemLogiSim', subject: 'Nouvelle Tâche : Création Fournisseur', body: "Bonjour, \n\nPour commencer, veuillez créer un nouveau fournisseur 'Pièces Auto Express' pour notre catalogue.\n\nCordialement,\nLogiSim Hub" } },
+      { taskOrder: 2, roleId: "equipe_reception", taskType: 'ACTION', prerequisiteTaskOrder: 1, emailDetails: { sender: 'Service Achats', subject: 'Demande : Commande Pièces', body: "Merci d'avoir ajouté notre fournisseur. Pouvez-vous passer une commande pour 10 unités de 'RECHANGE SOUFFLET' (ID: 23371) ?" } },
+      { taskOrder: 3, roleId: "equipe_reception", taskType: 'ACTION', prerequisiteTaskOrder: 2, emailDetails: { sender: 'SystemLogiSim', subject: 'Notification : Marchandise prête', body: "La marchandise de votre BC pour 'Pièces Auto Express' est arrivée. Veuillez la réceptionner.\nRéceptionnez exactement 10 unités." } },
+      { taskOrder: 4, roleId: "equipe_preparation", taskType: 'ACTION', emailDetails: { sender: 'Service Commercial', subject: 'Nouvelle Commande Client', body: "Bonjour, \n\nUn nouveau client, 'Garage Du Centre', a besoin de 8 'RECHANGE SOUFFLET' (ID: 23371). Merci de créer le client et le bon de livraison (BL) correspondant." } },
+      { taskOrder: 5, roleId: "equipe_preparation", taskType: 'ACTION', prerequisiteTaskOrder: 4, emailDetails: { sender: 'SystemLogiSim', subject: 'Préparation Commande', body: "Le BL pour 'Garage Du Centre' est prêt. Générez le bon de préparation et préparez la commande." } },
+      { taskOrder: 6, roleId: "equipe_preparation", taskType: 'ACTION', prerequisiteTaskOrder: 5, emailDetails: { sender: 'SystemLogiSim', subject: 'Expédition', body: "La commande pour 'Garage Du Centre' est prête. Veuillez l'expédier et générer les documents de transport." } },
     ],
     createdBy: 'admin',
     environnementId: 'magasin_pedago',
@@ -225,14 +242,13 @@ export const getInitialState = (): WmsState => {
   
   initialScenarioTemplates.set(templateIdCounter++, {
     id: 2,
-    title: "Réception avec Litige Fournisseur",
-    description: "Un fournisseur livre une commande avec des quantités incorrectes et des articles endommagés. L'élève doit identifier et gérer les anomalies.",
-    competences: ["Réception", "Gestion des litiges", "Communication"],
+    title: "WMS-R02 : Gestion d'un litige à la réception",
+    description: "Gérer une livraison fournisseur non-conforme et communiquer l'anomalie.",
+    competences: ["C1.6", "C2.2"],
     rolesRequis: ["equipe_reception"],
     tasks: [
-      { taskOrder: 1, description: "Un Bon de Commande (N°1) pour 10 'AMPOULE PHILIPS' est déjà créé. Allez dans 'Flux Entrant' pour le réceptionner.", roleId: "equipe_reception", taskType: "MANUAL_VALIDATION", environnementId: 'magasin_pedago' },
-      { taskOrder: 2, description: "Lors de la réception, déclarez seulement 8 articles reçus et 2 comme 'non-conformes'. Ajoutez une note sur le bon de livraison.", roleId: "equipe_reception", taskType: "RECEIVE_BC", prerequisiteTaskId: 1, environnementId: 'magasin_pedago' },
-      { taskOrder: 3, description: "Utilisez la messagerie pour envoyer un e-mail au fournisseur (fictif) pour l'informer du litige.", roleId: "equipe_reception", taskType: "MANUAL_VALIDATION", prerequisiteTaskId: 2, environnementId: 'magasin_pedago' },
+        { taskOrder: 1, roleId: "equipe_reception", taskType: 'ACTION', emailDetails: { sender: 'SystemLogiSim', subject: 'URGENT : Réception en attente', body: "Le Bon de Commande pour 12 'COLLIER DE SERRAGE' (ID: 185350) est arrivé.\n\nLors de la réception, veuillez déclarer que vous n'avez reçu que 10 unités et que 2 sont endommagées (non-conformes). N'oubliez pas de laisser une note sur le bon." } },
+        { taskOrder: 2, roleId: "equipe_reception", taskType: 'ACTION', prerequisiteTaskOrder: 1, emailDetails: { sender: 'Responsable Logistique', subject: 'Action requise : Litige réception', body: "Suite à la réception non-conforme, merci d'utiliser la messagerie interne pour envoyer une réclamation au fournisseur (simulé)." } },
     ],
     createdBy: 'admin',
     environnementId: 'magasin_pedago'
@@ -240,78 +256,75 @@ export const getInitialState = (): WmsState => {
 
   initialScenarioTemplates.set(templateIdCounter++, {
     id: 3,
-    title: "Inventaire Tournant Urgent",
-    description: "Suite à une alerte, un inventaire doit être réalisé sur une allée spécifique pour corriger un écart de stock majeur.",
-    competences: ["Inventaire", "Analyse d'écarts", "Correction de stock"],
+    title: "WMS-R03 : Gestion d'un retour client",
+    description: "Traiter le retour d'un article défectueux envoyé par un client.",
+    competences: ["C3.3"],
     rolesRequis: ["equipe_reception"],
     tasks: [
-      { taskOrder: 1, description: "Une alerte de stock négatif a été signalée sur l'article 'COLLIER SERFLEX'. Allez dans 'Gestion des Stocks > Inventaire'.", roleId: "equipe_reception", taskType: "MANUAL_VALIDATION", environnementId: 'magasin_pedago' },
-      { taskOrder: 2, description: "Comptez physiquement l'article 'COLLIER SERFLEX' et ajustez le stock à la quantité réelle de 5 unités.", roleId: "equipe_reception", taskType: "MANUAL_VALIDATION", prerequisiteTaskId: 1, environnementId: 'magasin_pedago' },
-    ],
-    createdBy: 'admin',
-    environnementId: 'magasin_pedago'
-  });
-  
-  initialScenarioTemplates.set(templateIdCounter++, {
-    id: 4,
-    title: "Préparation de Commande Express",
-    description: "Un client VIP passe une commande urgente. L'élève doit créer le BL, optimiser le picking et expédier la commande en priorité.",
-    competences: ["Préparation de commande", "Optimisation de picking", "Gestion des priorités"],
-    rolesRequis: ["equipe_preparation"],
-    tasks: [
-      { taskOrder: 1, description: "Créez un client 'Client Express'.", roleId: "equipe_preparation", taskType: "CREATE_TIERS_CLIENT", environnementId: 'magasin_pedago' },
-      { taskOrder: 2, description: "Créez un BL pour 'Client Express' avec les articles '67712' (2 unités) et 'A460' (3 unités).", roleId: "equipe_preparation", taskType: "CREATE_BL", prerequisiteTaskId: 1, environnementId: 'magasin_pedago' },
-      { taskOrder: 3, description: "Générez le bon de préparation optimisé pour ce BL.", roleId: "equipe_preparation", taskType: "PREPARE_BL", prerequisiteTaskId: 2, environnementId: 'magasin_pedago' },
-      { taskOrder: 4, description: "Expédiez la commande.", roleId: "equipe_preparation", taskType: "SHIP_BL", prerequisiteTaskId: 3, environnementId: 'magasin_pedago' },
+        { taskOrder: 1, roleId: "equipe_reception", taskType: 'ACTION', emailDetails: { sender: 'Service Client', subject: 'Avis de Retour', body: "Bonjour, \n\nLe client 'Garage Du Centre' nous retourne 1 'FEU ARRIERE' (ID: 2070649) car il est défectueux.\n\nMerci d'enregistrer ce retour dans le système." } },
+        { taskOrder: 2, roleId: "equipe_reception", taskType: 'ACTION', prerequisiteTaskOrder: 1, emailDetails: { sender: 'Responsable Qualité', subject: 'Traitement du retour', body: "Après inspection, l'article retourné est irréparable. Merci de traiter le retour et de 'Mettre au rebut' l'article." } },
     ],
     createdBy: 'admin',
     environnementId: 'magasin_pedago'
   });
 
+  // --- WMS SCENARIOS (FICTIF) ---
+  initialScenarioTemplates.set(templateIdCounter++, {
+    id: 4,
+    title: "WMS-F01 : Mise en place d'un nouveau fournisseur",
+    description: "Créer un nouveau fournisseur et son catalogue de produits dans un environnement fictif.",
+    competences: ["C1.1", "C1.2"],
+    rolesRequis: ["chef_equipe"],
+    tasks: [
+        { taskOrder: 1, roleId: "chef_equipe", taskType: 'ACTION', emailDetails: { sender: 'Direction', subject: 'Nouveau partenariat', body: "Bonjour, nous allons travailler avec 'ElectroChic'. Veuillez les créer comme nouveau fournisseur. Utilisez l'outil IA de génération de données pour ajouter 20 articles dans le secteur 'Produits Électroniques et High-Tech' pour peupler leur catalogue." } },
+    ],
+    createdBy: 'admin',
+    environnementId: 'entrepot_fictif_ecommerce'
+  });
+
   initialScenarioTemplates.set(templateIdCounter++, {
     id: 5,
-    title: "Gestion d'un Retour Client",
-    description: "Un client retourne un article défectueux. L'élève doit enregistrer le retour, inspecter l'article et décider de sa réintégration ou de sa mise au rebut.",
-    competences: ["Gestion des retours", "Contrôle qualité"],
+    title: "WMS-F02 : Correction d'inventaire massive",
+    description: "Réaliser un inventaire sur un article avec un écart important et analyser les causes possibles.",
+    competences: ["C3.1"],
     rolesRequis: ["equipe_reception"],
     tasks: [
-        { taskOrder: 1, description: "Un client rapporte un 'FEU ARRIERE' (ID 2070649). Allez dans 'Flux Entrant > Gérer un Retour Client' pour l'enregistrer.", roleId: "equipe_reception", taskType: "MANUAL_VALIDATION", environnementId: 'magasin_pedago' },
-        { taskOrder: 2, description: "Traitez le retour : décidez de 'Mettre au rebut' l'article car il est cassé.", roleId: "equipe_reception", taskType: "MANUAL_VALIDATION", prerequisiteTaskId: 1, environnementId: 'magasin_pedago' },
+        { taskOrder: 1, roleId: "equipe_reception", taskType: 'ACTION', emailDetails: { sender: 'SystemLogiSim', subject: 'Alerte Inventaire', body: "Un écart de stock significatif a été détecté sur un article. Veuillez trouver l'article avec le plus grand stock dans l'entrepôt, effectuez un comptage physique (simulé) de 50 unités et ajustez l'inventaire." } },
+        { taskOrder: 2, roleId: "equipe_reception", taskType: 'ACTION', prerequisiteTaskOrder: 1, emailDetails: { sender: 'Responsable Logistique', subject: 'Analyse d\'écart', body: "Utilisez l'outil d'IA 'Assistant d'Analyse' pour suggérer 3 causes possibles à cet écart d'inventaire et envoyez-les moi par mail." } },
     ],
     createdBy: 'admin',
-    environnementId: 'magasin_pedago'
+    environnementId: 'entrepot_fictif_ecommerce'
   });
-  
+
+  // --- TMS SCENARIOS ---
   initialScenarioTemplates.set(templateIdCounter++, {
     id: 6,
-    title: "Création d'un Devis de Transport (TMS)",
-    description: "Un client demande un devis pour un transport. L'élève doit utiliser l'environnement TMS pour créer un devis basé sur la grille tarifaire.",
-    competences: ["Chiffrage transport", "Relation client"],
+    title: "TMS01 : Création d'un devis transport",
+    description: "Répondre à une demande client en créant un devis de transport via le module TMS.",
+    competences: ["C4.1"],
     rolesRequis: ["tms_affreteur"],
     tasks: [
-        { taskOrder: 1, description: "Basculez sur l'environnement 'Agence de Transport (TMS)'.", roleId: "tms_affreteur", taskType: "MANUAL_VALIDATION", environnementId: 'agence_transport' },
-        { taskOrder: 2, description: "Créez un nouveau client pour cette demande de devis.", roleId: "tms_affreteur", taskType: "CREATE_TIERS_CLIENT", prerequisiteTaskId: 1, environnementId: 'agence_transport' },
-        { taskOrder: 3, description: "Créez un devis pour ce client pour un trajet de 150km avec un poids de 800kg.", roleId: "tms_affreteur", taskType: "MANUAL_VALIDATION", prerequisiteTaskId: 2, environnementId: 'agence_transport' },
+        { taskOrder: 1, roleId: "tms_affreteur", taskType: 'ACTION', emailDetails: { sender: 'commercial@logisim.hub', subject: 'Demande de devis - Client Express', body: "Bonjour, \n\nPouvez-vous établir un devis pour notre client 'Client Express' ?\n- Départ: Paris\n- Arrivée: Marseille\n- Distance: 780 km\n- Poids: 1200 kg\n- Nombre de palettes: 2\n\nCréez d'abord le client s'il n'existe pas." } },
     ],
     createdBy: 'admin',
     environnementId: 'agence_transport'
   });
-  
+
   initialScenarioTemplates.set(templateIdCounter++, {
     id: 7,
-    title: "Gestion de la Flotte de Véhicules (TMS)",
-    description: "Un véhicule nécessite une maintenance. L'élève doit l'enregistrer, le mettre en maintenance, puis le remettre en service.",
-    competences: ["Gestion de flotte", "Maintenance"],
+    title: "TMS02 : Gestion de maintenance véhicule",
+    description: "Gérer le cycle de vie d'une maintenance sur un véhicule de la flotte.",
+    competences: ["C5.2"],
     rolesRequis: ["tms_exploitation"],
     tasks: [
-        { taskOrder: 1, description: "Basculez sur l'environnement 'Agence de Transport (TMS)'.", roleId: "tms_exploitation", taskType: "MANUAL_VALIDATION", environnementId: 'agence_transport' },
-        { taskOrder: 2, description: "Ajoutez un nouveau véhicule 'Camion 20m³' à la flotte.", roleId: "tms_exploitation", taskType: "CREATE_TIERS_TRANSPORTEUR", prerequisiteTaskId: 1, environnementId: 'agence_transport' },
-        { taskOrder: 3, description: "Le nouveau camion a un pneu crevé. Mettez-le en maintenance pour 'Réparation pneu'.", roleId: "tms_exploitation", taskType: "MANUAL_VALIDATION", prerequisiteTaskId: 2, environnementId: 'agence_transport' },
-        { taskOrder: 4, description: "La réparation est terminée. Clôturez l'intervention de maintenance pour rendre le véhicule de nouveau disponible.", roleId: "tms_exploitation", taskType: "MANUAL_VALIDATION", prerequisiteTaskId: 3, environnementId: 'agence_transport' },
+        { taskOrder: 1, roleId: "tms_exploitation", taskType: 'ACTION', emailDetails: { sender: 'Chauffeur', subject: 'Problème sur le camion', body: "Le véhicule immatriculé 'AB-123-CD' a un pneu crevé. Merci de l'enregistrer dans le système." } },
+        { taskOrder: 2, roleId: "tms_exploitation", taskType: 'ACTION', prerequisiteTaskOrder: 1, emailDetails: { sender: 'SystemLogiSim', subject: 'Mise en maintenance', body: "Le véhicule est maintenant enregistré. Mettez-le en maintenance pour 'Réparation pneu'." } },
+        { taskOrder: 3, roleId: "tms_exploitation", taskType: 'ACTION', prerequisiteTaskOrder: 2, emailDetails: { sender: 'Garage', subject: 'Réparation terminée', body: "La réparation du pneu est terminée. Vous pouvez clôturer l'intervention et remettre le véhicule en service." } },
     ],
     createdBy: 'admin',
     environnementId: 'agence_transport'
   });
+
 
   return {
     articles: articlesMap,
@@ -374,65 +387,72 @@ type WmsAction =
 
 const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState => {
     const { currentUser, tasks, activeScenarios, currentEnvironmentId } = state;
-    if (!currentUser) return state;
+    if (!currentUser || currentUser.profile !== 'élève') return state;
 
     const userActiveScenario = Array.from(activeScenarios.values()).find(sc => sc.classId === currentUser.classId && sc.status === 'running');
     if (!userActiveScenario) return state;
 
     // A task can only be completed in its designated environment.
     const userTasks = Array.from(tasks.values()).filter(t => t.userId === currentUser.username && t.scenarioId === userActiveScenario.id && t.environnementId === currentEnvironmentId);
-    const todoTasks = userTasks.filter(t => t.status === 'todo');
+    const todoTasks = userTasks.filter(t => t.status === 'todo').sort((a,b) => a.taskOrder - b.taskOrder);
 
     let completedTaskId: number | null = null;
+    let completedTaskOrder: number | null = null;
 
+    // This loop is simplified. A real implementation would need a more robust check based on action details
     for (const task of todoTasks) {
         let taskCompleted = false;
-        switch (task.taskType) {
-            case 'CREATE_TIERS_CLIENT':
-                if (action.type === 'ADD_TIER' && action.payload.type === 'Client' && action.payload.environnementId === currentEnvironmentId) taskCompleted = true;
-                break;
-            case 'CREATE_TIERS_FOURNISSEUR':
-                if (action.type === 'ADD_TIER' && action.payload.type === 'Fournisseur' && action.payload.environnementId === currentEnvironmentId) taskCompleted = true;
-                break;
-            case 'CREATE_TIERS_TRANSPORTEUR':
-                if (action.type === 'ADD_TIER' && action.payload.type === 'Transporteur' && action.payload.environnementId === currentEnvironmentId) taskCompleted = true;
-                break;
-            case 'CREATE_BC':
-                if (action.type === 'CREATE_DOCUMENT' && action.payload.type === 'Bon de Commande Fournisseur' && action.payload.environnementId === currentEnvironmentId) taskCompleted = true;
-                break;
-            case 'RECEIVE_BC':
-                 if (action.type === 'UPDATE_DOCUMENT' && action.payload.type === 'Bon de Commande Fournisseur' && action.payload.status.startsWith('Réceptionné') && action.payload.environnementId === currentEnvironmentId) taskCompleted = true;
-                break;
-            case 'CREATE_BL':
-                 if (action.type === 'CREATE_DOCUMENT' && action.payload.type === 'Bon de Livraison Client' && action.payload.environnementId === currentEnvironmentId) taskCompleted = true;
-                break;
-            case 'PREPARE_BL': // This is a virtual step for now, linked to SHIP_BL
-            case 'SHIP_BL':
-                if (action.type === 'UPDATE_DOCUMENT' && action.payload.type === 'Bon de Livraison Client' && action.payload.status === 'Expédié' && action.payload.environnementId === currentEnvironmentId) taskCompleted = true;
-                break;
+
+        // A simple heuristic: the user performs an action of the correct type
+        switch (action.type) {
+             case 'ADD_TIER': taskCompleted = true; break;
+             case 'CREATE_DOCUMENT': taskCompleted = true; break;
+             case 'UPDATE_DOCUMENT': taskCompleted = true; break;
         }
+        
         if (taskCompleted) {
             completedTaskId = task.id;
+            completedTaskOrder = task.taskOrder;
             break; 
         }
     }
 
-    if (completedTaskId) {
+    if (completedTaskId && completedTaskOrder) {
         const newTasks = new Map(tasks);
+        const newEmails = new Map(state.emails);
+        let newEmailIdCounter = state.emailIdCounter;
+
         const completedTask = newTasks.get(completedTaskId);
         if (completedTask) {
             newTasks.set(completedTaskId, { ...completedTask, status: 'completed' });
 
-            // Unlock next tasks for all users in the scenario, not just the current user
-            newTasks.forEach(task => {
-                if (task.prerequisiteTaskId === completedTaskId) {
-                    const taskToUnlock = newTasks.get(task.id);
-                    if (taskToUnlock) {
-                        newTasks.set(task.id, { ...taskToUnlock, status: 'todo' });
-                    }
+            // Find and unlock the next task for this user
+            const scenarioTemplate = state.scenarioTemplates.get(userActiveScenario.templateId);
+            if (scenarioTemplate) {
+                 const nextTaskTemplate = scenarioTemplate.tasks.find(t => t.prerequisiteTaskOrder === completedTaskOrder && t.roleId === currentUser.roleId);
+                 if (nextTaskTemplate?.emailDetails) {
+                    const email: Email = {
+                        id: newEmailIdCounter++,
+                        sender: nextTaskTemplate.emailDetails.sender,
+                        recipient: currentUser.username,
+                        subject: nextTaskTemplate.emailDetails.subject,
+                        body: nextTaskTemplate.emailDetails.body,
+                        timestamp: new Date().toISOString(),
+                        isRead: false,
+                    };
+                    newEmails.set(email.id, email);
+                 }
+            }
+            
+            // Mark the task in the state as 'todo' if it was blocked
+            newTasks.forEach((task, taskId) => {
+                if (task.userId === currentUser.username && task.scenarioId === userActiveScenario.id && task.prerequisiteTaskOrder === completedTaskOrder) {
+                    newTasks.set(taskId, {...task, status: 'todo'});
                 }
             });
-            return { ...state, tasks: newTasks };
+
+
+            return { ...state, tasks: newTasks, emails: newEmails, emailIdCounter: newEmailIdCounter };
         }
     }
     
@@ -622,71 +642,10 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         break;
     }
     case 'SEND_EMAIL': {
-      if (!state.currentUser || !state.currentUserPermissions?.canUseMessaging) return state;
-    
-      const newEmailData = action.payload;
+      if (!state.currentUser) return state;
       const newEmails = new Map(state.emails);
-      let emailIdCounter = state.emailIdCounter;
-    
-      const sentEmail: Email = {
-        ...newEmailData,
-        id: emailIdCounter++,
-        timestamp: new Date().toISOString(),
-        isRead: true, 
-      };
-      newEmails.set(sentEmail.id, sentEmail);
-    
-      const isRecipientTier = newEmailData.recipient.startsWith('tier-');
-    
-      if (isRecipientTier && state.currentUser.profile === 'élève') {
-        const tierId = parseInt(newEmailData.recipient.split('-')[1]);
-        const tier = state.tiers.get(tierId);
-        const studentClass = state.currentUser.classId ? state.classes.get(state.currentUser.classId) : undefined;
-        
-        if (studentClass?.teacherIds && tier) {
-          studentClass.teacherIds.forEach(teacherId => {
-            const teacherEmail: Email = {
-              ...newEmailData,
-              id: emailIdCounter++,
-              recipient: teacherId,
-              subject: `[Pour correction - E-mail à ${tier.name}] ${newEmailData.subject}`,
-              timestamp: new Date().toISOString(),
-              isRead: false,
-            };
-            newEmails.set(teacherEmail.id, teacherEmail);
-          });
-        }
-      } else {
-        const inboxEmail: Email = {
-          ...newEmailData,
-          id: emailIdCounter++,
-          timestamp: new Date().toISOString(),
-          isRead: false,
-        };
-        newEmails.set(inboxEmail.id, inboxEmail);
-    
-        const recipientUser = state.users.get(newEmailData.recipient);
-        if (state.currentUser.profile === 'élève' && recipientUser?.profile === 'élève') {
-          const studentClass = state.currentUser.classId ? state.classes.get(state.currentUser.classId) : undefined;
-          if (studentClass?.teacherIds) {
-            studentClass.teacherIds.forEach(teacherId => {
-              if (newEmailData.recipient !== teacherId && newEmailData.sender !== teacherId) {
-                const ccEmail: Email = {
-                  ...newEmailData,
-                  id: emailIdCounter++,
-                  recipient: teacherId,
-                  subject: `[Copie de ${newEmailData.sender}] ${newEmailData.subject}`,
-                  timestamp: new Date().toISOString(),
-                  isRead: false,
-                };
-                newEmails.set(ccEmail.id, ccEmail);
-              }
-            });
-          }
-        }
-      }
-      
-      newState = { ...state, emails: newEmails, emailIdCounter };
+      newEmails.set(state.emailIdCounter, { ...action.payload, id: state.emailIdCounter, timestamp: new Date().toISOString(), isRead: false });
+      newState = { ...state, emails: newEmails, emailIdCounter: state.emailIdCounter + 1 };
       break;
     }
     case 'MARK_EMAIL_AS_READ': {
@@ -948,53 +907,51 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         const rolesToAssign = template.rolesRequis;
         const newUsers = new Map(state.users);
         const newTasks = new Map(state.tasks);
-        let newEmails = new Map(state.emails);
+        const newEmails = new Map(state.emails);
         let taskIdCounter = state.taskIdCounter;
         let emailIdCounter = state.emailIdCounter;
-        let localCurrentUser = state.currentUser;
-        let localCurrentUserPermissions = state.currentUserPermissions;
 
         if (rolesToAssign.length > 0) {
             studentsInClass.forEach((student, index) => {
                 const roleId = rolesToAssign[index % rolesToAssign.length];
                 const updatedUser = { ...student, roleId };
                 newUsers.set(student.username, updatedUser);
-
-                if (state.currentUser && state.currentUser.username === student.username) {
-                    localCurrentUser = updatedUser;
-                    localCurrentUserPermissions = state.roles.get(roleId)?.permissions || null;
-                }
             });
         }
-
+        
+        // Create all tasks and initial emails
         studentsInClass.forEach(student => {
+            const studentRoleId = newUsers.get(student.username)?.roleId;
             template.tasks.forEach(taskTemplate => {
-                if (taskTemplate.roleId === newUsers.get(student.username)?.roleId) {
-                    if (taskTemplate.taskType === 'SEND_AUTOMATED_EMAIL' && taskTemplate.details) {
+                if (taskTemplate.roleId === studentRoleId) {
+                    const newTaskId = taskIdCounter++;
+                    const isPrerequisiteMet = !taskTemplate.prerequisiteTaskOrder;
+                    
+                    newTasks.set(newTaskId, {
+                        id: newTaskId,
+                        scenarioId: newActiveScenarioId,
+                        userId: student.username,
+                        description: taskTemplate.emailDetails?.body || taskTemplate.description,
+                        status: isPrerequisiteMet ? 'todo' : 'blocked',
+                        taskType: taskTemplate.taskType,
+                        taskOrder: taskTemplate.taskOrder,
+                        prerequisiteTaskOrder: taskTemplate.prerequisiteTaskOrder,
+                        environnementId: taskTemplate.environnementId || template.environnementId,
+                    });
+
+                    // Send initial emails for tasks without prerequisites
+                    if (isPrerequisiteMet && taskTemplate.emailDetails) {
                         const email: Email = {
                             id: emailIdCounter++,
-                            sender: taskTemplate.details.sender || 'SystemLogiSim',
+                            sender: taskTemplate.emailDetails.sender,
                             recipient: student.username,
-                            subject: taskTemplate.details.emailSubject || 'Notification de Tâche',
-                            body: taskTemplate.details.emailBody || taskTemplate.description,
+                            subject: taskTemplate.emailDetails.subject,
+                            body: taskTemplate.emailDetails.body,
                             timestamp: new Date().toISOString(),
                             isRead: false,
                         };
                         newEmails.set(email.id, email);
                     }
-                    const newTaskId = taskIdCounter++;
-                    newTasks.set(newTaskId, {
-                        id: newTaskId,
-                        scenarioId: newActiveScenarioId,
-                        userId: student.username,
-                        description: taskTemplate.description,
-                        taskType: taskTemplate.taskType,
-                        status: taskTemplate.prerequisiteTaskId ? 'blocked' : 'todo',
-                        details: taskTemplate.details,
-                        taskOrder: taskTemplate.taskOrder,
-                        prerequisiteTaskId: taskTemplate.prerequisiteTaskId,
-                        environnementId: taskTemplate.environnementId || template.environnementId,
-                    });
                 }
             });
         });
@@ -1008,8 +965,6 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
             activeScenarioIdCounter: newActiveScenarioId + 1,
             taskIdCounter,
             emailIdCounter,
-            currentUser: localCurrentUser,
-            currentUserPermissions: localCurrentUserPermissions
         };
         break;
     }

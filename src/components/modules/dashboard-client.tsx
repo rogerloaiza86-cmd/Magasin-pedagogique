@@ -105,82 +105,32 @@ function KpiCard({ title, value, icon: Icon, color, onClick }: { title: string, 
 
 function ScenarioProgress() {
     const { state } = useWms();
-    const { currentUser, tasks, activeScenarios, currentEnvironmentId, environments, scenarioTemplates } = state;
+    const { currentUser, tasks, activeScenarios, scenarioTemplates } = state;
     
     if (!currentUser || currentUser.profile !== 'élève') return null;
 
     const userActiveScenario = Array.from(activeScenarios.values()).find(sc => sc.classId === currentUser.classId && sc.status === 'running');
     
     if (!userActiveScenario) {
-        return (
-             <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-                <CardHeader>
-                    <div className="flex items-center gap-3">
-                         <Swords className="h-6 w-6 text-blue-600"/>
-                        <CardTitle className="text-blue-900 dark:text-blue-200">Scénario Pédagogique</CardTitle>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-blue-800 dark:text-blue-300">Aucun scénario n'est actuellement en cours pour votre classe. Attendez les instructions de votre professeur.</p>
-                </CardContent>
-            </Card>
-        );
+        return null;
     }
     
     const template = scenarioTemplates.get(userActiveScenario.templateId);
-    const userTasks = Array.from(tasks.values()).filter(t => t.userId === currentUser.username && t.scenarioId === userActiveScenario.id);
-    const completedTasks = userTasks.filter(t => t.status === 'completed').length;
-    const totalTasks = userTasks.length;
-
-    const tasksInCurrentEnv = userTasks.filter(t => t.environnementId === currentEnvironmentId && t.status === 'todo');
     
-    const otherEnvTasks = userTasks.filter(t => t.environnementId !== currentEnvironmentId && t.status === 'todo');
-    const nextEnvId = otherEnvTasks.length > 0 ? otherEnvTasks[0].environnementId : null;
-    const nextEnv = nextEnvId ? environments.get(nextEnvId) : null;
-
     return (
-        <Card className="border-primary">
+        <Card className="border-primary bg-primary/5">
             <CardHeader>
-                <CardTitle>Scénario en cours : {template?.title}</CardTitle>
+                <div className="flex items-center gap-3">
+                    <Swords className="h-6 w-6 text-primary"/>
+                    <CardTitle>Scénario en cours : {template?.title}</CardTitle>
+                </div>
                 <CardDescription>{template?.description}</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="flex items-center gap-2 mb-4">
-                     <ListTodo className="h-5 w-5 text-primary"/>
-                    <h3 className="font-semibold text-lg">Vos Tâches en cours</h3>
-                </div>
-
-                {tasksInCurrentEnv.length > 0 ? (
-                    <ul className="space-y-3">
-                        {tasksInCurrentEnv.map(task => (
-                             <li key={task.id} className="flex items-start gap-3 p-3 bg-background rounded-lg">
-                                <CheckCircle2 className="h-5 w-5 mt-1 text-sky-500 flex-shrink-0" />
-                                <div>
-                                    <p className="font-semibold">{task.description}</p>
-                                    <Badge variant="secondary" className="mt-1">{state.roles.get(currentUser.roleId)?.name}</Badge>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                ) : (
-                    <div className="text-center text-muted-foreground p-4 border-dashed border-2 rounded-lg">
-                        {totalTasks === completedTasks ? (
-                             <p className="font-semibold text-green-600">Félicitations, vous avez terminé toutes les tâches de ce scénario !</p>
-                        ) : nextEnv ? (
-                             <p>Vous avez terminé vos tâches dans cet environnement. <br/><span className="font-semibold mt-2 block">Passez à l'environnement "{nextEnv.name}" pour continuer !</span></p>
-                        ) : (
-                             <p>Vous n'avez pas de nouvelles tâches assignées pour le moment.</p>
-                        )}
-                    </div>
-                )}
-                 {totalTasks > 0 && (
-                    <div className="mt-4 text-sm text-muted-foreground">
-                        <p>Progression totale : {completedTasks} / {totalTasks} tâches complétées.</p>
-                    </div>
-                 )}
+                <p className="text-primary-foreground font-medium">Un scénario est en cours. Consultez votre <Link href="/messaging" className="underline font-bold">messagerie</Link> pour recevoir vos instructions et commencer à travailler.</p>
             </CardContent>
         </Card>
-    )
+    );
 }
 
 function SystemAlerts() {
@@ -306,5 +256,3 @@ export function DashboardClient() {
     </div>
   );
 }
-
-    

@@ -1,14 +1,4 @@
 
-
-
-
-
-
-
-
-
-
-
 export type Environment = {
     id: string;
     name: string;
@@ -46,6 +36,7 @@ export type Tier = {
   createdAt: string;
   createdBy: string;
   environnementId: string;
+  email?: string;
   
   // -- VEHICLE SPECIFIC FIELDS --
   immatriculation?: string; // For Vehicule
@@ -175,9 +166,8 @@ export type Class = {
 
 export type Email = {
   id: number;
-  sender: string; // username or system identifier
+  sender: string; // username or system identifier or tier-id
   recipient: string; // username or tier-id
-  cc?: string[]; // for the teacher copy
   subject: string;
   body: string;
   timestamp: string;
@@ -187,29 +177,30 @@ export type Email = {
 // --- SCENARIO ENGINE TYPES ---
 
 export type TaskType = 
-    | 'CREATE_TIERS_FOURNISSEUR'
-    | 'CREATE_TIERS_CLIENT'
-    | 'CREATE_TIERS_TRANSPORTEUR'
-    | 'CREATE_BC'
-    | 'RECEIVE_BC'
-    | 'CREATE_BL'
-    | 'PREPARE_BL'
-    | 'SHIP_BL'
-    | 'SEND_AUTOMATED_EMAIL'
-    | 'MANUAL_VALIDATION'; // For tasks that require teacher validation
+    | 'ACTION' // Generic action based on email instructions
+    | 'VALIDATION'; // Teacher validation step
 
 export type ScenarioTaskTemplate = {
     taskOrder: number;
-    description: string;
+    description: string; // Internal description for the teacher
     roleId: string;
     taskType: TaskType;
-    prerequisiteTaskId?: number; // Refers to taskOrder
-    details?: {
-        sender?: string;
-        emailSubject?: string;
-        emailBody?: string;
-        [key: string]: any;
+    prerequisiteTaskOrder?: number;
+    
+    // For sending emails to students
+    emailDetails?: {
+        sender: string; // e.g., "Client Alpha" or "system@logisim.hub"
+        subject: string;
+        body: string;
+        delay?: number; // in minutes
     };
+    
+    // For validating student actions
+    validationDetails?: {
+        actionToValidate: 'CREATE_BC' | 'RECEIVE_BC_ANOMALY' | 'CREATE_BL' | 'SHIP_BL' | 'CREATE_TIER';
+        // Add more criteria later, e.g., quantity checks
+    };
+
     environnementId?: string; // If undefined, uses the scenario's default environment
 };
 
@@ -241,12 +232,11 @@ export type Task = {
     id: number;
     scenarioId: number;
     userId: string;
-    description: string;
+    description: string; // Comes from ScenarioTaskTemplate.emailDetails.body
     status: TaskStatus;
     taskType: TaskType;
     taskOrder: number;
-    prerequisiteTaskId?: number;
-    details?: Record<string, any>;
+    prerequisiteTaskOrder?: number;
     environnementId: string; // The specific environment where this task must be done
 };
 
