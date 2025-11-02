@@ -86,7 +86,7 @@ ROLES.set('tms_affreteur', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: false,
         canReceiveBC: false, canCreateBL: false, canPrepareBL: false, canShipBL: false,
         canManageStock: false, canViewStock: false, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: true, profile: "élève"
+        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: false, profile: "élève"
     }
 });
 
@@ -233,7 +233,7 @@ export const getInitialState = (): WmsState => {
       { taskOrder: 1, roleId: "equipe_reception", taskType: 'ACTION', emailDetails: { sender: 'SystemLogiSim', subject: 'Nouvelle Tâche : Création Fournisseur', body: "Bonjour, \n\nPour commencer, veuillez créer un nouveau fournisseur 'Pièces Auto Express' pour notre catalogue.\n\nCordialement,\nLogiSim Hub" } },
       { taskOrder: 2, roleId: "equipe_reception", taskType: 'ACTION', prerequisiteTaskOrder: 1, emailDetails: { sender: 'Service Achats', subject: 'Demande : Commande Pièces', body: "Merci d'avoir ajouté notre fournisseur. Pouvez-vous passer une commande pour 10 unités de 'RECHANGE SOUFFLET' (ID: 23371) ?" } },
       { taskOrder: 3, roleId: "equipe_reception", taskType: 'ACTION', prerequisiteTaskOrder: 2, emailDetails: { sender: 'SystemLogiSim', subject: 'Notification : Marchandise prête', body: "La marchandise de votre BC pour 'Pièces Auto Express' est arrivée. Veuillez la réceptionner.\nRéceptionnez exactement 10 unités." } },
-      { taskOrder: 4, roleId: "equipe_preparation", taskType: 'ACTION', emailDetails: { sender: 'Service Commercial', subject: 'Nouvelle Commande Client', body: "Bonjour, \n\nUn nouveau client, 'Garage Du Centre', a besoin de 8 'RECHANGE SOUFFLET' (ID: 23371). Merci de créer le client et le bon de livraison (BL) correspondant." } },
+      { taskOrder: 4, roleId: "equipe_preparation", taskType: 'ACTION', prerequisiteTaskOrder: 3, emailDetails: { sender: 'Service Commercial', subject: 'Nouvelle Commande Client', body: "Bonjour, \n\nUn nouveau client, 'Garage Du Centre', a besoin de 8 'RECHANGE SOUFFLET' (ID: 23371). Merci de créer le client et le bon de livraison (BL) correspondant." } },
       { taskOrder: 5, roleId: "equipe_preparation", taskType: 'ACTION', prerequisiteTaskOrder: 4, emailDetails: { sender: 'SystemLogiSim', subject: 'Préparation Commande', body: "Le BL pour 'Garage Du Centre' est prêt. Générez le bon de préparation et préparez la commande." } },
       { taskOrder: 6, roleId: "equipe_preparation", taskType: 'ACTION', prerequisiteTaskOrder: 5, emailDetails: { sender: 'SystemLogiSim', subject: 'Expédition', body: "La commande pour 'Garage Du Centre' est prête. Veuillez l'expédier et générer les documents de transport." } },
     ],
@@ -932,7 +932,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         id: newTaskId,
                         scenarioId: newActiveScenarioId,
                         userId: student.username,
-                        description: taskTemplate.emailDetails.body,
+                        description: taskTemplate.emailDetails?.body || `Tâche ${taskTemplate.taskOrder}: ${taskTemplate.taskType}`,
                         status: isPrerequisiteMet ? 'todo' : 'blocked',
                         taskType: taskTemplate.taskType,
                         taskOrder: taskTemplate.taskOrder,
