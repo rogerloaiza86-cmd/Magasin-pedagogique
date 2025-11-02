@@ -160,7 +160,7 @@ interface WmsState {
   currentEnvironmentId: string;
 }
 
-const getInitialState = (): WmsState => {
+export const getInitialState = (): WmsState => {
   const defaultEnvId = 'magasin_pedago';
   const articlesWithEnv = initialArticles.map(a => [a.id, {...a, environnementId: defaultEnvId, ean: faker.commerce.isbn().replace(/-/g, '') }]) as [string, Article][];
   const articlesMap = new Map(articlesWithEnv);
@@ -311,6 +311,7 @@ const getInitialState = (): WmsState => {
     roles: ROLES,
     environments: ENVIRONMENTS,
     grillesTarifaires: GRILLES_TARIFAIRES,
+    maintenances: new Map(),
     scenarioTemplates: initialScenarioTemplates,
     activeScenarios: new Map(),
     tasks: new Map(),

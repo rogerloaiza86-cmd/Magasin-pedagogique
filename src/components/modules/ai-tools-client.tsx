@@ -1,7 +1,8 @@
+
 "use client";
 
 import { documentGenerationAssistance } from "@/ai/flows/document-generation-assistance";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,9 +13,7 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -26,19 +25,22 @@ import { Loader2, Wand2 } from "lucide-react";
 import { useWms } from "@/context/WmsContext";
 
 type DocGenFormData = {
-  documentType: string;
-  documentDescription: string;
-  relevantInformation: string;
+  documentId: string;
 };
 
 export function AiToolsClient() {
   const { state } = useWms();
-  const { currentUserPermissions } = state;
+  const { currentUserPermissions, documents } = state;
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<{
     suggestedVerbiage: string;
     suggestedLayout: string;
   } | null>(null);
+
+  const shippedDocuments = useMemo(() => 
+    Array.from(documents.values()).filter(doc => doc.type === 'Bon de Livraison Client' && doc.status === 'Expédié'),
+    [documents]
+  );
 
   const {
     control,
@@ -46,9 +48,7 @@ export function AiToolsClient() {
     formState: { errors },
   } = useForm<DocGenFormData>({
     defaultValues: {
-      documentType: "Bon de Livraison Client",
-      documentDescription: "",
-      relevantInformation: "",
+      documentId: "",
     },
   });
 
@@ -56,7 +56,7 @@ export function AiToolsClient() {
     setIsLoading(true);
     setResult(null);
     try {
-      const response = await documentGenerationAssistance(data);
+      const response = await documentGenerationAssistance({ documentId: parseInt(data.documentId, 10) });
       setResult(response);
     } catch (error) {
       console.error(error);
@@ -84,95 +84,48 @@ export function AiToolsClient() {
       <Card>
         <form onSubmit={handleSubmit(onSubmit)}>
           <CardHeader>
-            <CardTitle>Assistant de Génération de Documents</CardTitle>
+            <CardTitle>Assistant de Génération de Lettre de Voiture (CMR)</CardTitle>
             <CardDescription>
-              Utilisez l'IA pour obtenir des suggestions de formulation et de
-              mise en page pour vos documents d'entrepôt.
+              Sélectionnez un Bon de Livraison (BL) expédié pour que l'IA vous génère une suggestion de Lettre de Voiture correspondante.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <Label htmlFor="documentType">Type de document</Label>
-                    <Controller
-                    name="documentType"
-                    control={control}
-                    rules={{ required: "Le type de document est requis" }}
-                    render={({ field }) => (
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <SelectTrigger id="documentType">
-                            <SelectValue placeholder="Sélectionner..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Bon de Commande Fournisseur">
-                            Bon de Commande Fournisseur
-                            </SelectItem>
-                            <SelectItem value="Bon de Livraison Client">
-                            Bon de Livraison Client
-                            </SelectItem>
-                            <SelectItem value="Lettre de Voiture">
-                            Lettre de Voiture
-                            </SelectItem>
-                        </SelectContent>
-                        </Select>
-                    )}
-                    />
-                    {errors.documentType && (
-                    <p className="text-sm text-destructive mt-1">
-                        {errors.documentType.message}
-                    </p>
-                    )}
-                </div>
-            </div>
-            <div>
-              <Label htmlFor="documentDescription">
-                Description du document et de son objectif
-              </Label>
-              <Controller
-                name="documentDescription"
+             <div>
+                <Label htmlFor="documentId">Bon de Livraison à utiliser comme source</Label>
+                <Controller
+                name="documentId"
                 control={control}
-                rules={{
-                  required: "La description est requise",
-                }}
+                rules={{ required: "Veuillez sélectionner un document." }}
                 render={({ field }) => (
-                  <Textarea
-                    id="documentDescription"
-                    placeholder="Ex: Un bon de livraison pour le client Dupont, contenant des pièces automobiles..."
-                    {...field}
-                  />
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={shippedDocuments.length === 0}>
+                    <SelectTrigger id="documentId">
+                        <SelectValue placeholder={shippedDocuments.length === 0 ? "Aucun BL expédié trouvé" : "Sélectionner un BL..."} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {shippedDocuments.map(doc => (
+                             <SelectItem key={doc.id} value={doc.id.toString()}>
+                                BL #{doc.id} - {state.tiers.get(doc.tierId)?.name || 'Tiers inconnu'}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                    </Select>
                 )}
-              />
-              {errors.documentDescription && (
+                />
+                {errors.documentId && (
                 <p className="text-sm text-destructive mt-1">
-                  {errors.documentDescription.message}
+                    {errors.documentId.message}
                 </p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="relevantInformation">
-                Informations pertinentes à inclure (optionnel)
-              </Label>
-              <Controller
-                name="relevantInformation"
-                control={control}
-                render={({ field }) => (
-                  <Textarea
-                    id="relevantInformation"
-                    placeholder="Ex: Mentionner 'Fragile', numéro de commande client 12345..."
-                    {...field}
-                  />
                 )}
-              />
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading || shippedDocuments.length === 0}>
               {isLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Wand2 className="mr-2 h-4 w-4" />
               )}
-              Générer des Suggestions
+              Générer une suggestion de CMR
             </Button>
           </CardFooter>
         </form>
@@ -189,9 +142,9 @@ export function AiToolsClient() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>Suggestion de Formulation</CardTitle>
+                    <CardTitle>Suggestion de Formulation pour la Lettre de Voiture</CardTitle>
                 </CardHeader>
-                <CardContent className="prose prose-sm max-w-none">
+                <CardContent className="prose prose-sm max-w-none whitespace-pre-wrap">
                     <p>{result.suggestedVerbiage}</p>
                 </CardContent>
             </Card>
@@ -199,7 +152,7 @@ export function AiToolsClient() {
                 <CardHeader>
                     <CardTitle>Suggestion de Mise en Page</CardTitle>
                 </CardHeader>
-                <CardContent className="prose prose-sm max-w-none">
+                <CardContent className="prose prose-sm max-w-none whitespace-pre-wrap">
                      <p>{result.suggestedLayout}</p>
                 </CardContent>
             </Card>
