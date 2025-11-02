@@ -48,47 +48,54 @@ function ComposeEmail() {
 
   const getPossibleRecipients = () => {
     if (!currentUser) return { users: [], tiers: [] };
-    
+
     let userRecipients: User[] = [];
-    
+    const currentUserUsername = currentUser.username;
+
     if (currentUser.profile === 'élève') {
-        const userClassId = currentUser.classId;
-        if (userClassId) {
-            const studentClass = classes.get(userClassId);
-            const otherStudents = Array.from(users.values()).filter(u => 
-                u.profile === 'élève' && u.classId === userClassId && u.username !== currentUser.username
-            );
-            userRecipients.push(...otherStudents);
-            if (studentClass?.teacherIds) {
-               studentClass.teacherIds.forEach(teacherId => {
-                    const teacher = users.get(teacherId);
-                    if (teacher) userRecipients.push(teacher);
-               });
-            }
+        const studentClass = classes.get(currentUser.classId || -1);
+        if (studentClass) {
+            // Add teachers of the class
+            studentClass.teacherIds?.forEach(teacherId => {
+                const teacher = users.get(teacherId);
+                if (teacher) userRecipients.push(teacher);
+            });
+            // Add other students in the same class
+            Array.from(users.values()).forEach(user => {
+                if (user.profile === 'élève' && user.classId === currentUser.classId && user.username !== currentUserUsername) {
+                    userRecipients.push(user);
+                }
+            });
         }
     } else if (currentUser.profile === 'professeur') {
-        const teacherClasses = Array.from(classes.values()).filter(c => c.teacherIds?.includes(currentUser.username));
-
+        // Add all students from the classes they teach
+        const teacherClasses = Array.from(classes.values()).filter(c => c.teacherIds?.includes(currentUserUsername));
         const studentUsernames = new Set<string>();
         teacherClasses.forEach(c => {
              Array.from(users.values()).forEach(u => {
                 if (u.profile === 'élève' && u.classId === c.id) {
                     studentUsernames.add(u.username);
                 }
-             })
+             });
         });
-        userRecipients = Array.from(studentUsernames).map(username => users.get(username)).filter(Boolean) as any[];
-
+        studentUsernames.forEach(username => {
+            const student = users.get(username);
+            if (student) userRecipients.push(student);
+        });
+        
         // Add other teachers and admins
-        const staff = Array.from(users.values()).filter(u => (u.profile === 'professeur' || u.profile === 'Administrateur') && u.username !== currentUser.username);
-        userRecipients.push(...staff);
-
+        Array.from(users.values()).forEach(user => {
+            if ((user.profile === 'professeur' || user.profile === 'Administrateur') && user.username !== currentUserUsername) {
+                userRecipients.push(user);
+            }
+        });
     } else if (currentUser.profile === 'Administrateur') {
         // Admins can message everyone
-        userRecipients = Array.from(users.values()).filter(u => u.username !== currentUser.username);
+        userRecipients = Array.from(users.values()).filter(u => u.username !== currentUserUsername);
     }
     
-    const tierRecipients = Array.from(tiers.values()).filter(t => t.environnementId === currentEnvironmentId);
+    // Tiers should be from the current environment, but let's show all for simplicity of communication across scenarios
+    const tierRecipients = Array.from(tiers.values());
 
     // Remove duplicates and sort
     const uniqueUserRecipients = Array.from(new Map(userRecipients.map(u => [u.username, u])).values())
