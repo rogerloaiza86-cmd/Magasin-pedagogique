@@ -4,6 +4,7 @@
 
 
 
+
 export type Environment = {
     id: string;
     name: string;
@@ -166,7 +167,7 @@ export type Class = {
 
 export type Email = {
   id: number;
-  sender: string; // username
+  sender: string; // username or system identifier
   recipient: string; // username or tier-id
   cc?: string[]; // for the teacher copy
   subject: string;
@@ -186,6 +187,7 @@ export type TaskType =
     | 'CREATE_BL'
     | 'PREPARE_BL'
     | 'SHIP_BL'
+    | 'SEND_AUTOMATED_EMAIL'
     | 'MANUAL_VALIDATION'; // For tasks that require teacher validation
 
 export type ScenarioTaskTemplate = {
@@ -194,7 +196,7 @@ export type ScenarioTaskTemplate = {
     roleId: string;
     taskType: TaskType;
     prerequisiteTaskId?: number; // Refers to taskOrder
-    details?: Record<string, any>; // e.g., { tierName: 'PneuExpress', articleId: '123', quantity: 20 }
+    details?: Record<string, any>; // e.g., { tierName: 'PneuExpress', articleId: '123', quantity: 20, emailSubject: '...', emailBody: '...' }
     environnementId?: string; // If undefined, uses the scenario's default environment
 };
 
@@ -206,7 +208,7 @@ export type ScenarioTemplate = {
     rolesRequis: string[];
     tasks: ScenarioTaskTemplate[];
     createdBy: string;
-    environnementId: string; // Default environment for the scenario
+    environnementId: string;
 };
 
 export type ScenarioStatus = 'preparing' | 'running' | 'completed';

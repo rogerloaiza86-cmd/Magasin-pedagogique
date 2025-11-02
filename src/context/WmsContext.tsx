@@ -199,11 +199,12 @@ const getInitialState = (): WmsState => {
     tasks: [
         { taskOrder: 1, description: "Créez un nouveau fournisseur pour des pièces automobiles.", roleId: "equipe_reception", taskType: "CREATE_TIERS_FOURNISSEUR", environnementId: 'magasin_pedago' },
         { taskOrder: 2, description: "Passez un Bon de Commande (BC) chez le fournisseur que vous venez de créer pour 5 unités de l'article '23371'.", roleId: "equipe_reception", taskType: "CREATE_BC", prerequisiteTaskId: 1, environnementId: 'magasin_pedago' },
-        { taskOrder: 3, description: "Réceptionnez la marchandise du Bon de Commande. Déclarez 4 unités reçues conformes et 1 non-conforme.", roleId: "equipe_reception", taskType: "RECEIVE_BC", prerequisiteTaskId: 2, environnementId: 'magasin_pedago' },
-        { taskOrder: 4, description: "Créez un nouveau client pour le garage 'Auto-Répar'.", roleId: "equipe_preparation", taskType: "CREATE_TIERS_CLIENT", environnementId: 'magasin_pedago'},
-        { taskOrder: 5, description: "Créez un Bon de Livraison (BL) pour le client 'Auto-Répar' avec 3 unités de l'article '23371'.", roleId: "equipe_preparation", taskType: "CREATE_BL", prerequisiteTaskId: 4, environnementId: 'magasin_pedago' },
-        { taskOrder: 6, description: "Préparez la commande du BL que vous venez de créer.", roleId: "equipe_preparation", taskType: "PREPARE_BL", prerequisiteTaskId: 5, environnementId: 'magasin_pedago' },
-        { taskOrder: 7, description: "Expédiez la commande et générez les documents finaux.", roleId: "equipe_preparation", taskType: "SHIP_BL", prerequisiteTaskId: 6, environnementId: 'magasin_pedago' },
+        { taskOrder: 3, description: "Vous avez reçu une notification. Consultez votre messagerie.", roleId: "equipe_reception", taskType: 'SEND_AUTOMATED_EMAIL', details: { sender: 'System', subject: 'BC en attente de réception', body: 'Le BC pour les pièces automobiles est prêt à être réceptionné.' }, prerequisiteTaskId: 2, environnementId: 'magasin_pedago' },
+        { taskOrder: 4, description: "Réceptionnez la marchandise du Bon de Commande. Déclarez 4 unités reçues conformes et 1 non-conforme.", roleId: "equipe_reception", taskType: "RECEIVE_BC", prerequisiteTaskId: 3, environnementId: 'magasin_pedago' },
+        { taskOrder: 5, description: "Créez un nouveau client pour le garage 'Auto-Répar'.", roleId: "equipe_preparation", taskType: "CREATE_TIERS_CLIENT", environnementId: 'magasin_pedago'},
+        { taskOrder: 6, description: "Créez un Bon de Livraison (BL) pour le client 'Auto-Répar' avec 3 unités de l'article '23371'.", roleId: "equipe_preparation", taskType: "CREATE_BL", prerequisiteTaskId: 5, environnementId: 'magasin_pedago' },
+        { taskOrder: 7, description: "Préparez la commande du BL que vous venez de créer.", roleId: "equipe_preparation", taskType: "PREPARE_BL", prerequisiteTaskId: 6, environnementId: 'magasin_pedago' },
+        { taskOrder: 8, description: "Expédiez la commande et générez les documents finaux.", roleId: "equipe_preparation", taskType: "SHIP_BL", prerequisiteTaskId: 7, environnementId: 'magasin_pedago' },
     ],
     createdBy: 'admin',
     environnementId: 'magasin_pedago',
@@ -933,7 +934,9 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         const rolesToAssign = template.rolesRequis;
         const newUsers = new Map(state.users);
         const newTasks = new Map(state.tasks);
+        let newEmails = new Map(state.emails);
         let taskIdCounter = state.taskIdCounter;
+        let emailIdCounter = state.emailIdCounter;
         let localCurrentUser = state.currentUser;
         let localCurrentUserPermissions = state.currentUserPermissions;
 
@@ -953,6 +956,18 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         studentsInClass.forEach(student => {
             template.tasks.forEach(taskTemplate => {
                 if (taskTemplate.roleId === newUsers.get(student.username)?.roleId) {
+                    if (taskTemplate.taskType === 'SEND_AUTOMATED_EMAIL') {
+                        const email: Email = {
+                            id: emailIdCounter++,
+                            sender: taskTemplate.details?.sender || 'Système',
+                            recipient: student.username,
+                            subject: taskTemplate.details?.emailSubject || 'Notification de Tâche',
+                            body: taskTemplate.details?.emailBody || taskTemplate.description,
+                            timestamp: new Date().toISOString(),
+                            isRead: false,
+                        };
+                        newEmails.set(email.id, email);
+                    }
                     const newTaskId = taskIdCounter++;
                     newTasks.set(newTaskId, {
                         id: newTaskId,
@@ -975,8 +990,10 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
             activeScenarios: newActiveScenarios,
             users: newUsers,
             tasks: newTasks,
+            emails: newEmails,
             activeScenarioIdCounter: newActiveScenarioId + 1,
             taskIdCounter,
+            emailIdCounter,
             currentUser: localCurrentUser,
             currentUserPermissions: localCurrentUserPermissions
         };
@@ -1297,5 +1314,3 @@ export const useWms = () => {
   }
   return context;
 };
-
-    
