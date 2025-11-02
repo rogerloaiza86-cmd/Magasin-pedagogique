@@ -1216,19 +1216,15 @@ interface WmsContextType {
 const WmsContext = createContext<WmsContextType | undefined>(undefined);
 
 export const WmsProvider = ({ children }: { children: ReactNode }) => {
-  const [state, dispatch] = useReducer(wmsReducer, undefined, getInitialState);
+  const [state, dispatch] = useReducer(wmsReducer, getInitialState());
 
   useEffect(() => {
-    let isMounted = true;
     try {
       const savedStateJSON = localStorage.getItem('wmsState');
-      const initialState = getInitialState();
-      
-      let finalState = initialState;
+      let finalState = getInitialState();
 
       if (savedStateJSON) {
         const savedState = JSON.parse(savedStateJSON);
-        
         const reviveMap = (arr: any) => arr ? new Map(arr) : new Map();
 
         finalState = {
@@ -1244,7 +1240,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
             scenarioTemplates: new Map([...initialState.scenarioTemplates, ...reviveMap(savedState.scenarioTemplates)]),
             activeScenarios: reviveMap(savedState.activeScenarios) || new Map(),
             tasks: reviveMap(savedState.tasks) || new Map(),
-            roles: ROLES, 
+            roles: ROLES,
             environments: ENVIRONMENTS,
             grillesTarifaires: GRILLES_TARIFAIRES,
             currentUser: null,
@@ -1252,35 +1248,28 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
         };
       }
       
-      if (isMounted) {
-        const lastUser = localStorage.getItem('wmsLastUser');
-        if (lastUser && finalState.users.has(lastUser)) {
-           finalState.currentUser = finalState.users.get(lastUser) || null;
-           finalState = updateUserPermissions(finalState);
-        }
-        
-        const lastEnv = localStorage.getItem('wmsLastEnv');
-        if(lastEnv && finalState.environments.has(lastEnv)) {
-            finalState.currentEnvironmentId = lastEnv;
-        }
-
-        dispatch({ type: 'SET_STATE', payload: finalState });
+      const lastUser = localStorage.getItem('wmsLastUser');
+      if (lastUser && finalState.users.has(lastUser)) {
+         finalState.currentUser = finalState.users.get(lastUser) || null;
+         finalState = updateUserPermissions(finalState);
       }
+      
+      const lastEnv = localStorage.getItem('wmsLastEnv');
+      if(lastEnv && finalState.environments.has(lastEnv)) {
+          finalState.currentEnvironmentId = lastEnv;
+      }
+
+      dispatch({ type: 'SET_STATE', payload: finalState });
 
     } catch (e) {
       console.error("Could not load state from localStorage. Using initial state.", e);
-       if (isMounted) {
-        dispatch({ type: 'SET_STATE', payload: getInitialState() });
-      }
-    }
-    return () => {
-        isMounted = false;
+      dispatch({ type: 'SET_STATE', payload: getInitialState() });
     }
   }, []);
 
   useEffect(() => {
-    // Only save to localStorage if the state is not the initial, undefined state
-    if (state !== undefined && state.currentUser !== undefined) {
+    // Only save to localStorage if the state has been initialized
+    if (state.currentUser !== undefined) {
         try {
           const serializeMap = (map: Map<any, any>) => Array.from(map.entries());
 
@@ -1341,7 +1330,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
     return { ...article, stockReserver, stockDisponible };
   }
 
-  const contextValue = useMemo(() => (state ? {
+  const contextValue = useMemo(() => ({
     state,
     dispatch,
     getArticle: (id: string) => state.articles.get(id),
@@ -1349,9 +1338,9 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
     getDocument: (id: number) => state.documents.get(id),
     getClass: (id: number) => state.classes.get(id),
     getArticleWithComputedStock,
-  } : undefined), [state]);
+  }), [state]);
 
-  if (!contextValue) {
+  if (!state) {
     return null; // or a loading spinner
   }
 
