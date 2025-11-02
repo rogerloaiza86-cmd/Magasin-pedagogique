@@ -86,7 +86,7 @@ ROLES.set('tms_affreteur', {
         isSuperAdmin: false, canViewDashboard: true, canManageTiers: true, canViewTiers: true, canCreateBC: false,
         canReceiveBC: false, canCreateBL: false, canPrepareBL: false, canShipBL: false,
         canManageStock: false, canViewStock: false, canManageClasses: false, canUseIaTools: true, canUseMessaging: true,
-        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: false, profile: "élève"
+        canManageScenarios: false, canManageStudents: false, canManageFleet: false, canManageQuotes: true, profile: "élève"
     }
 });
 
@@ -219,35 +219,47 @@ export const getInitialState = (): WmsState => {
   initialUsers.set('eleve2', { username: 'eleve2', password: 'eleve2', profile: 'élève', createdAt: new Date().toISOString(), roleId: 'equipe_preparation', classId: demoClassId });
   initialUsers.set('affreteur', { username: 'affreteur', password: 'affreteur', profile: 'élève', createdAt: new Date().toISOString(), roleId: 'tms_affreteur', classId: demoClassId });
 
+  const initialTiers = new Map<number, Tier>();
+  initialTiers.set(1, {
+    id: 1, type: 'Transporteur', name: 'Transporteur Test', address: '456 Avenue des Tests',
+    createdAt: new Date().toISOString(), createdBy: 'admin', environnementId: 'agence_transport', email: 'contact@transport-test.com'
+  });
+
+
   const initialEmails = new Map<number, Email>();
   let emailIdCounter = 1;
+  const now = Date.now();
+  // Prof to eleve1
   initialEmails.set(emailIdCounter++, {
-    id: 1,
-    sender: 'prof',
-    recipient: 'eleve1',
-    subject: 'Bienvenue dans LogiSim Hub',
-    body: 'Bonjour, ceci est un message de test pour vérifier que la messagerie fonctionne bien.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // 5 minutes ago
-    isRead: false,
+    id: 1, sender: 'prof', recipient: 'eleve1', subject: 'Instructions pour le scénario',
+    body: 'Bonjour, veuillez commencer par créer le fournisseur "Test Fournisseur".',
+    timestamp: new Date(now - 1000 * 60 * 10).toISOString(), isRead: false,
   });
+  // eleve1 to prof
   initialEmails.set(emailIdCounter++, {
-    id: 2,
-    sender: 'eleve1',
-    recipient: 'prof',
-    subject: 'Re: Bienvenue dans LogiSim Hub',
-    body: 'Bonjour Professeur, message bien reçu. Le système semble fonctionner.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 2).toISOString(), // 2 minutes ago
-    isRead: false,
+    id: 2, sender: 'eleve1', recipient: 'prof', subject: 'Re: Instructions',
+    body: 'Bonjour Professeur, bien reçu. Je m\'en occupe.',
+    timestamp: new Date(now - 1000 * 60 * 8).toISOString(), isRead: false,
   });
-   initialEmails.set(emailIdCounter++, {
-    id: 3,
-    sender: 'SystemLogiSim',
-    recipient: 'admin',
-    subject: 'Rapport Système',
-    body: 'Ceci est une notification automatique de test pour l\'administrateur.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 10).toISOString(), // 10 minutes ago
-    isRead: true,
+  // eleve1 to eleve2
+  initialEmails.set(emailIdCounter++, {
+    id: 3, sender: 'eleve1', recipient: 'eleve2', subject: 'Info réception',
+    body: 'Salut, je vais bientôt réceptionner une commande. Prépare-toi pour la mise en stock.',
+    timestamp: new Date(now - 1000 * 60 * 5).toISOString(), isRead: false,
   });
+  // admin to prof
+  initialEmails.set(emailIdCounter++, {
+    id: 4, sender: 'admin', recipient: 'prof', subject: 'Rappel réunion pédagogique',
+    body: 'N\'oubliez pas notre réunion demain à 10h pour discuter des nouveaux scénarios.',
+    timestamp: new Date(now - 1000 * 60 * 60 * 2).toISOString(), isRead: true,
+  });
+  // affreteur to tier
+  initialEmails.set(emailIdCounter++, {
+    id: 5, sender: 'affreteur', recipient: 'tier-1', subject: 'Demande de cotation',
+    body: 'Bonjour, pourriez-vous nous fournir un devis pour un transport Paris-Lille ?',
+    timestamp: new Date(now - 1000 * 60 * 3).toISOString(), isRead: false,
+  });
+
 
   const initialScenarioTemplates = new Map<number, ScenarioTemplate>();
   let templateIdCounter = 1;
@@ -339,10 +351,24 @@ export const getInitialState = (): WmsState => {
     createdBy: 'admin',
     environnementId: 'agence_transport'
   });
+  
+   initialScenarioTemplates.set(templateIdCounter++, {
+    id: 7,
+    title: "TMS02 : Ajout à la flotte et maintenance",
+    description: "Ajouter un nouveau véhicule à la flotte TMS et planifier sa première maintenance.",
+    competences: ["C5.1", "C5.2"],
+    rolesRequis: ["tms_exploitation"],
+    tasks: [
+        { taskOrder: 1, roleId: "tms_exploitation", taskType: 'ACTION', emailDetails: { sender: 'Gestion de flotte', subject: 'Nouveau Véhicule', body: "Bonjour, veuillez ajouter notre nouveau 'Porteur 26T' à la flotte avec l'immatriculation 'NE-123-WVE'." } },
+        { taskOrder: 2, roleId: "tms_exploitation", taskType: 'ACTION', prerequisiteTaskOrder: 1, emailDetails: { sender: 'Atelier', subject: 'Maintenance initiale', body: "Le nouveau porteur a besoin d'une première vérification. Veuillez le mettre en maintenance pour 'Contrôle initial'." } },
+    ],
+    createdBy: 'admin',
+    environnementId: 'agence_transport'
+  });
 
   return {
     articles: articlesMap,
-    tiers: new Map(),
+    tiers: initialTiers,
     documents: new Map(),
     movements: initialMovements,
     users: initialUsers,
@@ -355,7 +381,7 @@ export const getInitialState = (): WmsState => {
     scenarioTemplates: initialScenarioTemplates,
     activeScenarios: new Map(),
     tasks: new Map(),
-    tierIdCounter: 1,
+    tierIdCounter: 2,
     docIdCounter: 1,
     movementIdCounter: initialMovements.length + 1,
     classIdCounter: 2,
@@ -947,7 +973,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         id: newTaskId,
                         scenarioId: newActiveScenarioId,
                         userId: student.username,
-                        description: taskTemplate.emailDetails?.body || '',
+                        description: taskTemplate.emailDetails?.body ?? `Tâche: ${taskTemplate.taskType}`,
                         status: isPrerequisiteMet ? 'todo' : 'blocked',
                         taskType: taskTemplate.taskType,
                         taskOrder: taskTemplate.taskOrder,
@@ -1331,4 +1357,5 @@ export const useWms = () => {
   return context;
 };
 
+    
     
