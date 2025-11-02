@@ -1,4 +1,5 @@
 
+
 export type Environment = {
     id: string;
     name: string;
@@ -177,25 +178,23 @@ export type Email = {
 // --- SCENARIO ENGINE TYPES ---
 
 export type TaskType = 
-    | 'ACTION' // Generic action based on email instructions
+    | 'ACTION' // A task requiring the student to perform an action in the WMS, usually triggered by an email.
     | 'VALIDATION'; // Teacher validation step
 
 export type ScenarioTaskTemplate = {
     taskOrder: number;
-    description: string; // Internal description for the teacher
     roleId: string;
     taskType: TaskType;
     prerequisiteTaskOrder?: number;
     
-    // For sending emails to students
-    emailDetails?: {
-        sender: string; // e.g., "Client Alpha" or "system@logisim.hub"
+    // Details for the instruction email sent to the student.
+    emailDetails: {
+        sender: string; // e.g., "Client Alpha", "Service Achat", "SystemLogiSim"
         subject: string;
         body: string;
-        delay?: number; // in minutes
     };
     
-    // For validating student actions
+    // For automatic validation later
     validationDetails?: {
         actionToValidate: 'CREATE_BC' | 'RECEIVE_BC_ANOMALY' | 'CREATE_BL' | 'SHIP_BL' | 'CREATE_TIER';
         // Add more criteria later, e.g., quantity checks

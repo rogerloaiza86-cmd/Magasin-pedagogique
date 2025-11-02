@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
@@ -932,7 +933,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         id: newTaskId,
                         scenarioId: newActiveScenarioId,
                         userId: student.username,
-                        description: taskTemplate.emailDetails?.body || taskTemplate.description,
+                        description: taskTemplate.emailDetails.body,
                         status: isPrerequisiteMet ? 'todo' : 'blocked',
                         taskType: taskTemplate.taskType,
                         taskOrder: taskTemplate.taskOrder,
