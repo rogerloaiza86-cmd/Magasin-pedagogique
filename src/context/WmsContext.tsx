@@ -351,20 +351,6 @@ export const getInitialState = (): WmsState => {
     createdBy: 'admin',
     environnementId: 'agence_transport'
   });
-  
-   initialScenarioTemplates.set(templateIdCounter++, {
-    id: 7,
-    title: "TMS02 : Ajout à la flotte et maintenance",
-    description: "Ajouter un nouveau véhicule à la flotte TMS et planifier sa première maintenance.",
-    competences: ["C5.1", "C5.2"],
-    rolesRequis: ["tms_exploitation"],
-    tasks: [
-        { taskOrder: 1, roleId: "tms_exploitation", taskType: 'ACTION', emailDetails: { sender: 'Gestion de flotte', subject: 'Nouveau Véhicule', body: "Bonjour, veuillez ajouter notre nouveau 'Porteur 26T' à la flotte avec l'immatriculation 'NE-123-WVE'." } },
-        { taskOrder: 2, roleId: "tms_exploitation", taskType: 'ACTION', prerequisiteTaskOrder: 1, emailDetails: { sender: 'Atelier', subject: 'Maintenance initiale', body: "Le nouveau porteur a besoin d'une première vérification. Veuillez le mettre en maintenance pour 'Contrôle initial'." } },
-    ],
-    createdBy: 'admin',
-    environnementId: 'agence_transport'
-  });
 
   return {
     articles: articlesMap,
@@ -426,25 +412,32 @@ type WmsAction =
   | { type: 'SET_STATE'; payload: WmsState }
   | { type: 'SET_ENVIRONMENT'; payload: { environmentId: string } };
 
-const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState => {
-    const { currentUser, tasks, activeScenarios, currentEnvironmentId } = state;
-    if (!currentUser || currentUser.profile !== 'élève') return state;
+const updateUserPermissions = (state: WmsState): WmsState => {
+    if (state.currentUser) {
+        const permissions = state.roles.get(state.currentUser.roleId)?.permissions || null;
+        return { ...state, currentUserPermissions: permissions };
+    }
+    return { ...state, currentUserPermissions: null };
+};
 
-    const userActiveScenario = Array.from(activeScenarios.values()).find(sc => sc.classId === currentUser.classId && sc.status === 'running');
+const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState => {
+    if (!state.currentUser || state.currentUser.profile !== 'élève') return state;
+
+    const { tasks, activeScenarios, currentEnvironmentId } = state;
+
+    const userActiveScenario = Array.from(activeScenarios.values()).find(sc => sc.classId === state.currentUser?.classId && sc.status === 'running');
     if (!userActiveScenario) return state;
 
     // A task can only be completed in its designated environment.
-    const userTasks = Array.from(tasks.values()).filter(t => t.userId === currentUser.username && t.scenarioId === userActiveScenario.id && t.environnementId === currentEnvironmentId);
+    const userTasks = Array.from(tasks.values()).filter(t => t.userId === state.currentUser?.username && t.scenarioId === userActiveScenario.id && t.environnementId === currentEnvironmentId);
     const todoTasks = userTasks.filter(t => t.status === 'todo').sort((a,b) => a.taskOrder - b.taskOrder);
 
     let completedTaskId: number | null = null;
     let completedTaskOrder: number | null = null;
 
-    // This loop is simplified. A real implementation would need a more robust check based on action details
     for (const task of todoTasks) {
         let taskCompleted = false;
 
-        // A simple heuristic: the user performs an action of the correct type
         switch (action.type) {
              case 'ADD_TIER': taskCompleted = true; break;
              case 'CREATE_DOCUMENT': taskCompleted = true; break;
@@ -458,7 +451,7 @@ const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState =>
         }
     }
 
-    if (completedTaskId && completedTaskOrder) {
+    if (completedTaskId && completedTaskOrder !== null) {
         const newTasks = new Map(tasks);
         const newEmails = new Map(state.emails);
         let newEmailIdCounter = state.emailIdCounter;
@@ -467,15 +460,14 @@ const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState =>
         if (completedTask) {
             newTasks.set(completedTaskId, { ...completedTask, status: 'completed' });
 
-            // Find and unlock the next task for this user
             const scenarioTemplate = state.scenarioTemplates.get(userActiveScenario.templateId);
             if (scenarioTemplate) {
-                 const nextTaskTemplate = scenarioTemplate.tasks.find(t => t.prerequisiteTaskOrder === completedTaskOrder && t.roleId === currentUser.roleId);
+                 const nextTaskTemplate = scenarioTemplate.tasks.find(t => t.prerequisiteTaskOrder === completedTaskOrder && t.roleId === state.currentUser?.roleId);
                  if (nextTaskTemplate?.emailDetails) {
                     const email: Email = {
                         id: newEmailIdCounter++,
                         sender: nextTaskTemplate.emailDetails.sender,
-                        recipient: currentUser.username,
+                        recipient: state.currentUser!.username,
                         subject: nextTaskTemplate.emailDetails.subject,
                         body: nextTaskTemplate.emailDetails.body,
                         timestamp: new Date().toISOString(),
@@ -485,9 +477,9 @@ const validateAndUpdateTasks = (state: WmsState, action: WmsAction): WmsState =>
                  }
             }
             
-            // Mark the task in the state as 'todo' if it was blocked
+            // Unblock next tasks for the user
             newTasks.forEach((task, taskId) => {
-                if (task.userId === currentUser.username && task.scenarioId === userActiveScenario.id && task.prerequisiteTaskOrder === completedTaskOrder) {
+                if (task.userId === state.currentUser?.username && task.scenarioId === userActiveScenario.id && task.prerequisiteTaskOrder === completedTaskOrder) {
                     newTasks.set(taskId, {...task, status: 'todo'});
                 }
             });
@@ -508,10 +500,9 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       const { username, password } = action.payload;
       const user = state.users.get(username);
       if (user && user.password === password) {
-        const permissions = state.roles.get(user.roleId)?.permissions || null;
-        newState = { ...state, currentUser: user, currentUserPermissions: permissions };
+        newState = { ...state, currentUser: user };
       } else {
-        newState = state; // Do not throw, just return current state
+        newState = state; 
       }
       break;
     }
@@ -519,11 +510,9 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       const { username } = action.payload;
       const user = state.users.get(username);
       if (user) {
-        const permissions = state.roles.get(user.roleId)?.permissions || null;
-        newState = { ...state, currentUser: user, currentUserPermissions: permissions };
+        newState = { ...state, currentUser: user };
       } else {
-        // User from localStorage not found, just return current state
-        newState = state;
+        newState = { ...state, currentUser: null };
       }
       break;
     }
@@ -534,7 +523,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         ...getInitialState(), 
         users: state.users,
         classes: state.classes,
-        scenarioTemplates: state.scenarioTemplates, // Keep templates
+        scenarioTemplates: state.scenarioTemplates,
       };
       break;
     case 'REGISTER_USER': {
@@ -581,8 +570,6 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
       if (!state.currentUserPermissions?.canManageStock || !state.currentUser) return state;
       const { id, name, location, stock, price, packaging, ean } = action.payload;
       if (state.articles.has(id)) {
-        // In a real app, you'd probably want to throw an error here or show a toast.
-        // For now, we'll just log it and not add the article.
         console.error(`Article with ID ${id} already exists.`);
         return state;
       }
@@ -753,7 +740,6 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         const newMovements = [...state.movements];
         let newMovementIdCounter = state.movementIdCounter;
         
-        // --- LOGIC FOR CUSTOMER RETURNS ---
         if (oldDoc.type === 'Retour Client' && oldDoc.status !== 'Traité' && docToUpdate.status === 'Traité') {
             if (!state.currentUserPermissions?.canReceiveBC) return state;
 
@@ -776,13 +762,12 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         documentId: docToUpdate.id,
                     });
                 } else if (line.returnDecision === 'Mettre au rebut') {
-                    // Stock doesn't change, just log the event. Real-world might move to a different stock type.
                     newMovements.push({
                         id: newMovementIdCounter++,
                         timestamp: new Date().toISOString(),
                         articleId: line.articleId,
                         type: 'Retour Client',
-                        quantity: 0, // No change in quantity
+                        quantity: 0,
                         stockAfter: article.stock,
                         user: currentUser.username,
                         environnementId: state.currentEnvironmentId,
@@ -802,7 +787,6 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                 const quantityNonConforming = line.quantityNonConforming || 0;
 
                 if (article) {
-                    // Update stock with conforming quantity
                     const newStock = article.stock + quantityConforming;
                     newArticles.set(line.articleId, { ...article, stock: newStock });
                     newMovements.push({
@@ -817,7 +801,6 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         documentId: docToUpdate.id,
                     });
 
-                    // Handle non-conforming items
                     if (quantityNonConforming > 0) {
                         const updatedArticle = newArticles.get(line.articleId);
                         if (updatedArticle) {
@@ -828,7 +811,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                                 articleId: line.articleId,
                                 type: 'Mise en non-conforme',
                                 quantity: quantityNonConforming,
-                                stockAfter: updatedArticle.stock, // Stock isn't changing here, just status
+                                stockAfter: updatedArticle.stock,
                                 user: currentUser.username,
                                 environnementId: state.currentEnvironmentId,
                                 documentId: docToUpdate.id,
@@ -898,12 +881,12 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
     case 'SAVE_SCENARIO_TEMPLATE': {
         if (!state.currentUserPermissions?.canManageScenarios || !state.currentUser) return state;
         const newTemplates = new Map(state.scenarioTemplates);
-        if (action.payload.id) { // Update existing
+        if (action.payload.id) { 
             const existing = newTemplates.get(action.payload.id);
             if(existing && (existing.createdBy === state.currentUser.username || state.currentUserPermissions.isSuperAdmin)) {
                 newTemplates.set(action.payload.id, {...existing, ...action.payload, environnementId: state.currentEnvironmentId});
             }
-        } else { // Create new
+        } else { 
             const newId = state.scenarioTemplateIdCounter;
             const newTemplate: ScenarioTemplate = {
                 ...action.payload,
@@ -961,7 +944,6 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
             });
         }
         
-        // Create all tasks and initial emails
         studentsInClass.forEach(student => {
             const studentRoleId = newUsers.get(student.username)?.roleId;
             template.tasks.forEach(taskTemplate => {
@@ -981,7 +963,6 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         environnementId: taskTemplate.environnementId || template.environnementId,
                     });
 
-                    // Send initial emails for tasks without prerequisites
                     if (isPrerequisiteMet && taskTemplate.emailDetails) {
                         const email: Email = {
                             id: emailIdCounter++,
@@ -1186,13 +1167,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         break;
     }
     case 'SET_STATE': {
-        const loadedState = action.payload;
-        if(loadedState.currentUser) {
-            loadedState.currentUserPermissions = loadedState.roles.get(loadedState.currentUser.roleId) ?.permissions || null;
-        } else {
-            loadedState.currentUserPermissions = null;
-        }
-        newState = loadedState;
+        newState = action.payload;
         break;
     }
     case 'SET_ENVIRONMENT': {
@@ -1206,7 +1181,10 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
     default:
       return state;
   }
-  return validateAndUpdateTasks(newState, action);
+  // This is the critical part: After any action, recalculate permissions
+  // and then check for task updates.
+  const stateWithUpdatedPerms = updateUserPermissions(newState);
+  return validateAndUpdateTasks(stateWithUpdatedPerms, action);
 };
 
 interface WmsContextType {
@@ -1257,19 +1235,15 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
       
       const lastUser = localStorage.getItem('wmsLastUser');
       if (lastUser && finalState.users.has(lastUser)) {
-         const user = finalState.users.get(lastUser);
-         if (user) {
-            finalState.currentUser = user;
-            finalState.currentUserPermissions = finalState.roles.get(user.roleId)?.permissions || null;
-         }
+         dispatch({ type: 'REAUTHENTICATE_USER', payload: { username: lastUser } });
+      } else {
+        dispatch({ type: 'SET_STATE', payload: finalState });
       }
       
       const lastEnv = localStorage.getItem('wmsLastEnv');
       if(lastEnv && finalState.environments.has(lastEnv)) {
-          finalState.currentEnvironmentId = lastEnv;
+          dispatch({ type: 'SET_ENVIRONMENT', payload: { environmentId: lastEnv } });
       }
-
-      dispatch({ type: 'SET_STATE', payload: finalState });
 
     } catch (e) {
       console.error("Could not load state from localStorage. Using initial state.", e);
@@ -1356,6 +1330,3 @@ export const useWms = () => {
   }
   return context;
 };
-
-    
-    
