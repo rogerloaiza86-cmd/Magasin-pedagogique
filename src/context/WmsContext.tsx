@@ -291,7 +291,6 @@ export const getInitialState = (): WmsState => {
     rolesRequis: ["equipe_reception"],
     tasks: [
         { taskOrder: 1, roleId: "equipe_reception", taskType: 'ACTION', emailDetails: { sender: 'SystemLogiSim', subject: 'Alerte Inventaire', body: "Un écart de stock significatif a été détecté sur un article. Veuillez trouver l'article avec le plus grand stock dans l'entrepôt, effectuez un comptage physique (simulé) de 50 unités et ajustez l'inventaire." } },
-        { taskOrder: 2, roleId: "equipe_reception", taskType: 'ACTION', prerequisiteTaskOrder: 1, emailDetails: { sender: 'Responsable Logistique', subject: 'Analyse d\'écart', body: "Utilisez l'outil d'IA 'Assistant d'Analyse' pour suggérer 3 causes possibles à cet écart d'inventaire et envoyez-les moi par mail." } },
     ],
     createdBy: 'admin',
     environnementId: 'entrepot_fictif_ecommerce'
