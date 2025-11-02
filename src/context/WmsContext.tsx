@@ -352,6 +352,20 @@ export const getInitialState = (): WmsState => {
     environnementId: 'agence_transport'
   });
 
+  initialScenarioTemplates.set(templateIdCounter++, {
+    id: 7,
+    title: "TMS02: Gestion de flotte simple",
+    description: "Ajouter un véhicule à la flotte et le mettre en maintenance.",
+    competences: ["C4.2"],
+    rolesRequis: ["tms_exploitation"],
+    tasks: [
+        { taskOrder: 1, roleId: "tms_exploitation", taskType: "ACTION", emailDetails: { sender: "Direction", subject: "Nouveau véhicule", body: "Bonjour, nous venons d'acquérir un nouveau semi-remorque. Veuillez l'ajouter à notre flotte avec les informations suivantes:\n- Immatriculation: NEW-TRUCK-01\n- Type: Semi-remorque\n- Capacité: 33 palettes" }},
+        { taskOrder: 2, roleId: "tms_exploitation", taskType: "ACTION", prerequisiteTaskOrder: 1, emailDetails: { sender: "Atelier", subject: "Contrôle initial", body: "Le nouveau véhicule NEW-TRUCK-01 doit subir une inspection initiale. Veuillez le mettre en maintenance avec la note 'Inspection initiale avant mise en service'." }}
+    ],
+    createdBy: "admin",
+    environnementId: "agence_transport"
+});
+
 
   return {
     articles: articlesMap,
@@ -418,6 +432,7 @@ const updateUserPermissions = (state: WmsState): WmsState => {
         const permissions = state.roles.get(state.currentUser.roleId)?.permissions || null;
         return { ...state, currentUserPermissions: permissions };
     }
+    // If no user is logged in, permissions should be null.
     return { ...state, currentUserPermissions: null };
 };
 
@@ -1232,21 +1247,24 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
             roles: ROLES, 
             environments: ENVIRONMENTS,
             grillesTarifaires: GRILLES_TARIFAIRES,
+            currentUser: null,
+            currentUserPermissions: null,
         };
       }
       
       if (isMounted) {
-        dispatch({ type: 'SET_STATE', payload: finalState });
-
         const lastUser = localStorage.getItem('wmsLastUser');
         if (lastUser && finalState.users.has(lastUser)) {
-           dispatch({ type: 'REAUTHENTICATE_USER', payload: { username: lastUser } });
+           finalState.currentUser = finalState.users.get(lastUser) || null;
+           finalState = updateUserPermissions(finalState);
         }
         
         const lastEnv = localStorage.getItem('wmsLastEnv');
         if(lastEnv && finalState.environments.has(lastEnv)) {
-            dispatch({ type: 'SET_ENVIRONMENT', payload: { environmentId: lastEnv } });
+            finalState.currentEnvironmentId = lastEnv;
         }
+
+        dispatch({ type: 'SET_STATE', payload: finalState });
       }
 
     } catch (e) {
@@ -1262,7 +1280,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     // Only save to localStorage if the state is not the initial, undefined state
-    if (state !== undefined) {
+    if (state !== undefined && state.currentUser !== undefined) {
         try {
           const serializeMap = (map: Map<any, any>) => Array.from(map.entries());
 
@@ -1304,6 +1322,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
 
 
   const getArticleWithComputedStock = (articleId: string) => {
+    if (!state) return undefined;
     const article = state.articles.get(articleId);
     if (!article) return undefined;
 
@@ -1322,7 +1341,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
     return { ...article, stockReserver, stockDisponible };
   }
 
-  const contextValue = useMemo(() => ({
+  const contextValue = useMemo(() => (state ? {
     state,
     dispatch,
     getArticle: (id: string) => state.articles.get(id),
@@ -1330,7 +1349,11 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
     getDocument: (id: number) => state.documents.get(id),
     getClass: (id: number) => state.classes.get(id),
     getArticleWithComputedStock,
-  }), [state]);
+  } : undefined), [state]);
+
+  if (!contextValue) {
+    return null; // or a loading spinner
+  }
 
   return <WmsContext.Provider value={contextValue}>{children}</WmsContext.Provider>;
 };
