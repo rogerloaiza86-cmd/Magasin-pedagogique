@@ -117,8 +117,8 @@ function MainLayout({
             <div className="flex items-center gap-2 p-2">
               <Boxes className="h-8 w-8 text-primary" />
               <div>
-                <h1 className="text-lg font-bold">LogiSim Hub</h1>
-                <p className="text-xs text-muted-foreground">{currentEnv?.name}</p>
+                <h1 className="text-lg font-bold">Magasin Pédagogique</h1>
+                <p className="text-xs text-muted-foreground">Lycée Gaspard Monge</p>
               </div>
             </div>
           </SidebarHeader>
