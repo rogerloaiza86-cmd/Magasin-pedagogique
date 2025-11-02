@@ -352,6 +352,7 @@ export const getInitialState = (): WmsState => {
     environnementId: 'agence_transport'
   });
 
+
   return {
     articles: articlesMap,
     tiers: initialTiers,
@@ -1203,6 +1204,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(wmsReducer, undefined, getInitialState);
 
   useEffect(() => {
+    let isMounted = true;
     try {
       const savedStateJSON = localStorage.getItem('wmsState');
       const initialState = getInitialState();
@@ -1233,60 +1235,70 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
         };
       }
       
-      const lastUser = localStorage.getItem('wmsLastUser');
-      if (lastUser && finalState.users.has(lastUser)) {
-         dispatch({ type: 'REAUTHENTICATE_USER', payload: { username: lastUser } });
-      } else {
+      if (isMounted) {
         dispatch({ type: 'SET_STATE', payload: finalState });
-      }
-      
-      const lastEnv = localStorage.getItem('wmsLastEnv');
-      if(lastEnv && finalState.environments.has(lastEnv)) {
-          dispatch({ type: 'SET_ENVIRONMENT', payload: { environmentId: lastEnv } });
+
+        const lastUser = localStorage.getItem('wmsLastUser');
+        if (lastUser && finalState.users.has(lastUser)) {
+           dispatch({ type: 'REAUTHENTICATE_USER', payload: { username: lastUser } });
+        }
+        
+        const lastEnv = localStorage.getItem('wmsLastEnv');
+        if(lastEnv && finalState.environments.has(lastEnv)) {
+            dispatch({ type: 'SET_ENVIRONMENT', payload: { environmentId: lastEnv } });
+        }
       }
 
     } catch (e) {
       console.error("Could not load state from localStorage. Using initial state.", e);
-      dispatch({ type: 'SET_STATE', payload: getInitialState() });
+       if (isMounted) {
+        dispatch({ type: 'SET_STATE', payload: getInitialState() });
+      }
+    }
+    return () => {
+        isMounted = false;
     }
   }, []);
 
   useEffect(() => {
-    try {
-      const serializeMap = (map: Map<any, any>) => Array.from(map.entries());
+    // Only save to localStorage if the state is not the initial, undefined state
+    if (state !== undefined) {
+        try {
+          const serializeMap = (map: Map<any, any>) => Array.from(map.entries());
 
-      const stateToSave = {
-          ...state,
-          articles: serializeMap(state.articles),
-          tiers: serializeMap(state.tiers),
-          documents: serializeMap(state.documents),
-          users: serializeMap(state.users),
-          classes: serializeMap(state.classes),
-          emails: serializeMap(state.emails),
-          maintenances: serializeMap(state.maintenances),
-          scenarioTemplates: serializeMap(state.scenarioTemplates),
-          activeScenarios: serializeMap(state.activeScenarios),
-          tasks: serializeMap(state.tasks),
-          roles: undefined, 
-          environments: undefined,
-          grillesTarifaires: undefined,
-          currentUser: undefined, 
-          currentUserPermissions: undefined,
-      };
-      localStorage.setItem('wmsState', JSON.stringify(stateToSave));
+          const stateToSave = {
+              ...state,
+              articles: serializeMap(state.articles),
+              tiers: serializeMap(state.tiers),
+              documents: serializeMap(state.documents),
+              users: serializeMap(state.users),
+              classes: serializeMap(state.classes),
+              emails: serializeMap(state.emails),
+              maintenances: serializeMap(state.maintenances),
+              scenarioTemplates: serializeMap(state.scenarioTemplates),
+              activeScenarios: serializeMap(state.activeScenarios),
+              tasks: serializeMap(state.tasks),
+              roles: undefined, 
+              environments: undefined,
+              grillesTarifaires: undefined,
+              currentUser: undefined, 
+              currentUserPermissions: undefined,
+          };
+          localStorage.setItem('wmsState', JSON.stringify(stateToSave));
 
-      if (state.currentUser) {
-          localStorage.setItem('wmsLastUser', state.currentUser.username);
-      } else {
-          localStorage.removeItem('wmsLastUser');
-      }
+          if (state.currentUser) {
+              localStorage.setItem('wmsLastUser', state.currentUser.username);
+          } else {
+              localStorage.removeItem('wmsLastUser');
+          }
 
-      if (state.currentEnvironmentId) {
-        localStorage.setItem('wmsLastEnv', state.currentEnvironmentId);
-      }
+          if (state.currentEnvironmentId) {
+            localStorage.setItem('wmsLastEnv', state.currentEnvironmentId);
+          }
 
-    } catch (e) {
-      console.error("Could not save state to localStorage.", e);
+        } catch (e) {
+          console.error("Could not save state to localStorage.", e);
+        }
     }
   }, [state]);
 
