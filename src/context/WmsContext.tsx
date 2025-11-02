@@ -758,6 +758,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         stockAfter: newStock,
                         user: currentUser.username,
                         environnementId: state.currentEnvironmentId,
+                        documentId: docToUpdate.id,
                     });
                 } else if (line.returnDecision === 'Mettre au rebut') {
                     // Stock doesn't change, just log the event. Real-world might move to a different stock type.
@@ -770,6 +771,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         stockAfter: article.stock,
                         user: currentUser.username,
                         environnementId: state.currentEnvironmentId,
+                        documentId: docToUpdate.id,
                     });
                 }
             });
@@ -797,6 +799,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         stockAfter: newStock,
                         user: currentUser.username,
                         environnementId: state.currentEnvironmentId,
+                        documentId: docToUpdate.id,
                     });
 
                     // Handle non-conforming items
@@ -813,6 +816,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                                 stockAfter: updatedArticle.stock, // Stock isn't changing here, just status
                                 user: currentUser.username,
                                 environnementId: state.currentEnvironmentId,
+                                documentId: docToUpdate.id,
                             });
                         }
                     }
@@ -836,6 +840,7 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
                         stockAfter: newStock,
                         user: currentUser.username,
                         environnementId: state.currentEnvironmentId,
+                        documentId: docToUpdate.id,
                     });
                 }
             });
@@ -909,71 +914,75 @@ const wmsReducer = (state: WmsState, action: WmsAction): WmsState => {
         break;
     }
     case 'LAUNCH_SCENARIO': {
-      if (!state.currentUserPermissions?.canManageScenarios) return state;
-      const { templateId, classId } = action.payload;
-      const template = state.scenarioTemplates.get(templateId);
-      if (!template || !template.rolesRequis.length) return state;
-  
-      const newActiveScenarioId = state.activeScenarioIdCounter;
-      const newActiveScenarios = new Map(state.activeScenarios);
-      newActiveScenarios.set(newActiveScenarioId, {
-          id: newActiveScenarioId,
-          templateId,
-          classId,
-          status: 'running',
-          createdAt: new Date().toISOString(),
-          environnementId: template.environnementId,
-      });
-  
-      const studentsInClass = Array.from(state.users.values()).filter(u => u.classId === classId && u.profile === 'élève');
-      const rolesToAssign = template.rolesRequis;
-      const newUsers = new Map(state.users);
-      const newTasks = new Map(state.tasks);
-      let taskIdCounter = state.taskIdCounter;
-      let localCurrentUser = state.currentUser;
-      let localCurrentUserPermissions = state.currentUserPermissions;
-  
-      studentsInClass.forEach((student, index) => {
-          const roleId = rolesToAssign[index % rolesToAssign.length];
-          const updatedUser = { ...student, roleId };
-          newUsers.set(student.username, updatedUser);
-  
-          if (state.currentUser && state.currentUser.username === student.username) {
-              localCurrentUser = updatedUser;
-              localCurrentUserPermissions = state.roles.get(roleId)?.permissions || null;
-          }
-  
-          template.tasks.forEach(taskTemplate => {
-              if (taskTemplate.roleId === roleId) {
-                  const newTaskId = taskIdCounter++;
-                  newTasks.set(newTaskId, {
-                      id: newTaskId,
-                      scenarioId: newActiveScenarioId,
-                      userId: student.username,
-                      description: taskTemplate.description,
-                      taskType: taskTemplate.taskType,
-                      status: taskTemplate.prerequisiteTaskId ? 'blocked' : 'todo',
-                      details: taskTemplate.details,
-                      taskOrder: taskTemplate.taskOrder,
-                      prerequisiteTaskId: taskTemplate.prerequisiteTaskId,
-                      environnementId: taskTemplate.environnementId || template.environnementId,
-                  });
-              }
-          });
-      });
+        if (!state.currentUserPermissions?.canManageScenarios) return state;
+        const { templateId, classId } = action.payload;
+        const template = state.scenarioTemplates.get(templateId);
+        if (!template) return state;
 
-      newState = {
-          ...state,
-          activeScenarios: newActiveScenarios,
-          users: newUsers,
-          tasks: newTasks,
-          activeScenarioIdCounter: newActiveScenarioId + 1,
-          taskIdCounter,
-          currentUser: localCurrentUser,
-          currentUserPermissions: localCurrentUserPermissions
-      };
-      break;
-  }
+        const newActiveScenarioId = state.activeScenarioIdCounter;
+        const newActiveScenarios = new Map(state.activeScenarios);
+        newActiveScenarios.set(newActiveScenarioId, {
+            id: newActiveScenarioId,
+            templateId,
+            classId,
+            status: 'running',
+            createdAt: new Date().toISOString(),
+            environnementId: template.environnementId,
+        });
+
+        const studentsInClass = Array.from(state.users.values()).filter(u => u.classId === classId && u.profile === 'élève');
+        const rolesToAssign = template.rolesRequis;
+        const newUsers = new Map(state.users);
+        const newTasks = new Map(state.tasks);
+        let taskIdCounter = state.taskIdCounter;
+        let localCurrentUser = state.currentUser;
+        let localCurrentUserPermissions = state.currentUserPermissions;
+
+        if (rolesToAssign.length > 0) {
+            studentsInClass.forEach((student, index) => {
+                const roleId = rolesToAssign[index % rolesToAssign.length];
+                const updatedUser = { ...student, roleId };
+                newUsers.set(student.username, updatedUser);
+
+                if (state.currentUser && state.currentUser.username === student.username) {
+                    localCurrentUser = updatedUser;
+                    localCurrentUserPermissions = state.roles.get(roleId)?.permissions || null;
+                }
+            });
+        }
+
+        studentsInClass.forEach(student => {
+            template.tasks.forEach(taskTemplate => {
+                if (taskTemplate.roleId === newUsers.get(student.username)?.roleId) {
+                    const newTaskId = taskIdCounter++;
+                    newTasks.set(newTaskId, {
+                        id: newTaskId,
+                        scenarioId: newActiveScenarioId,
+                        userId: student.username,
+                        description: taskTemplate.description,
+                        taskType: taskTemplate.taskType,
+                        status: taskTemplate.prerequisiteTaskId ? 'blocked' : 'todo',
+                        details: taskTemplate.details,
+                        taskOrder: taskTemplate.taskOrder,
+                        prerequisiteTaskId: taskTemplate.prerequisiteTaskId,
+                        environnementId: taskTemplate.environnementId || template.environnementId,
+                    });
+                }
+            });
+        });
+
+        newState = {
+            ...state,
+            activeScenarios: newActiveScenarios,
+            users: newUsers,
+            tasks: newTasks,
+            activeScenarioIdCounter: newActiveScenarioId + 1,
+            taskIdCounter,
+            currentUser: localCurrentUser,
+            currentUserPermissions: localCurrentUserPermissions
+        };
+        break;
+    }
     case 'GENERATE_ARTICLES_BATCH': {
         if (!state.currentUserPermissions?.canManageStock || !state.currentUser) return state;
         const newArticlesMap = new Map(state.articles);
@@ -1256,7 +1265,7 @@ export const WmsProvider = ({ children }: { children: ReactNode }) => {
 
     let stockReserver = 0;
     for (const doc of state.documents.values()) {
-        if (doc.type === 'Bon de Livraison Client' && doc.status === 'En préparation') {
+        if (doc.type === 'Bon de Livraison Client' && doc.status === 'En préparation' && doc.environnementId === state.currentEnvironmentId) {
             for (const line of doc.lines) {
                 if (line.articleId === articleId) {
                     stockReserver += line.quantity;
