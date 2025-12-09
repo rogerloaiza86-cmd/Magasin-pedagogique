@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { Send, Inbox, Mail, ArrowLeft } from "lucide-react";
-import type { Email, User } from "@/lib/types";
+import type { Email } from "@/lib/types";
 
 type EmailFormData = {
   recipient: string;
@@ -230,5 +230,3 @@ export function MessagingClient() {
     </Tabs>
   );
 }
-
-    
