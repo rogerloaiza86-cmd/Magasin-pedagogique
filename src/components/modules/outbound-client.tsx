@@ -44,7 +44,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import type { WmsDocument } from "@/lib/types";
+import type { Document as WmsDocument } from "@/lib/types";
 import { useSearchParams } from "next/navigation";
 
 
@@ -59,10 +59,10 @@ function CreateDeliveryNote() {
   const { currentUser, currentEnvironmentId } = state;
   const [searchTerm, setSearchTerm] = useState("");
 
-  const clients = Array.from(state.tiers.values()).filter((t) => t.type === "Client" && t.createdBy === currentUser?.username && t.environnementId === currentEnvironmentId);
+  const clients = Array.from(state.tiers.values()).filter((t) => t.type === "Client" && t.environnementId === currentEnvironmentId);
   
   const allArticles = useMemo(() => 
-    Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId && a.stock > 0),
+    Array.from(state.articles.values()).filter(a => a.environnementId === currentEnvironmentId && a.stock > 0 && a.status === 'Actif'),
     [state.articles, currentEnvironmentId]
   );
   
@@ -87,10 +87,10 @@ function CreateDeliveryNote() {
     let hasError = false;
     data.lines.forEach((line, index) => {
       const article = getArticleWithComputedStock(line.articleId);
-      if (article && Number(line.quantity) > article.stockDisponible) {
+      if (!article || Number(line.quantity) > article.stockDisponible) {
         setError(`lines.${index}.quantity`, {
           type: "manual",
-          message: `Stock dispo. insuffisant (${article.stockDisponible} dispo.)`,
+          message: `Stock insuffisant (${article?.stockDisponible || 0} dispo.)`,
         });
         hasError = true;
       }
@@ -121,25 +121,25 @@ function CreateDeliveryNote() {
     reset();
   };
 
-  const handleQuantityChange = (index: number, value: string) => {
-    const articleId = watchedLines[index]?.articleId;
-    if (!articleId) return;
-    const article = getArticleWithComputedStock(articleId);
-    if (article && Number(value) > article.stockDisponible) {
-      setError(`lines.${index}.quantity`, {
-        type: 'manual',
-        message: `Stock dispo. insuffisant (${article.stockDisponible} dispo.)`,
-      });
-    } else {
-      clearErrors(`lines.${index}.quantity`);
-    }
-  };
+  const validateStock = (index: number, articleId: string, quantity: string) => {
+      if (!articleId) return;
+      const article = getArticleWithComputedStock(articleId);
+      if (article && Number(quantity) > article.stockDisponible) {
+        setError(`lines.${index}.quantity`, {
+          type: 'manual',
+          message: `Stock dispo. insuffisant (${article.stockDisponible} dispo.)`,
+        });
+      } else {
+        clearErrors(`lines.${index}.quantity`);
+      }
+  }
+
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Créer un Bon de Livraison (BL)</CardTitle>
-        <CardDescription>Créez une commande pour un client que vous avez créé. Le stock disponible sera vérifié.</CardDescription>
+        <CardDescription>Créez une commande pour un client. Le stock disponible sera vérifié.</CardDescription>
       </CardHeader>
       <CardContent>
         {clients.length === 0 ? (
@@ -171,13 +171,17 @@ function CreateDeliveryNote() {
               className="mb-2"
             />
             {fields.map((field, index) => {
-              const article = getArticleWithComputedStock(watchedLines[index]?.articleId);
+              const selectedArticleId = watchedLines[index]?.articleId;
+              const quantity = watchedLines[index]?.quantity;
               return (
               <div key={field.id} className="flex items-end gap-2 p-2 border rounded-lg bg-background">
                 <div className="flex-1">
                   <Controller name={`lines.${index}.articleId`} control={control} rules={{ required: "Article requis."}}
                     render={({ field }) => (
-                        <Select onValueChange={(value) => { field.onChange(value); clearErrors(`lines.${index}.quantity`); }} value={field.value}>
+                        <Select onValueChange={(value) => { 
+                            field.onChange(value);
+                            validateStock(index, value, quantity.toString());
+                         }} value={field.value}>
                             <SelectTrigger><SelectValue placeholder="Sélectionner un article..."/></SelectTrigger>
                             <SelectContent>
                                 {filteredArticles.map(a => <SelectItem key={a.id} value={a.id}>{a.name} (Stock dispo: {getArticleWithComputedStock(a.id)?.stockDisponible || 0})</SelectItem>)}
@@ -193,7 +197,7 @@ function CreateDeliveryNote() {
                     render={({ field }) => (
                       <Input type="number" min="1" {...field} onChange={(e) => {
                         field.onChange(e);
-                        handleQuantityChange(index, e.target.value);
+                        validateStock(index, selectedArticleId, e.target.value);
                       }}/>
                     )}
                   />
@@ -218,7 +222,7 @@ function PrepareOrder() {
   const { state, dispatch, getTier, getArticle } = useWms();
   const { toast } = useToast();
   const {currentUser, currentEnvironmentId} = state;
-  const pendingDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "En préparation" && d.environnementId === currentEnvironmentId).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
+  const pendingDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "En préparation" && d.environnementId === currentEnvironmentId);
   
   const [pickingList, setPickingList] = useState<any[] | null>(null);
   const [currentDoc, setCurrentDoc] = useState<WmsDocument | null>(null);
@@ -329,8 +333,8 @@ function ShipOrder() {
     const { state, dispatch, getTier, getArticle } = useWms();
     const { toast } = useToast();
     const {currentUser, currentEnvironmentId, users, roles} = state;
-    const transporters = Array.from(state.tiers.values()).filter(t => t.type === 'Transporteur' && t.environnementId === currentEnvironmentId).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
-    const shippableDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "Prêt pour expédition" && d.environnementId === currentEnvironmentId).filter(d => state.currentUserPermissions?.isSuperAdmin || d.createdBy === currentUser?.username);
+    const transporters = Array.from(state.tiers.values()).filter(t => t.type === 'Transporteur' && t.environnementId === currentEnvironmentId);
+    const shippableDNs = Array.from(state.documents.values()).filter((d) => d.type === "Bon de Livraison Client" && d.status === "Prêt pour expédition" && d.environnementId === currentEnvironmentId);
 
     const [selectedTransporter, setSelectedTransporter] = useState<string>("");
     const [finalDoc, setFinalDoc] = useState<{bl: WmsDocument, cmr: WmsDocument} | null>(null);
@@ -390,7 +394,7 @@ function ShipOrder() {
         <Card>
             <CardHeader><CardTitle>Expédier une Commande et Générer Documents</CardTitle><CardDescription>Finalisez l'expédition et générez le BL final et la Lettre de Voiture (CMR).</CardDescription></CardHeader>
             <CardContent>
-            {transporters.length === 0 ? (<p className="text-muted-foreground">Veuillez d'abord ajouter un transporteur que vous avez créé.</p>) : (
+            {transporters.length === 0 ? (<p className="text-muted-foreground">Veuillez d'abord ajouter un transporteur.</p>) : (
                 <div className="space-y-4">
                     <div>
                         <Label>Transporteur</Label>
@@ -493,3 +497,5 @@ export function OutboundClient() {
     </Tabs>
   );
 }
+
+    

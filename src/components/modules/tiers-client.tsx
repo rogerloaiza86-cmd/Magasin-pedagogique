@@ -85,19 +85,16 @@ export function TiersClient() {
   const { currentUser, currentUserPermissions, currentEnvironmentId } = state;
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const currentEnv = state.environments.get(currentEnvironmentId);
   
   const {
     control,
     handleSubmit,
     reset,
-    watch,
     formState: { errors },
   } = useForm<TierFormData>({
     defaultValues: { name: "", address: "", type: "Client" },
   });
   
-  const selectedType = watch("type");
 
   const onSubmit = (data: TierFormData) => {
     dispatch({ type: "ADD_TIER", payload: data });
@@ -110,7 +107,7 @@ export function TiersClient() {
   };
   
   const currentUserTiers = Array.from(state.tiers.values()).filter(
-    (tier) => tier.createdBy === currentUser?.username && tier.environnementId === currentEnvironmentId
+    (tier) => tier.environnementId === currentEnvironmentId
   );
 
   const clients = currentUserTiers.filter(t => t.type === 'Client');
@@ -124,7 +121,7 @@ export function TiersClient() {
         <div>
           <CardTitle>Gestion des Tiers</CardTitle>
           <CardDescription>
-            Consultez et ajoutez vos clients, fournisseurs et transporteurs pour cet environnement.
+            Consultez et ajoutez des clients, fournisseurs et transporteurs pour cet environnement.
           </CardDescription>
         </div>
         {currentUserPermissions?.canManageTiers && (
@@ -204,3 +201,5 @@ export function TiersClient() {
     </Card>
   );
 }
+
+    
